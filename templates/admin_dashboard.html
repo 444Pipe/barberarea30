@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin – Barber Freestyle</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FullCalendar: CSS principal + bundle global JS -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-bebas { font-family: 'Bebas Neue', cursive; }
+    .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+
+    /* Ajustes para móvil */
+    @media (max-width: 640px) {
+      nav .max-w-6xl { padding-left: 1rem; padding-right: 1rem; }
+      main .max-w-6xl { padding-left: 1rem; padding-right: 1rem; }
+
+      #admin-calendar .fc-toolbar-title {
+        font-size: 1rem;
+      }
+
+      #admin-calendar .fc-toolbar.fc-header-toolbar {
+        padding: 0.25rem 0;
+      }
+
+      #admin-calendar .fc-daygrid-day-number {
+        font-size: 0.65rem;
+      }
+
+      #admin-calendar .fc-event {
+        font-size: 0.6rem;
+        padding: 1px 2px;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-black text-white">
+  <nav class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-zinc-950 flex items-center justify-center border border-blue-500">
+          <span class="font-bebas text-lg tracking-widest text-white">BF</span>
+        </div>
+        <div>
+          <div class="font-bebas text-lg tracking-widest">BARBER<span class="text-amber-500">FREESTYLE</span></div>
+          <div class="text-[10px] font-rajdhani tracking-[0.25em] uppercase text-zinc-500">Panel Administrativo</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 text-xs font-rajdhani tracking-[0.2em] uppercase">
+        <a href="/" class="text-zinc-400 hover:text-white">Ver sitio</a>
+        <a href="{{ url_for('admin_logout') }}" class="text-red-400 hover:text-red-300">Salir</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <!-- Navbar de vistas admin -->
+    <div class="mb-6 flex justify-between items-center">
+      <div class="inline-flex rounded-xl bg-zinc-950 border border-zinc-800 p-1 text-xs font-rajdhani uppercase tracking-[0.2em]">
+        <button type="button" data-admin-view="reservas" class="px-4 py-1.5 rounded-lg bg-amber-500 text-black font-semibold shadow-sm">Reservas</button>
+        <button type="button" data-admin-view="dashboard" class="px-4 py-1.5 rounded-lg text-zinc-400 hover:text-white">Dashboard</button>
+        <button type="button" data-admin-view="calendar" class="px-4 py-1.5 rounded-lg text-zinc-400 hover:text-white">Calendario</button>
+      </div>
+    </div>
+
+    <!-- Métricas (Dashboard y Reservas) -->
+    <section data-view-section="dashboard,reservas" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+        <div class="text-xs font-rajdhani tracking-[0.25em] uppercase text-zinc-500 mb-1">Ingresos totales</div>
+        <div class="text-2xl font-semibold text-amber-400">${{ '{:,}'.format(total_ingresos).replace(',', '.') }} COP</div>
+        <p class="text-xs text-zinc-500 mt-1">Sólo reservas marcadas como completadas</p>
+      </div>
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+        <div class="text-xs font-rajdhani tracking-[0.25em] uppercase text-zinc-500 mb-1">Cortes completados</div>
+        <div class="text-2xl font-semibold">{{ total_cortes }}</div>
+        <p class="text-xs text-zinc-500 mt-1">Total histórico</p>
+      </div>
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+        <div class="text-xs font-rajdhani tracking-[0.25em] uppercase text-zinc-500 mb-1">Promedio por corte</div>
+        <div class="text-2xl font-semibold text-emerald-400">${{ '{:,}'.format(promedio_por_corte).replace(',', '.') }} COP</div>
+        <p class="text-xs text-zinc-500 mt-1">Ingresos totales / cortes completados</p>
+      </div>
+    </section>
+
+    <!-- Calendario (solo vista Calendario) -->
+    <section data-view-section="calendar" class="mb-8 hidden">
+      <div class="bg-zinc-950 border border-zinc-900 rounded-2xl p-4">
+        <div class="mb-3">
+          <h2 class="font-rajdhani text-sm tracking-[0.3em] uppercase text-zinc-400">Calendario</h2>
+          <p class="text-xs text-zinc-500">Vista mensual de las reservas registradas</p>
+        </div>
+        <div id="admin-calendar" class="text-xs"></div>
+      </div>
+    </section>
+
+    <!-- Gráfica de ingresos (solo Dashboard) -->
+    <section data-view-section="dashboard" class="mb-8">
+      <div class="bg-zinc-950 border border-zinc-900 rounded-2xl p-4">
+        <div class="mb-3">
+          <h2 class="font-rajdhani text-sm tracking-[0.3em] uppercase text-zinc-400">Ingresos mensuales</h2>
+          <p class="text-xs text-zinc-500">Comparación de ingresos por mes (solo completados)</p>
+        </div>
+        <div class="h-64">
+          <canvas id="incomeChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabla de reservas (vista Reservas) -->
+    <section data-view-section="reservas" class="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden hidden">
+      <div class="px-4 py-3 border-b border-zinc-900 flex items-center justify-between">
+        <div>
+          <h2 class="font-rajdhani text-sm tracking-[0.3em] uppercase text-zinc-400">Reservas</h2>
+          <p class="text-xs text-zinc-500">Histórico de solicitudes de cita</p>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-xs">
+          <thead class="bg-zinc-900/80 text-zinc-400 font-rajdhani uppercase tracking-[0.2em]">
+            <tr>
+              <th class="px-3 py-2 text-left">ID</th>
+              <th class="px-3 py-2 text-left">Cliente</th>
+              <th class="px-3 py-2 text-left">Contacto</th>
+              <th class="px-3 py-2 text-left">Servicio</th>
+              <th class="px-3 py-2 text-left">Fecha</th>
+              <th class="px-3 py-2 text-left">Hora</th>
+              <th class="px-3 py-2 text-left">Precio</th>
+              <th class="px-3 py-2 text-left">Estado</th>
+              <th class="px-3 py-2 text-left">Creado</th>
+              <th class="px-3 py-2 text-left">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-900">
+            {% for b in bookings %}
+              <tr class="hover:bg-zinc-900/60">
+                <td class="px-3 py-2 text-zinc-500">#{{ b.id }}</td>
+                <td class="px-3 py-2">
+                  <div class="text-zinc-100">{{ b.name }}</div>
+                  {% if b.email %}
+                    <div class="text-[11px] text-zinc-500">{{ b.email }}</div>
+                  {% endif %}
+                </td>
+                <td class="px-3 py-2 text-[11px] text-zinc-400">
+                  {{ b.phone }}
+                </td>
+                <td class="px-3 py-2">
+                  <div class="text-zinc-100 text-xs">{{ b.service_name }}</div>
+                  <div class="text-[10px] text-zinc-500">{{ b.service_slug }}</div>
+                </td>
+                <td class="px-3 py-2 text-[11px] text-zinc-200">{{ b.date }}</td>
+                <td class="px-3 py-2 text-[11px] text-zinc-200">{{ b.time|time_12h }}</td>
+                <td class="px-3 py-2 text-[11px] text-emerald-400 font-medium">
+                  ${{ '{:,}'.format(b.price).replace(',', '.') }}
+                </td>
+                <td class="px-3 py-2">
+                  {% if b.status == 'completado' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300 text-[11px]">Completado</span>
+                  {% elif b.status == 'cancelado' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 text-[11px]">Cancelado</span>
+                  {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 text-[11px]">Pendiente</span>
+                  {% endif %}
+                </td>
+                <td class="px-3 py-2 text-[10px] text-zinc-500">
+                  {{ b.created_at }}
+                  {% if b.completed_at %}<br><span class="text-emerald-400">{{ b.completed_at }}</span>{% endif %}
+                </td>
+                <td class="px-3 py-2 text-[11px]">
+                  <div class="flex flex-col gap-1">
+                    {% if b.status != 'completado' %}
+                      <form method="post" action="{{ url_for('admin_complete_booking', booking_id=b.id) }}">
+                        <button class="w-full px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Marcar completado</button>
+                      </form>
+                    {% endif %}
+                    {% if b.status != 'cancelado' %}
+                      <form method="post" action="{{ url_for('admin_cancel_booking', booking_id=b.id) }}">
+                        <button class="w-full px-2 py-1 rounded bg-red-700/80 hover:bg-red-700 text-white">Cancelar</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="10" class="px-3 py-6 text-center text-sm text-zinc-500">Aún no hay reservas registradas.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal detalle de reserva -->
+  <div id="booking-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+    <div class="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg mx-4 shadow-xl">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
+        <div>
+          <h3 class="font-rajdhani text-sm tracking-[0.3em] uppercase text-zinc-400">Detalle de reserva</h3>
+          <p id="modal-reserva-id" class="text-[11px] text-zinc-500"></p>
+        </div>
+        <button type="button" id="modal-close" class="text-zinc-500 hover:text-zinc-200 text-sm">✕</button>
+      </div>
+      <div class="px-5 py-4 text-sm">
+        <dl class="space-y-2">
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Cliente</dt>
+            <dd id="modal-cliente" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Contacto</dt>
+            <dd id="modal-contacto" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Servicio</dt>
+            <dd id="modal-servicio" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Fecha</dt>
+            <dd id="modal-fecha" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Hora</dt>
+            <dd id="modal-hora" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Estado</dt>
+            <dd id="modal-estado" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Precio</dt>
+            <dd id="modal-precio" class="text-emerald-400 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-zinc-500">Creado</dt>
+            <dd id="modal-creado" class="text-zinc-100 text-right"></dd>
+          </div>
+          <div class="flex justify-between gap-4" id="modal-completado-row" style="display:none">
+            <dt class="text-zinc-500">Completado</dt>
+            <dd id="modal-completado" class="text-emerald-400 text-right"></dd>
+          </div>
+        </dl>
+        <div class="mt-4">
+          <p class="text-zinc-500 text-xs mb-1">Notas</p>
+          <p id="modal-notas" class="text-[13px] text-zinc-200 whitespace-pre-line"></p>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-zinc-800 flex justify-end">
+        <button type="button" id="modal-close-bottom" class="px-4 py-1.5 rounded-lg bg-zinc-800 text-xs font-rajdhani tracking-[0.2em] uppercase text-zinc-200 hover:bg-zinc-700">Cerrar</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // ----- Cambio de vistas (Dashboard / Calendario / Reservas) -----
+      const viewButtons = document.querySelectorAll('[data-admin-view]');
+      const viewSections = document.querySelectorAll('[data-view-section]');
+
+      const calendarEl = document.getElementById('admin-calendar');
+      const calendarEvents = {{ calendar_events | tojson }};
+      let calendar = null;
+
+      // Modal elementos
+      const modal = document.getElementById('booking-modal');
+      const modalClose = document.getElementById('modal-close');
+      const modalCloseBottom = document.getElementById('modal-close-bottom');
+      const modalReservaId = document.getElementById('modal-reserva-id');
+      const modalCliente = document.getElementById('modal-cliente');
+      const modalContacto = document.getElementById('modal-contacto');
+      const modalServicio = document.getElementById('modal-servicio');
+      const modalFecha = document.getElementById('modal-fecha');
+      const modalHora = document.getElementById('modal-hora');
+      const modalEstado = document.getElementById('modal-estado');
+      const modalPrecio = document.getElementById('modal-precio');
+      const modalCreado = document.getElementById('modal-creado');
+      const modalCompletadoRow = document.getElementById('modal-completado-row');
+      const modalCompletado = document.getElementById('modal-completado');
+      const modalNotas = document.getElementById('modal-notas');
+
+      function formatearHora12(timeStr) {
+        if (!timeStr) return '';
+        const [h, m] = timeStr.split(':');
+        if (h === undefined || m === undefined) return timeStr;
+        let hourNum = parseInt(h, 10);
+        if (Number.isNaN(hourNum)) return timeStr;
+        const sufijo = hourNum >= 12 ? 'p.m.' : 'a.m.';
+        hourNum = hourNum % 12;
+        if (hourNum === 0) hourNum = 12;
+        return `${hourNum}:${m.padStart(2, '0')} ${sufijo}`;
+      }
+
+      function abrirModal(data) {
+        if (!modal) return;
+        modalReservaId.textContent = data.id ? `Reserva #${data.id}` : '';
+        modalCliente.textContent = data.name || '';
+        modalContacto.textContent = [data.phone || '', data.email || ''].filter(Boolean).join(' · ');
+        modalServicio.textContent = data.service_name || '';
+        modalFecha.textContent = data.date || '';
+        modalHora.textContent = formatearHora12(data.time || '');
+        modalEstado.textContent = data.status || '';
+        if (typeof data.price === 'number') {
+          modalPrecio.textContent = '$' + data.price.toLocaleString('es-CO') + ' COP';
+        } else {
+          modalPrecio.textContent = '';
+        }
+        modalCreado.textContent = data.created_at || '';
+        if (data.completed_at) {
+          modalCompletadoRow.style.display = '';
+          modalCompletado.textContent = data.completed_at;
+        } else {
+          modalCompletadoRow.style.display = 'none';
+          modalCompletado.textContent = '';
+        }
+        modalNotas.textContent = data.notes || '—';
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+      }
+
+      function cerrarModal() {
+        if (!modal) return;
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+      }
+
+      function ensureCalendar() {
+        if (!calendarEl || !window.FullCalendar) return;
+        if (!calendar) {
+          calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: window.innerWidth < 640 ? 'listWeek' : 'dayGridMonth',
+            height: window.innerWidth < 640 ? 'auto' : 430,
+            locale: 'es',
+            headerToolbar: {
+              left: window.innerWidth < 640 ? 'prev,next' : 'prev,next today',
+              center: 'title',
+              right: window.innerWidth < 640 ? '' : 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            events: calendarEvents.map(ev => ({
+              title: ev.title,
+              start: ev.time ? `${ev.date}T${ev.time}` : ev.date,
+              extendedProps: ev,
+            })),
+            eventClick: function (info) {
+              info.jsEvent.preventDefault();
+              abrirModal(info.event.extendedProps || {});
+            },
+            eventDidMount: function (info) {
+              const status = info.event.extendedProps.status;
+              let bg = '#fbbf24';
+              if (status === 'completado') bg = '#22c55e';
+              else if (status === 'cancelado') bg = '#ef4444';
+
+              info.el.style.backgroundColor = bg;
+              info.el.style.borderColor = bg;
+              info.el.style.color = '#020617';
+            }
+          });
+        }
+        calendar.render();
+        calendar.updateSize();
+      }
+
+      function setView(view) {
+        viewSections.forEach(sec => {
+          const views = sec.dataset.viewSection.split(',');
+          const shouldShow = views.includes(view);
+          sec.classList.toggle('hidden', !shouldShow);
+        });
+
+        viewButtons.forEach(btn => {
+          const isActive = btn.dataset.adminView === view;
+          btn.classList.toggle('bg-amber-500', isActive);
+          btn.classList.toggle('text-black', isActive);
+          btn.classList.toggle('font-semibold', isActive);
+          btn.classList.toggle('shadow-sm', isActive);
+          btn.classList.toggle('text-zinc-400', !isActive);
+        });
+
+        if (view === 'calendar') {
+          ensureCalendar();
+        }
+      }
+
+      viewButtons.forEach(btn => {
+        btn.addEventListener('click', () => setView(btn.dataset.adminView));
+      });
+
+      // Vista inicial: prioridad Reservas
+      setView('reservas');
+
+      // Eventos de cierre de modal
+      if (modalClose) modalClose.addEventListener('click', cerrarModal);
+      if (modalCloseBottom) modalCloseBottom.addEventListener('click', cerrarModal);
+      if (modal) {
+        modal.addEventListener('click', function (e) {
+          if (e.target === modal) cerrarModal();
+        });
+      }
+      
+
+      const ctx = document.getElementById('incomeChart');
+      const monthlyLabels = {{ monthly_labels | tojson }};
+      const monthlyTotals = {{ monthly_totals | tojson }};
+
+      if (ctx && Array.isArray(monthlyLabels) && monthlyLabels.length) {
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: monthlyLabels,
+            datasets: [{
+              label: 'Ingresos (COP)',
+              data: monthlyTotals,
+              backgroundColor: 'rgba(34, 197, 94, 0.5)',
+              borderColor: 'rgb(34, 197, 94)',
+              borderWidth: 1,
+              borderRadius: 4
+            }]
+          },
+          options: {
+            plugins: {
+              legend: {
+                labels: { color: '#9ca3af', font: { size: 11 } }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    const value = context.parsed.y || 0;
+                    return ' $' + value.toLocaleString('es-CO') + ' COP';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#9ca3af', font: { size: 10 } },
+                grid: { display: false }
+              },
+              y: {
+                ticks: {
+                  color: '#6b7280',
+                  font: { size: 10 },
+                  callback: function (value) {
+                    return '$' + value.toLocaleString('es-CO');
+                  }
+                },
+                grid: { color: '#27272a' }
+              }
+            }
+          }
+        });
+      } else if (ctx) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.textContent = 'Aún no hay datos de ingresos completados.';
+        emptyMsg.className = 'text-xs text-zinc-500 mt-2';
+        ctx.parentElement.appendChild(emptyMsg);
+      }
+    });
+  </script>
+</body>
+</html>

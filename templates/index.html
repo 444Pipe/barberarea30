@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Área 30 Barber Club - La Excelencia en Grooming en Restrepo</title>
+
+  <!-- Google Fonts: Playfair Display & Montserrat -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: {
+              DEFAULT: '#D4AF37',
+              dark: '#b39129',
+              light: '#f3d97f'
+            },
+            jet: {
+              DEFAULT: '#0A0A0A',
+              card: '#111111',
+              lighter: '#1a1a1a'
+            },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
+
+  <!-- Navegación -->
+  <nav class="fixed w-full top-0 z-50 bg-jet/80 backdrop-blur-md border-b border-gold/10 transition-all duration-500"
+    id="navbar">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+
+      <!-- Logo -->
+      <a href="/" class="flex flex-col items-center justify-center group">
+        <div
+          class="text-3xl font-serif font-bold tracking-widest text-gold group-hover:text-gold-light transition-colors">
+          ÁREA 30
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <div class="h-[1px] w-6 bg-gold/50"></div>
+          <span class="text-[0.65rem] tracking-[0.3em] font-light text-smoke/80 uppercase">Barber Club</span>
+          <div class="h-[1px] w-6 bg-gold/50"></div>
+        </div>
+      </a>
+
+      <!-- Desktop Links -->
+      <div class="hidden md:flex gap-8 items-center">
+        <a href="#el-club" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">El Club</a>
+        <a href="#servicios" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Grooming</a>
+        <a href="gallery.html" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Galería</a>
+        <a href="#testimonios" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Experiencia</a>
+        <a href="booking.html" class="px-6 py-2.5 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm">Reserva tu Cita</a>
+      </div>
+
+      <!-- Mobile Button -->
+      <button class="md:hidden p-2 text-gold hover:text-gold-light transition-colors" id="menu-toggle">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden bg-jet-lighter border-t border-gold/20 px-4 py-6 shadow-2xl">
+      <a href="#el-club" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">El Club</a>
+      <a href="#servicios" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Grooming</a>
+      <a href="gallery.html" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Galería</a>
+      <a href="#testimonios" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Experiencia</a>
+      <a href="booking.html" class="block mt-6 px-4 py-3 gold-btn text-xs tracking-widest uppercase font-semibold text-center rounded-sm mx-8">Reserva tu Cita</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section Rediseñado -->
+  <section class="hero-section relative min-h-screen flex items-center justify-center px-4 overflow-hidden pt-20">
+    <!-- Background Image with Parallax & Lujo -->
+    <div class="absolute inset-0 z-0">
+      <img src="/static/images/hero_luxury.png" alt="Área 30 Club" class="w-full h-full object-cover scale-110">
+      <div class="absolute inset-0 bg-gradient-to-r from-jet via-jet/40 to-transparent z-10"></div>
+      <div class="absolute inset-0 bg-gradient-to-b from-jet/60 via-transparent to-jet z-10"></div>
+      <div class="absolute top-1/2 left-0 w-full h-1/2 bg-gold/5 blur-[120px] -translate-y-1/2 z-10"></div>
+    </div>
+
+    <div class="relative z-20 max-w-6xl mx-auto w-full">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div class="lg:col-span-8 text-left fade-in-up">
+           <div class="flex items-center gap-4 mb-8">
+              <div class="h-[1px] w-16 bg-gold"></div>
+              <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold select-none">Est. 2018 | RESTREPO</span>
+           </div>
+
+           <h1 class="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-serif font-bold mb-8 leading-[0.9] text-white tracking-tighter drop-shadow-2xl">
+              Elevamos tu <br>
+              <span class="text-gold italic font-light drop-shadow-none">Identidad.</span>
+           </h1>
+
+           <p class="text-lg md:text-xl text-smoke/90 mb-12 max-w-xl font-light leading-relaxed">
+              Área 30 Barber Club no es una barbería rústica. Es el santuario donde la precisión milimétrica se une al lujo 5 estrellas para tallar tu mejor legado en Restrepo.
+           </p>
+
+           <div class="flex flex-col sm:flex-row gap-8 items-start">
+             <a href="booking.html" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn">
+               <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold">Reserva Tu Lugar</span>
+               <div class="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></div>
+             </a>
+             <a href="#servicios" class="group flex items-center gap-4 text-xs tracking-[0.3em] uppercase font-bold text-smoke/60 hover:text-gold transition-all py-5">
+               Ver Grooming Menu
+               <span class="w-12 h-[1px] bg-smoke/20 group-hover:bg-gold group-hover:w-20 transition-all duration-500"></span>
+             </a>
+           </div>
+        </div>
+
+        <div class="hidden lg:flex lg:col-span-4 justify-end fade-in-up" style="transition-delay: 200ms;">
+           <div class="border-l border-gold/20 pl-10 py-4 h-fit">
+              <div class="flex gap-2 mb-6 text-gold text-lg">
+                <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+              </div>
+              <p class="text-smoke/40 text-[0.6rem] tracking-[0.4em] uppercase font-bold mb-4">Membresía Elite</p>
+              <p class="text-smoke/60 text-sm italic font-serif leading-relaxed">"La excelencia no es un acto, es el hábito que define a un caballero."</p>
+           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 hidden md:flex flex-col items-center gap-6 opacity-40">
+       <span class="text-[0.6rem] tracking-[0.5em] uppercase text-smoke/50 font-bold rotate-90 mb-10 origin-center">Scroll</span>
+       <div class="w-[1px] h-24 bg-gradient-to-b from-gold to-transparent"></div>
+    </div>
+  </section>
+
+  <!-- El Club -->
+  <section id="el-club" class="py-32 px-4 bg-jet relative border-t border-gold/5">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center fade-in-up">
+        <div class="order-2 lg:order-1 relative">
+          <div class="absolute -inset-4 border border-gold/20 rounded-sm transform translate-x-4 -translate-y-4"></div>
+          <div class="aspect-[4/5] bg-jet border border-white/5 relative z-10 flex items-center justify-center overflow-hidden group">
+            <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10 duration-500"></div>
+            <img src="/static/images/area30_silla.jpeg" alt="Interior VIP Área 30" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
+          </div>
+        </div>
+        <div class="order-1 lg:order-2">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="h-[1px] w-12 bg-gold"></div>
+            <span class="text-gold tracking-widest uppercase text-sm font-semibold">Concepto 5 Estrellas</span>
+          </div>
+          <h2 class="text-5xl lg:text-7xl font-serif font-bold mb-8 text-white tracking-tight">
+            Un Espacio de <span class="text-gold italic font-light">Estatus.</span>
+          </h2>
+          <p class="text-smoke/70 leading-relaxed font-light mb-6 text-xl">
+             En Área 30, no cortamos el pelo. Esculpimos identidades. Dejamos atrás lo rústico para abrazar la elegancia de un club privado donde la pulcritud y el lujo son la única norma en Restrepo.
+          </p>
+          <div class="grid grid-cols-2 gap-12 border-t border-gold/20 pt-10 mt-10">
+            <div>
+              <div class="text-4xl font-serif text-gold mb-3">01</div>
+              <h4 class="text-white font-bold mb-2 uppercase tracking-widest text-xs">Precisión Exacta</h4>
+              <p class="text-smoke/50 text-xs font-light tracking-wide uppercase">Maestría en cada trazo.</p>
+            </div>
+            <div>
+              <div class="text-4xl font-serif text-gold mb-3">02</div>
+              <h4 class="text-white font-bold mb-2 uppercase tracking-widest text-xs">Exclusividad</h4>
+              <p class="text-smoke/50 text-xs font-light tracking-wide uppercase">Solo para caballeros exigentes.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Menú de Servicios -->
+  <section id="servicios" class="py-32 px-4 bg-jet-lighter relative border-y border-gold/5">
+    <div class="max-w-7xl mx-auto text-center">
+        <h2 class="text-5xl md:text-7xl font-serif font-bold text-white tracking-tight mb-20">
+           Servicios <span class="italic text-gold font-light">Elite.</span>
+        </h2>
+        <!-- (Rest of services as before) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60">
+              <div class="flex justify-between items-start mb-8">
+                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Corte Imperial</h3>
+                <span class="text-gold font-medium tracking-widest">$30k</span>
+              </div>
+              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Asesoría visajista, precisión milimétrica y acabado impecable."</p>
+              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
+            </div>
+            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up border-gold/40 bg-jet shadow-2xl" style="transition-delay: 100ms;">
+              <div class="flex justify-between items-start mb-8">
+                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Club Experience</h3>
+                <span class="text-gold font-medium tracking-widest">$60k</span>
+              </div>
+              <p class="text-smoke/70 font-light text-sm mb-10 leading-relaxed">Nuestro ritual insignia: Corte imperial, arreglo de barba ritual, vapor ozono y mascarilla.</p>
+              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
+            </div>
+            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60" style="transition-delay: 200ms;">
+              <div class="flex justify-between items-start mb-8">
+                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Ritual de Barba</h3>
+                <span class="text-gold font-medium tracking-widest">$25k</span>
+              </div>
+              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Perfilación a navaja, toallas calientes aromáticas y aceites."</p>
+              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
+            </div>
+        </div>
+    </div>
+  </section>
+
+  <!-- Testimonios -->
+  <!-- ... (Testimonios as before) ... -->
+
+  <!-- Mapa Panorámico Dinámico -->
+  <section class="bg-jet py-32 px-4 overflow-hidden border-t border-gold/5 relative">
+    <!-- Luz de fondo sutil que reacciona indirectamente -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-64 bg-gold/5 blur-[120px] pointer-events-none"></div>
+
+    <div class="max-w-6xl mx-auto relative z-10">
+       <div class="flex items-center gap-6 mb-16">
+          <div class="flex flex-col">
+            <span class="text-gold tracking-[0.6em] uppercase text-[0.65rem] font-black mb-2 select-none">// ENCONTRÁNOS AQUÍ</span>
+            <div class="h-[2px] w-24 bg-gradient-to-r from-gold to-transparent"></div>
+          </div>
+          <div class="h-[1px] flex-grow bg-white/5"></div>
+       </div>
+       
+       <!-- Contenedor del Mapa con borde dinámico y amigable -->
+       <div class="relative group p-1 sm:p-2 bg-gradient-to-br from-gold/30 via-transparent to-gold/30 rounded-[2.5rem] transition-all duration-700 hover:shadow-[0_0_50px_rgba(212,175,55,0.15)]">
+          <div class="w-full h-[500px] rounded-[2rem] overflow-hidden border border-white/10 relative shadow-2xl transition-transform duration-700 group-hover:scale-[1.01]">
+             <div class="absolute inset-0 bg-gold/5 pointer-events-none z-10 group-hover:opacity-0 transition-opacity duration-700"></div>
+             <!-- Overlay de brillo al hover -->
+             <div class="absolute inset-0 bg-gradient-to-tr from-gold/0 via-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none z-20"></div>
+             
+             <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d497.35027840786654!2d-73.5609166!3d4.2586784!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e3fd300366cd1c3%3A0x13be8592885001d8!2s%C3%81rea%2030%20Barber%20Club!5e0!3m2!1ses!2sco!4v1774390658548!5m2!1ses!2sco" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          </div>
+          
+          <!-- Elementos decorativos en las esquinas -->
+          <div class="absolute -top-4 -left-4 w-12 h-12 border-t-2 border-l-2 border-gold/40 rounded-tl-3xl pointer-events-none group-hover:scale-110 transition-transform duration-500"></div>
+          <div class="absolute -bottom-4 -right-4 w-12 h-12 border-b-2 border-r-2 border-gold/40 rounded-br-3xl pointer-events-none group-hover:scale-110 transition-transform duration-500"></div>
+       </div>
+    </div>
+  </section>
+
+  <!-- Footer de Lujo Rediseñado Final -->
+  <footer class="bg-black pt-24 pb-12 px-4 border-t border-white/5">
+    <div class="max-w-7xl mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-16 mb-24">
+        
+        <div class="lg:col-span-4 pr-8">
+          <div class="text-4xl font-serif font-bold tracking-[0.2em] text-gold mb-6 uppercase">ÁREA 30</div>
+          <p class="text-smoke/60 text-sm font-light leading-relaxed mb-8">
+            Más que una barbería, un club privado donde la excelencia y la identidad masculina se encuentran. Bienvenidos a la élite del grooming en Restrepo.
+          </p>
+          <div class="flex gap-4">
+            <a href="https://www.instagram.com/area30barberclub" target="_blank" class="w-10 h-10 rounded-full border border-gold/20 flex items-center justify-center text-smoke/40 hover:text-gold hover:border-gold transition-all duration-300">
+               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            </a>
+            <a href="https://www.tiktok.com/@area30barberclub" target="_blank" class="w-10 h-10 rounded-full border border-gold/20 flex items-center justify-center text-smoke/40 hover:text-gold hover:border-gold transition-all duration-300">
+               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.86-.6-4.12-1.31a6.34 6.34 0 0 1-2.02-1.84v9.33c.02 1.44-.32 2.91-1.03 4.15a6.52 6.52 0 0 1-9 2.5 6.52 6.52 0 0 1-2.5-9 6.52 6.52 0 0 1 9-2.5v4.1c-1.31-.67-3.03-.43-4.1.58a2.44 2.44 0 0 0-.65 2.14 2.44 2.44 0 0 0 2.14 2.14 2.44 2.44 0 0 0 2.14-.65c.65-.65.89-1.6.65-2.5v-13z"/></svg>
+            </a>
+            <a href="https://wa.me/573124879250" target="_blank" class="w-10 h-10 rounded-full border border-gold/20 flex items-center justify-center text-smoke/40 hover:text-gold hover:border-gold transition-all duration-300">
+               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-12">
+          <div>
+            <h4 class="text-white font-serif tracking-widest mb-10 uppercase text-xs">Ubicación</h4>
+            <p class="text-smoke/60 text-lg font-serif mb-4">C.C. Sunrise, Restrepo - Meta</p>
+            <p class="text-gold/80 text-sm font-light italic mb-8">"Más que una barbería, un club 💈"</p>
+            
+            <h4 class="text-white font-serif tracking-widest mb-8 uppercase text-xs">Horario Elite</h4>
+            <div class="space-y-4 text-smoke/40 text-xs">
+              <div class="flex justify-between border-b border-white/5 pb-2">
+                <span>Lunes - Sábado</span>
+                <span class="text-gold">09:00 - 20:00</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Domingos</span>
+                <span class="text-gold">09:00 - 14:00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center sm:flex sm:justify-between sm:text-left text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">
+        <p>&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
+        <div class="mt-4 sm:mt-0 flex gap-6 justify-center">
+          <a href="#" class="hover:text-gold transition-colors">Términos</a>
+          <a href="#" class="hover:text-gold transition-colors">Privacidad</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Botón Flotante de Redes Sociales (FAB) -->
+  <div class="fab-container">
+    <div id="fab-list" class="fab-social-list">
+      <a href="https://wa.me/573124879250" target="_blank" class="social-item" data-label="WhatsApp">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      </a>
+      <a href="https://www.instagram.com/area30barberclub" target="_blank" class="social-item" data-label="Instagram">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      </a>
+      <a href="https://www.tiktok.com/@area30barberclub" target="_blank" class="social-item" data-label="TikTok">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.86-.6-4.12-1.31a6.34 6.34 0 0 1-2.02-1.84v9.33c.02 1.44-.32 2.91-1.03 4.15a6.52 6.52 0 0 1-9 2.5 6.52 6.52 0 0 1-2.5-9 6.52 6.52 0 0 1 9-2.5v4.1c-1.31-.67-3.03-.43-4.1.58a2.44 2.44 0 0 0-.65 2.14 2.44 2.44 0 0 0 2.14 2.14 2.44 2.44 0 0 0 2.14-.65c.65-.65.89-1.6.65-2.5v-13z"/></svg>
+      </a>
+    </div>
+    <button id="fab-main" class="fab-main">
+      30
+    </button>
+  </div>
+
+  <script>
+    // Toggle FAB
+    const fabMain = document.getElementById('fab-main');
+    const fabList = document.getElementById('fab-list');
+    
+    fabMain.addEventListener('click', () => {
+      fabList.classList.toggle('active');
+    });
+
+    // Close FAB when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.fab-container')) {
+        fabList.classList.remove('active');
+      }
+    });
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('mobile-menu').classList.toggle('hidden');
+    });
+    window.addEventListener('scroll', () => {
+      const nav = document.getElementById('navbar');
+      if (window.scrollY > 50) {
+        nav.classList.add('py-2', 'bg-jet/95', 'shadow-2xl');
+      } else {
+        nav.classList.remove('py-2', 'bg-jet/95', 'shadow-2xl');
+      }
+    });
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
