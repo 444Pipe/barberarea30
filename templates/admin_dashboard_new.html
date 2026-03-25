@@ -38,6 +38,28 @@
     .fc-event { background: #D4AF37 !important; border-color: #D4AF37 !important; }
     .fc-event-title { color: #0A0A0A !important; }
     .fc-toolbar-title { color: #D4AF37 !important; }
+    
+    @media (max-width: 768px) {
+      body {
+        font-size: 0.9rem;
+      }
+
+      nav .max-w-7xl > div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      #calendar {
+        height: 420px !important;
+      }
+
+      .fc-toolbar.fc-header-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+    }
   </style>
 </head>
 
