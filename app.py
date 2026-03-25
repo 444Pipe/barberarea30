@@ -16,7 +16,9 @@ from email.message import EmailMessage
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'bookings.db')
+# Permite sobreescribir la ruta de la base de datos vía variable de entorno
+# útil para usar volúmenes persistentes en plataformas como Railway.
+DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, 'bookings.db'))
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-dev-secret')
@@ -534,9 +536,13 @@ def api_admin_stats():
     })
 
 
+# Aseguramos que la base de datos y la tabla existan también cuando
+# la app se carga vía WSGI (por ejemplo, con gunicorn en Railway).
+init_db()
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'
-    init_db()
     app.run(host='0.0.0.0', port=port, debug=debug)
 
