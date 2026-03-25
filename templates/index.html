@@ -42,6 +42,7 @@
   </script>
 
   <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/modal.css">
 </head>
 
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
@@ -70,7 +71,7 @@
         <a href="#servicios" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Grooming</a>
         <a href="gallery.html" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Galería</a>
         <a href="#testimonios" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Experiencia</a>
-        <a href="booking.html" class="px-6 py-2.5 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm">Reserva tu Cita</a>
+        <button data-open-booking class="px-6 py-2.5 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm cursor-pointer">Reserva tu Cita</button>
       </div>
 
       <!-- Mobile Button -->
@@ -87,7 +88,7 @@
       <a href="#servicios" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Grooming</a>
       <a href="gallery.html" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Galería</a>
       <a href="#testimonios" class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Experiencia</a>
-      <a href="booking.html" class="block mt-6 px-4 py-3 gold-btn text-xs tracking-widest uppercase font-semibold text-center rounded-sm mx-8">Reserva tu Cita</a>
+      <button data-open-booking class="block mt-6 px-4 py-3 gold-btn text-xs tracking-widest uppercase font-semibold text-center rounded-sm mx-8 cursor-pointer w-[calc(100%-4rem)]">Reserva tu Cita</button>
     </div>
   </nav>
 
@@ -119,10 +120,10 @@
            </p>
 
            <div class="flex flex-col sm:flex-row gap-8 items-start">
-             <a href="booking.html" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn">
+             <button data-open-booking class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn cursor-pointer">
                <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold">Reserva Tu Lugar</span>
                <div class="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></div>
-             </a>
+             </button>
              <a href="#servicios" class="group flex items-center gap-4 text-xs tracking-[0.3em] uppercase font-bold text-smoke/60 hover:text-gold transition-all py-5">
                Ver Grooming Menu
                <span class="w-12 h-[1px] bg-smoke/20 group-hover:bg-gold group-hover:w-20 transition-all duration-500"></span>
@@ -201,7 +202,7 @@
                 <span class="text-gold font-medium tracking-widest">$30k</span>
               </div>
               <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Asesoría visajista, precisión milimétrica y acabado impecable."</p>
-              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
+              <a href="booking.html?service=Corte%20Imperial" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
             </div>
             <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up border-gold/40 bg-jet shadow-2xl" style="transition-delay: 100ms;">
               <div class="flex justify-between items-start mb-8">
@@ -209,7 +210,7 @@
                 <span class="text-gold font-medium tracking-widest">$60k</span>
               </div>
               <p class="text-smoke/70 font-light text-sm mb-10 leading-relaxed">Nuestro ritual insignia: Corte imperial, arreglo de barba ritual, vapor ozono y mascarilla.</p>
-              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
+              <a href="booking.html?service=Club%20Experience" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
             </div>
             <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60" style="transition-delay: 200ms;">
               <div class="flex justify-between items-start mb-8">
@@ -217,7 +218,7 @@
                 <span class="text-gold font-medium tracking-widest">$25k</span>
               </div>
               <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Perfilación a navaja, toallas calientes aromáticas y aceites."</p>
-              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
+              <a href="booking.html?service=Ritual%20de%20Barba" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
             </div>
         </div>
     </div>
@@ -302,7 +303,10 @@
       </div>
 
       <div class="text-center sm:flex sm:justify-between sm:text-left text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">
-        <p>&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
+        <div class="flex items-center justify-center sm:justify-start gap-3">
+          <p>&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
+          <a href="/admin/login" class="text-smoke/10 hover:text-gold/40 transition-colors text-xs" title="Panel de Control">⚙</a>
+        </div>
         <div class="mt-4 sm:mt-0 flex gap-6 justify-center">
           <a href="#" class="hover:text-gold transition-colors">Términos</a>
           <a href="#" class="hover:text-gold transition-colors">Privacidad</a>
@@ -363,5 +367,80 @@
     }, { threshold: 0.1 });
     document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
   </script>
+
+  <!-- Modal de Reserva -->
+  <div id="booking-modal">
+    <div class="booking-modal-content">
+      <div class="booking-modal-header">
+        <h2>RESERVA TU CITA</h2>
+        <button class="booking-modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="booking-modal-body">
+        <form id="booking-form-modal" class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Nombre Completo</label>
+              <input type="text" name="name" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Tu nombre">
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Celular / WhatsApp</label>
+              <input type="tel" name="phone" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="+57 312 487 9250">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Email</label>
+            <input type="email" name="email" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="tu@email.com">
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Servicio Deseado</label>
+            <select name="service" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
+              <option value="" class="bg-jet">Selecciona un servicio</option>
+              <option value="Corte Imperial" class="bg-jet">Corte Imperial - $30.000</option>
+              <option value="Club Experience" class="bg-jet">Club Experience - $60.000</option>
+              <option value="Ritual de Barba" class="bg-jet">Ritual de Barba - $25.000</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Fecha Deseada</label>
+              <input type="date" name="date" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all">
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Hora Preferida</label>
+              <select name="time" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
+                <option value="" class="bg-jet">Selecciona una hora</option>
+                <option value="09:00" class="bg-jet">09:00 AM</option>
+                <option value="10:00" class="bg-jet">10:00 AM</option>
+                <option value="11:00" class="bg-jet">11:00 AM</option>
+                <option value="12:00" class="bg-jet">12:00 PM</option>
+                <option value="13:00" class="bg-jet">01:00 PM</option>
+                <option value="14:00" class="bg-jet">02:00 PM</option>
+                <option value="15:00" class="bg-jet">03:00 PM</option>
+                <option value="16:00" class="bg-jet">04:00 PM</option>
+                <option value="17:00" class="bg-jet">05:00 PM</option>
+                <option value="18:00" class="bg-jet">06:00 PM</option>
+                <option value="19:00" class="bg-jet">07:00 PM</option>
+                <option value="20:00" class="bg-jet">08:00 PM</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Notas (Opcional)</label>
+            <textarea name="notes" rows="3" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all resize-none" placeholder="Cuéntanos algo especial sobre tu cita..."></textarea>
+          </div>
+
+          <button type="submit" class="w-full px-8 py-4 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm">
+            Confirmar Reserva
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/booking-modal.js"></script>
 </body>
 </html>

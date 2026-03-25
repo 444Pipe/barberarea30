@@ -246,6 +246,27 @@ def api_create_booking():
     return jsonify({'ok': True, 'id': booking_id})
 
 
+@app.get('/api/availability')
+def api_availability():
+    """Devuelve las horas ocupadas para una fecha.
+
+    Se consideran ocupadas las reservas con estado 'pendiente' o 'completado'.
+    """
+    date_str = (request.args.get('date') or '').strip()
+    if not date_str:
+        return jsonify({'ok': False, 'error': 'Falta el parámetro date (YYYY-MM-DD)'}), 400
+
+    conn = get_db_connection()
+    rows = conn.execute(
+        "SELECT time FROM bookings WHERE date = ? AND status IN ('pendiente', 'completado')",
+        (date_str,),
+    ).fetchall()
+    conn.close()
+
+    taken_times = [r['time'] for r in rows]
+    return jsonify({'ok': True, 'date': date_str, 'taken_times': taken_times})
+
+
 # ───────────── Panel administrativo ─────────────
 
 
@@ -262,7 +283,7 @@ def admin_login():
         else:
             error = 'Credenciales inválidas'
 
-    return render_template('admin_login.html', error=error)
+    return render_template('admin_login_new.html', error=error)
 
 
 @app.route('/admin/logout')
@@ -274,40 +295,44 @@ def admin_logout():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
+    """Página principal: Gestión de Reservas"""
     conn = get_db_connection()
     bookings = conn.execute(
         'SELECT * FROM bookings ORDER BY date DESC, time DESC'
     ).fetchall()
 
-    # Métricas de ingresos
+    # Métricas
     completed = [b for b in bookings if b['status'] == 'completado']
     total_ingresos = sum(b['price'] for b in completed) if completed else 0
     total_cortes = len(completed)
     promedio_por_corte = int(total_ingresos / total_cortes) if total_cortes else 0
 
-    # Eventos para calendario (todas las reservas)
-    calendar_events = []
-    for b in bookings:
-        calendar_events.append(
-            {
-                'id': b['id'],
-                'title': f"{b['name']} - {b['service_name']}",
-                'date': b['date'],
-                'time': b['time'],
-                'name': b['name'],
-                'phone': b['phone'],
-                'email': b['email'],
-                'service_name': b['service_name'],
-                'service_slug': b['service_slug'],
-                'status': b['status'],
-                'price': b['price'],
-                'notes': b['notes'],
-                'created_at': b['created_at'],
-                'completed_at': b['completed_at'],
-            }
-        )
+    conn.close()
 
-    # Ingresos por mes (solo reservas completadas)
+    return render_template(
+        'admin_reservas.html',
+        bookings=bookings,
+        total_ingresos=total_ingresos,
+        total_cortes=total_cortes,
+        promedio_por_corte=promedio_por_corte,
+    )
+
+
+@app.route('/admin/graficas')
+@login_required
+def admin_graficas():
+    """Página dedicada a gráficas de análisis"""
+    conn = get_db_connection()
+    bookings = conn.execute(
+        'SELECT * FROM bookings ORDER BY date DESC, time DESC'
+    ).fetchall()
+
+    # Métricas
+    completed = [b for b in bookings if b['status'] == 'completado']
+    total_ingresos = sum(b['price'] for b in completed) if completed else 0
+    total_cortes = len(completed)
+
+    # Ingresos por mes
     monthly_map = {}
     for b in completed:
         date_str = b['date']
@@ -335,14 +360,73 @@ def admin_dashboard():
     conn.close()
 
     return render_template(
-        'admin_dashboard.html',
+        'admin_graficas.html',
+        bookings=bookings,
+        total_ingresos=total_ingresos,
+        total_cortes=total_cortes,
+        monthly_labels=monthly_labels,
+        monthly_totals=monthly_totals,
+    )
+
+
+@app.route('/admin/calendario')
+@login_required
+def admin_calendario():
+    """Página dedicada al calendario de reservas"""
+    conn = get_db_connection()
+    bookings = conn.execute(
+        'SELECT * FROM bookings ORDER BY date DESC, time DESC'
+    ).fetchall()
+
+    # Eventos para calendario
+    calendar_events = []
+    for b in bookings:
+        calendar_events.append(
+            {
+                'id': b['id'],
+                'title': f"{b['name']} - {b['service_name']}",
+                'date': b['date'],
+                'time': b['time'],
+                'name': b['name'],
+                'phone': b['phone'],
+                'email': b['email'],
+                'service_name': b['service_name'],
+                'status': b['status'],
+                'price': b['price'],
+            }
+        )
+
+    conn.close()
+
+    return render_template(
+        'admin_calendario.html',
+        calendar_events=calendar_events,
+    )
+
+
+@app.route('/admin/reservas')
+@login_required
+def admin_reservas():
+    """Página dedicada a tabla de reservas e ingresos"""
+    conn = get_db_connection()
+    bookings = conn.execute(
+        'SELECT * FROM bookings ORDER BY date DESC, time DESC'
+    ).fetchall()
+
+    # Métricas
+    completed = [b for b in bookings if b['status'] == 'completado']
+    total_ingresos = sum(b['price'] for b in completed) if completed else 0
+    total_cortes = len(completed)
+    promedio_por_corte = int(total_ingresos / total_cortes) if total_cortes else 0
+
+    conn.close()
+
+    return render_template(
+        'admin_reservas.html',
         bookings=bookings,
         total_ingresos=total_ingresos,
         total_cortes=total_cortes,
         promedio_por_corte=promedio_por_corte,
-        calendar_events=calendar_events,
-        monthly_labels=monthly_labels,
-        monthly_totals=monthly_totals,
     )
 
 
@@ -401,6 +485,53 @@ def admin_cancel_booking(booking_id: int):
 
     conn.close()
     return redirect(url_for('admin_dashboard'))
+
+
+# ───────────── APIs de Estadísticas ─────────────
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+def api_admin_stats():
+    """API para obtener estadísticas del panel admin"""
+    conn = get_db_connection()
+    bookings = conn.execute(
+        'SELECT * FROM bookings ORDER BY date DESC, time DESC'
+    ).fetchall()
+
+    # Métricas
+    completed = [b for b in bookings if b['status'] == 'completado']
+    total_ingresos = sum(b['price'] for b in completed) if completed else 0
+    total_cortes = len(completed)
+    pendientes = len([b for b in bookings if b['status'] == 'pendiente'])
+
+    # Servicios más solicitados
+    service_count = {}
+    for b in bookings:
+        service_count[b['service_name']] = service_count.get(b['service_name'], 0) + 1
+
+    # Ingresos por mes
+    monthly_data = {}
+    for b in completed:
+        try:
+            date_obj = datetime.strptime(b['date'], '%Y-%m-%d')
+            month_key = date_obj.strftime('%Y-%m')
+            month_label = date_obj.strftime('%b %Y')
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {'label': month_label, 'total': 0}
+            monthly_data[month_key]['total'] += b['price']
+        except ValueError:
+            pass
+
+    conn.close()
+
+    return jsonify({
+        'total_ingresos': total_ingresos,
+        'total_cortes': total_cortes,
+        'pendientes': pendientes,
+        'promedio_por_corte': int(total_ingresos / total_cortes) if total_cortes else 0,
+        'servicios': service_count,
+        'ingresos_mensuales': sorted(monthly_data.items(), key=lambda x: x[0])
+    })
 
 
 if __name__ == '__main__':
