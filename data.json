@@ -1,0 +1,64 @@
+{
+  "business": {
+    "name": "Barber Freestyle",
+    "tagline": "Cortes Explosivos",
+    "description": "Diseño freestyle profesional, corrección de cortes y color de alta calidad en Villavicencio",
+    "address": "tv. 25 # 13-66, Villavicencio",
+    "phone": "+57 300 000 0000",
+    "instagram": "@barberfreestyle5",
+    "hours": "08:00 - 18:00 (Lunes - Domingo)",
+    "rating": 5.0,
+    "reviews_count": 10
+  },
+  "services": [
+    {
+      "id": 1,
+      "name": "Corte Básico",
+      "price": 30000,
+      "duration": 25,
+      "features": ["Incluye cejas", "Styling con productos premium"]
+    },
+    {
+      "id": 2,
+      "name": "Corte + Freestyle",
+      "price": 35000,
+      "duration": 35,
+      "features": ["Corte completo", "Diseño freestyle personalizado", "Cejas y styling"],
+      "popular": true
+    },
+    {
+      "id": 3,
+      "name": "Corte con Barba",
+      "price": 40000,
+      "duration": 35,
+      "features": ["Corte de cabello", "Perfilado de barba", "Cejas y styling"]
+    },
+    {
+      "id": 4,
+      "name": "Corte para Dama",
+      "price": 35000,
+      "duration": 40,
+      "features": ["Corte personalizado", "Limpieza de cejas con cuchilla"]
+    }
+  ],
+  "testimonials": [
+    {
+      "author": "Johan Felipe Serrano",
+      "city": "Villavicencio",
+      "rating": 5,
+      "text": "El servicio es excepcional. La habilidad del barbero y la atención personalizada son increíbles. Totalmente satisfecho con mi corte."
+    },
+    {
+      "author": "Juan Porros",
+      "city": "Villavicencio",
+      "rating": 5,
+      "text": "Me salvó la vida. Los mejores cortes en Villavicencio. Definitivamente recomendado para todos mis amigos."
+    },
+    {
+      "author": "Jonathan López",
+      "city": "Villavicencio",
+      "rating": 5,
+      "text": "Experiencia positiva desde el inicio. Los detalles, la limpieza y la profesionalidad son impecables. Volveré."
+    }
+  ]
+}

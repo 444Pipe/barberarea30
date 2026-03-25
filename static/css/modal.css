@@ -1,0 +1,144 @@
+/* Modal de Reserva */
+#booking-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  padding: 20px;
+}
+
+#booking-modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.booking-modal-content {
+  background: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  animation: slideUp 0.3s ease-out;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.booking-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 0;
+  background: #111111;
+  z-index: 10;
+}
+
+.booking-modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  font-family: 'Playfair Display', serif;
+  letter-spacing: 2px;
+}
+
+.booking-modal-close {
+  background: none;
+  border: none;
+  color: #D4AF37;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.booking-modal-close:hover {
+  color: #f3d97f;
+}
+
+.booking-modal-body {
+  padding: 32px;
+}
+
+/* Scrollbar personalizada */
+#booking-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+#booking-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#booking-modal::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 3px;
+}
+
+#booking-modal::-webkit-scrollbar-thumb:hover {
+  background: #f3d97f;
+}
+
+.booking-modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.booking-modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.booking-modal-content::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 3px;
+}
+
+.booking-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #f3d97f;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .booking-modal-content {
+    max-height: 100vh;
+    border-radius: 8px 8px 0 0;
+    max-width: 100%;
+    margin-bottom: 0;
+  }
+
+  .booking-modal-header {
+    padding: 16px;
+  }
+
+  .booking-modal-body {
+    padding: 20px;
+  }
+}

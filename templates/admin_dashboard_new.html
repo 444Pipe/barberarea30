@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin – Área 30 Barber Club</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .fc-theme-standard .fc-col-time-text { color: #D4AF37; }
+    .fc-event { background: #D4AF37 !important; border-color: #D4AF37 !important; }
+    .fc-event-title { color: #0A0A0A !important; }
+    .fc-toolbar-title { color: #D4AF37 !important; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-jet text-smoke font-sans">
+  <!-- Navbar -->
+  <nav class="bg-jet-card border-b border-gold/20 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-serif font-bold text-gold">ÁREA 30 - PANEL ADMIN</h1>
+      </div>
+      <a href="/admin/logout" class="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold text-sm tracking-widest uppercase rounded-sm transition-colors">
+        Cerrar Sesión
+      </a>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Total Ingresos</p>
+        <p class="text-3xl font-bold text-gold">${{ "{:,.0f}".format(total_ingresos) }}</p>
+        <p class="text-smoke/40 text-xs mt-2">Cortes completados</p>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Total Cortes</p>
+        <p class="text-3xl font-bold text-gold">{{ total_cortes }}</p>
+        <p class="text-smoke/40 text-xs mt-2">Completados</p>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Promedio x Corte</p>
+        <p class="text-3xl font-bold text-gold">${{ "{:,.0f}".format(promedio_por_corte) }}</p>
+        <p class="text-smoke/40 text-xs mt-2">COP</p>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Reservas Pendientes</p>
+        <p class="text-3xl font-bold text-gold">{{ bookings|selectattr('status', 'equalto', 'pendiente')|list|length }}</p>
+        <p class="text-smoke/40 text-xs mt-2">Por confirmar</p>
+      </div>
+    </div>
+
+    <!-- Dos columnas: Gráfica + Calendario -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Gráfica de Ingresos -->
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <h2 class="text-xl font-bold text-gold mb-4 tracking-widest uppercase">Ingresos por Mes</h2>
+        <canvas id="incomeChart" height="80"></canvas>
+      </div>
+
+      <!-- Servicios más solicitados -->
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <h2 class="text-xl font-bold text-gold mb-4 tracking-widest uppercase">Servicios Top</h2>
+        <canvas id="servicesChart" height="80"></canvas>
+      </div>
+    </div>
+
+    <!-- Calendario -->
+    <div class="bg-jet-card border border-gold/20 p-6 rounded-sm mb-8">
+      <h2 class="text-xl font-bold text-gold mb-4 tracking-widest uppercase">Calendario de Reservas</h2>
+      <div id="calendar" style="height: 500px;"></div>
+    </div>
+
+    <!-- Tabla de Reservas -->
+    <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+      <h2 class="text-xl font-bold text-gold mb-4 tracking-widest uppercase">Todas las Reservas</h2>
+      
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gold/20">
+              <th class="text-left py-3 px-2 text-gold">Cliente</th>
+              <th class="text-left py-3 px-2 text-gold">Servicio</th>
+              <th class="text-left py-3 px-2 text-gold">Fecha</th>
+              <th class="text-left py-3 px-2 text-gold">Hora</th>
+              <th class="text-left py-3 px-2 text-gold">Precio</th>
+              <th class="text-left py-3 px-2 text-gold">Estado</th>
+              <th class="text-left py-3 px-2 text-gold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for booking in bookings %}
+            <tr class="border-b border-white/5 hover:bg-jet-lighter transition-colors">
+              <td class="py-3 px-2">
+                <div class="font-medium">{{ booking.name }}</div>
+                <div class="text-smoke/60 text-xs">{{ booking.phone }}</div>
+              </td>
+              <td class="py-3 px-2">{{ booking.service_name }}</td>
+              <td class="py-3 px-2">{{ booking.date }}</td>
+              <td class="py-3 px-2">{{ booking.time }}</td>
+              <td class="py-3 px-2 text-gold font-bold">${{ "{:,.0f}".format(booking.price) }}</td>
+              <td class="py-3 px-2">
+                <span class="px-2 py-1 rounded-sm text-xs font-semibold
+                  {% if booking.status == 'completado' %}
+                    bg-green-950 text-green-300
+                  {% elif booking.status == 'pendiente' %}
+                    bg-yellow-950 text-yellow-300
+                  {% elif booking.status == 'cancelado' %}
+                    bg-red-950 text-red-300
+                  {% endif %}
+                ">{{ booking.status|upper }}</span>
+              </td>
+              <td class="py-3 px-2">
+                {% if booking.status != 'completado' %}
+                  <form method="post" action="/admin/bookings/{{ booking.id }}/complete" style="display: inline;">
+                    <button type="submit" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-sm transition-colors">
+                      ✓ Completar
+                    </button>
+                  </form>
+                {% endif %}
+                {% if booking.status != 'cancelado' %}
+                  <form method="post" action="/admin/bookings/{{ booking.id }}/cancel" style="display: inline;">
+                    <button type="submit" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-sm transition-colors ml-1">
+                      ✗ Cancelar
+                    </button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Gráfica de Ingresos por Mes
+    const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+    new Chart(incomeCtx, {
+      type: 'line',
+      data: {
+        labels: {{ monthly_labels|tojson }},
+        datasets: [{
+          label: 'Ingresos (COP)',
+          data: {{ monthly_totals|tojson }},
+          borderColor: '#D4AF37',
+          backgroundColor: 'rgba(212, 175, 55, 0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#D4AF37',
+          pointBorderColor: '#0A0A0A',
+          pointSize: 5
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#D4AF37' } }
+        },
+        scales: {
+          y: { ticks: { color: '#D4AF37' }, grid: { color: 'rgba(212, 175, 55, 0.1)' } },
+          x: { ticks: { color: '#D4AF37' }, grid: { color: 'rgba(212, 175, 55, 0.1)' } }
+        }
+      }
+    });
+
+    // Gráfica de Servicios más solicitados
+    const servicesData = {};
+    {% for booking in bookings %}
+      const svc = "{{ booking.service_name }}";
+      servicesData[svc] = (servicesData[svc] || 0) + 1;
+    {% endfor %}
+
+    const servicesCtx = document.getElementById('servicesChart').getContext('2d');
+    new Chart(servicesCtx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(servicesData),
+        datasets: [{
+          data: Object.values(servicesData),
+          backgroundColor: ['#D4AF37', '#b39129', '#f3d97f', '#FFB6C1', '#FFA07A', '#FF8C00', '#FF6347', '#FF4500'],
+          borderColor: '#0A0A0A',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#D4AF37' } } }
+      }
+    });
+
+    // Calendario
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek'
+      },
+      events: {{ calendar_events|tojson }},
+      eventClick: function(info) {
+        alert(`Cita de ${info.event.extendedProps.name}\nServicio: ${info.event.extendedProps.service_name}\nHora: ${info.event.extendedProps.time}\nEstado: ${info.event.extendedProps.status}`);
+      }
+    });
+    calendar.render();
+  </script>
+</body>
+</html>

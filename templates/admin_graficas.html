@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gráficas - Área 30 Barber Club</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-jet text-smoke font-sans">
+  <!-- Navbar -->
+  <nav class="bg-jet-card border-b border-gold/20 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <h1 class="text-2xl font-serif font-bold text-gold">ÁREA 30 - ADMIN</h1>
+      <a href="/admin/logout" class="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold text-sm tracking-widest uppercase rounded-sm transition-colors">
+        Cerrar Sesión
+      </a>
+    </div>
+
+    <!-- Sub-navegación -->
+    <div class="max-w-7xl mx-auto px-4 border-t border-gold/10">
+      <div class="flex gap-1 py-3 overflow-x-auto">
+        <a href="/admin/graficas" class="px-4 py-2 bg-gold text-jet text-xs tracking-widest uppercase font-semibold rounded-sm whitespace-nowrap">Gráficas</a>
+        <a href="/admin/calendario" class="px-4 py-2 bg-gold/10 hover:bg-gold/20 text-gold text-xs tracking-widest uppercase rounded-sm transition-colors whitespace-nowrap">Calendario</a>
+        <a href="/admin/reservas" class="px-4 py-2 bg-gold/10 hover:bg-gold/20 text-gold text-xs tracking-widest uppercase rounded-sm transition-colors whitespace-nowrap">Reservas</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-4 py-12">
+    <!-- Encabezado -->
+    <div class="mb-12">
+      <h2 class="text-3xl font-serif font-bold text-gold mb-2">Análisis de Ingresos</h2>
+      <p class="text-smoke/60">Visualiza tus ingresos mensuales y servicios más populares</p>
+    </div>
+
+    <!-- Gráficas en Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      <!-- Gráfica de Ingresos por Mes -->
+      <div class="bg-jet-card border border-gold/20 p-8 rounded-sm">
+        <h3 class="text-xl font-bold text-gold mb-6 tracking-widest uppercase">Ingresos por Mes</h3>
+        <canvas id="incomeChart"></canvas>
+        <p class="text-smoke/60 text-xs mt-4 text-center">Ingresos mensuales desde servicios completados</p>
+      </div>
+
+      <!-- Gráfica de Servicios más Solicitados -->
+      <div class="bg-jet-card border border-gold/20 p-8 rounded-sm">
+        <h3 class="text-xl font-bold text-gold mb-6 tracking-widest uppercase">Servicios Top 5</h3>
+        <canvas id="servicesChart"></canvas>
+        <p class="text-smoke/60 text-xs mt-4 text-center">Servicios más populares del negocio</p>
+      </div>
+    </div>
+
+    <!-- Estadísticas Adicionales -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Total Ingresos</p>
+        <p class="text-3xl font-bold text-gold">${{ "{:,.0f}".format(total_ingresos) }}</p>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Total Servicios</p>
+        <p class="text-3xl font-bold text-gold">{{ total_cortes }}</p>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-6 rounded-sm">
+        <p class="text-smoke/60 text-xs uppercase tracking-widest mb-2">Promedio por Servicio</p>
+        <p class="text-3xl font-bold text-gold">${{ "{:,.0f}".format(total_ingresos / total_cortes if total_cortes > 0 else 0) }}</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Gráfica de Ingresos por Mes (Línea)
+    const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+    new Chart(incomeCtx, {
+      type: 'line',
+      data: {
+        labels: {{ monthly_labels|tojson }},
+        datasets: [{
+          label: 'Ingresos (COP)',
+          data: {{ monthly_totals|tojson }},
+          borderColor: '#D4AF37',
+          backgroundColor: 'rgba(212, 175, 55, 0.1)',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#D4AF37',
+          pointBorderColor: '#0A0A0A',
+          pointSize: 8,
+          pointRadius: 6,
+          pointHoverRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { 
+            labels: { 
+              color: '#D4AF37',
+              font: { size: 14, weight: 'bold' }
+            },
+            padding: 20
+          }
+        },
+        scales: {
+          y: { 
+            ticks: { 
+              color: '#D4AF37',
+              font: { size: 12 },
+              callback: function(value) { return '$' + value.toLocaleString(); }
+            }, 
+            grid: { color: 'rgba(212, 175, 55, 0.1)' },
+            border: { color: 'rgba(212, 175, 55, 0.2)' }
+          },
+          x: { 
+            ticks: { 
+              color: '#D4AF37',
+              font: { size: 12 }
+            }, 
+            grid: { color: 'rgba(212, 175, 55, 0.1)' },
+            border: { color: 'rgba(212, 175, 55, 0.2)' }
+          }
+        }
+      }
+    });
+
+    // Gráfica de Servicios (Dónut)
+    const servicesData = {};
+    {% for booking in bookings %}
+      const svc = "{{ booking.service_name }}";
+      servicesData[svc] = (servicesData[svc] || 0) + 1;
+    {% endfor %}
+
+    // Ordenar y obtener solo los top 5
+    const sortedServices = Object.entries(servicesData)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const servicesCtx = document.getElementById('servicesChart').getContext('2d');
+    new Chart(servicesCtx, {
+      type: 'doughnut',
+      data: {
+        labels: sortedServices.map(x => x[0]),
+        datasets: [{
+          data: sortedServices.map(x => x[1]),
+          backgroundColor: ['#D4AF37', '#b39129', '#f3d97f', '#FFB6C1', '#FFA07A'],
+          borderColor: '#0A0A0A',
+          borderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { 
+          legend: { 
+            labels: { 
+              color: '#D4AF37',
+              font: { size: 12 },
+              padding: 15
+            },
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+:root {
+  --color-primary: #D4AF37;
+  --color-primary-dark: #b39129;
+  --color-secondary: #0A0A0A;
+  --color-light: #F5F5F5;
+  --color-border: rgba(212, 175, 55, 0.3);
+  --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Animations */
+.hero-section {
+  animation: fadeIn 1.2s ease-out forwards;
+}
+
+.fade-in-up {
+  opacity: 0;
+  transform: translateY(40px);
+  filter: blur(5px);
+  transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1), 
+              transform 1.2s cubic-bezier(0.22, 1, 0.36, 1),
+              filter 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fade-in-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+.hero-section img {
+  transition: transform 10s linear;
+}
+
+.hero-section:hover img {
+  transform: scale(1.15) translateZ(0);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Buttons and Interactions */
+.gold-btn {
+  background: linear-gradient(135deg, #D4AF37 0%, #b39129 100%);
+  color: #0A0A0A;
+  transition: var(--transition-smooth);
+  border: 1px solid #D4AF37;
+}
+
+.gold-btn:hover {
+  background: linear-gradient(135deg, #f3d97f 0%, #D4AF37 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
+
+.gold-outline-btn {
+  background: transparent;
+  color: #D4AF37;
+  border: 1px solid #D4AF37;
+  transition: var(--transition-smooth);
+}
+
+.gold-outline-btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15);
+}
+
+.service-card {
+  background: #111111;
+  border: 1px solid var(--color-border);
+  transition: var(--transition-smooth);
+}
+
+.service-card:hover {
+  border-color: #D4AF37;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(212, 175, 55, 0.1);
+}
+
+.gallery-item {
+  transition: var(--transition-smooth);
+}
+
+.gallery-item:hover {
+  box-shadow: 0 20px 40px rgba(212, 175, 55, 0.15);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 0 1px #D4AF37 !important;
+}
+
+/* Scrollbar customization for luxury feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D4AF37;
+}
+
+/* Floating Social Menu (FAB) */
+.fab-container {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.fab-main {
+  width: 60px;
+  height: 60px;
+  background: #D4AF37;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0A0A0A;
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 1.4rem;
+  box-shadow: 0 10px 25px rgba(212, 175, 55, 0.4);
+  cursor: pointer;
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.fab-main:hover {
+  transform: scale(1.1) rotate(5deg);
+  background: #f3d97f;
+}
+
+.fab-social-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.fab-social-list.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.social-item {
+  width: 50px;
+  height: 50px;
+  background: #111;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #D4AF37;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  position: relative;
+}
+
+.social-item:hover {
+  background: #D4AF37;
+  color: #0A0A0A;
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+}
+
+/* Tooltip for FAB */
+.social-item::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 70px;
+  background: rgba(10, 10, 10, 0.9);
+  color: #f5f5f5;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: bold;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  white-space: nowrap;
+}
+
+.social-item:hover::after {
+  opacity: 1;
+}

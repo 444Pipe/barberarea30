@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario - Área 30 Barber Club</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .fc-theme-standard .fc-col-time-text { color: #D4AF37; }
+    .fc-event { background: #D4AF37 !important; border-color: #D4AF37 !important; }
+    .fc-event-title { color: #0A0A0A !important; font-weight: bold; }
+    .fc-toolbar-title { color: #D4AF37 !important; }
+    .fc button { background-color: #D4AF37 !important; color: #0A0A0A !important; }
+    .fc button:hover { background-color: #b39129 !important; }
+    .fc-button-active { background-color: #b39129 !important; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-jet text-smoke font-sans">
+  <!-- Navbar -->
+  <nav class="bg-jet-card border-b border-gold/20 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <h1 class="text-2xl font-serif font-bold text-gold">ÁREA 30 - ADMIN</h1>
+      <a href="/admin/logout" class="px-4 py-2 bg-gold/20 hover:bg-gold/30 text-gold text-sm tracking-widest uppercase rounded-sm transition-colors">
+        Cerrar Sesión
+      </a>
+    </div>
+
+    <!-- Sub-navegación -->
+    <div class="max-w-7xl mx-auto px-4 border-t border-gold/10">
+      <div class="flex gap-1 py-3 overflow-x-auto">
+        <a href="/admin/graficas" class="px-4 py-2 bg-gold/10 hover:bg-gold/20 text-gold text-xs tracking-widest uppercase rounded-sm transition-colors whitespace-nowrap">Gráficas</a>
+        <a href="/admin/calendario" class="px-4 py-2 bg-gold text-jet text-xs tracking-widest uppercase font-semibold rounded-sm whitespace-nowrap">Calendario</a>
+        <a href="/admin/reservas" class="px-4 py-2 bg-gold/10 hover:bg-gold/20 text-gold text-xs tracking-widest uppercase rounded-sm transition-colors whitespace-nowrap">Reservas</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Encabezado -->
+    <div class="mb-8">
+      <h2 class="text-3xl font-serif font-bold text-gold mb-2">Calendario de Reservas</h2>
+      <p class="text-smoke/60">Visualiza todas tus citas programadas en un calendario interactivo</p>
+    </div>
+
+    <!-- Calendario -->
+    <div class="bg-jet-card border border-gold/20 p-8 rounded-sm">
+      <div id="calendar" style="min-height: 600px;"></div>
+    </div>
+
+    <!-- Leyenda -->
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-jet-card border border-gold/20 p-4 rounded-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-4 h-4 bg-gold rounded-sm"></div>
+          <div>
+            <p class="text-gold font-semibold text-sm">Todas las Reservas</p>
+            <p class="text-smoke/60 text-xs">Pendientes y completadas</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-4 rounded-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-4 h-4 bg-blue-500 rounded-sm"></div>
+          <div>
+            <p class="text-blue-400 font-semibold text-sm">Eventos Actuales</p>
+            <p class="text-smoke/60 text-xs">Hoy resaltado</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-jet-card border border-gold/20 p-4 rounded-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-4 h-4 bg-green-500 rounded-sm"></div>
+          <div>
+            <p class="text-green-400 font-semibold text-sm">Filtros Disponibles</p>
+            <p class="text-smoke/60 text-xs">Cambia entre vistas</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const calendarEl = document.getElementById('calendar');
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        locale: 'es',
+        events: {{ calendar_events|tojson }},
+        eventDisplay: 'block',
+        eventClick: function(info) {
+          const evt = info.event.extendedProps;
+          alert(
+            `👤 Cliente: ${evt.name}\n` +
+            `📞 Teléfono: ${evt.phone}\n` +
+            `✂️ Servicio: ${evt.service_name}\n` +
+            `⏰ Hora: ${evt.time}\n` +
+            `💰 Precio: $${evt.price.toLocaleString()}\n` +
+            `📌 Estado: ${evt.status.toUpperCase()}`
+          );
+        }
+      });
+      calendar.render();
+    });
+  </script>
+</body>
+</html>
