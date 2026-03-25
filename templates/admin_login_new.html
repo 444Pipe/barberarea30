@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login – Área 30 Barber Club</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="min-h-screen bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
+  <div class="min-h-screen flex items-center justify-center px-4">
+    <div class="w-full max-w-md">
+      <!-- Logo -->
+      <div class="text-center mb-12">
+        <div class="text-4xl font-serif font-bold tracking-widest text-gold mb-2">ÁREA 30</div>
+        <div class="text-xs tracking-[0.3em] uppercase text-smoke/60">Panel de Administración</div>
+      </div>
+
+      <!-- Card de Login -->
+      <div class="bg-jet-card border border-white/10 rounded-sm p-8 shadow-2xl">
+        {% if error %}
+          <div class="mb-6 p-4 bg-red-950/40 border border-red-600/60 rounded-sm text-sm text-red-300">
+            ❌ {{ error }}
+          </div>
+        {% endif %}
+
+        <form method="post" class="space-y-6">
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Usuario</label>
+            <input type="text" name="username" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold focus:outline-none transition-all" placeholder="admin">
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Contraseña</label>
+            <input type="password" name="password" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold focus:outline-none transition-all" placeholder="••••••">
+          </div>
+
+          <button type="submit" class="w-full px-6 py-3 bg-gold hover:bg-gold-light text-jet text-xs tracking-widest uppercase font-semibold rounded-sm transition-colors cursor-pointer">
+            Acceder al Panel
+          </button>
+        </form>
+
+        <hr class="my-6 border-white/10">
+
+        <p class="text-center text-xs text-smoke/50">
+          <a href="/" class="hover:text-gold transition-colors">← Volver a Inicio</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>
