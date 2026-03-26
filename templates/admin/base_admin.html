@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Panel Admin{% endblock %} — Área 30 Barber Club</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b8962e', light: '#f3d97f' },
+            jet: { DEFAULT: '#0a0a0a', card: '#111111', lighter: '#1a1a1a', mid: '#151515' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/static/css/admin.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-jet text-smoke font-sans antialiased">
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside id="sidebar" class="sidebar fixed lg:static inset-y-0 left-0 z-50 w-64 bg-jet-card border-r border-white/5 flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+
+      <!-- Logo -->
+      <div class="px-6 py-6 border-b border-white/5">
+        <a href="/admin-panel/" class="block">
+          <div class="text-2xl font-serif font-bold tracking-widest text-gold">ÁREA 30</div>
+          <div class="flex items-center gap-2 mt-1">
+            <div class="h-[1px] w-5 bg-gold/50"></div>
+            <span class="text-[0.55rem] tracking-[0.3em] text-smoke/50 uppercase font-semibold">Admin Panel</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <a href="/admin-panel/" class="sidebar-link {% if active_section == 'dashboard' %}active{% endif %}" data-section="dashboard">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="/admin-panel/calendar/" class="sidebar-link {% if active_section == 'calendar' %}active{% endif %}" data-section="calendar">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span>Calendario</span>
+        </a>
+        <a href="/admin-panel/bookings/" class="sidebar-link {% if active_section == 'bookings' %}active{% endif %}" data-section="bookings">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <span>Reservas</span>
+        </a>
+        {% if user_role != 'barber' %}
+        <a href="/admin-panel/barbers/" class="sidebar-link {% if active_section == 'barbers' %}active{% endif %}" data-section="barbers">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <span>Barberos</span>
+        </a>
+        <a href="/admin-panel/clients/" class="sidebar-link {% if active_section == 'clients' %}active{% endif %}" data-section="clients">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <span>Clientes</span>
+        </a>
+        {% endif %}
+        <a href="/admin-panel/charts/" class="sidebar-link {% if active_section == 'charts' %}active{% endif %}" data-section="charts">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span>Gráficas</span>
+        </a>
+        {% if user_role != 'barber' %}
+        <a href="/admin-panel/settings/" class="sidebar-link {% if active_section == 'settings' %}active{% endif %}" data-section="settings">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Configuración</span>
+        </a>
+        {% endif %}
+      </nav>
+
+      <!-- User info -->
+      <div class="px-4 py-4 border-t border-white/5">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center text-gold font-serif font-bold text-sm">
+            {{ user_name|first|upper }}
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-white truncate">{{ user_name }}</div>
+            <div class="text-[10px] tracking-widest uppercase text-smoke/40">{{ user_role }}</div>
+          </div>
+        </div>
+        <a href="/admin-panel/logout/" class="flex items-center gap-2 text-xs text-red-400/70 hover:text-red-400 transition-colors tracking-wider uppercase mb-3">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Cerrar Sesión
+        </a>
+        <a href="/" class="flex items-center gap-2 text-[10px] text-smoke/30 hover:text-gold transition-colors tracking-[0.2em] uppercase font-medium">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          Volver al Sitio
+        </a>
+      </div>
+    </aside>
+
+    <!-- ═══ OVERLAY (mobile) ═══ -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <!-- Top bar (mobile) -->
+      <header class="lg:hidden flex items-center justify-between px-4 py-3 bg-jet-card border-b border-white/5">
+        <button onclick="toggleSidebar()" class="text-gold p-1">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="text-lg font-serif font-bold tracking-widest text-gold">ÁREA 30</span>
+        <a href="/" class="text-xs text-smoke/50 hover:text-gold transition-colors tracking-wider uppercase">Sitio</a>
+      </header>
+
+      <!-- Page content -->
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      sidebar.classList.toggle('-translate-x-full');
+      overlay.classList.toggle('hidden');
+    }
+  </script>
+  <script src="/static/js/admin.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

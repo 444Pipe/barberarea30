@@ -1,0 +1,183 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Reservas{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Reservas</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Gestión de citas</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="exportCSV()" class="px-4 py-2 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase hover:text-gold hover:border-gold/30 transition-all flex items-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Exportar CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-jet-card border border-white/5 rounded-xl p-4">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <select id="filter-barber" onchange="loadBookings()" class="admin-select">
+        <option value="">Todos los barberos</option>
+      </select>
+      <select id="filter-status" onchange="loadBookings()" class="admin-select">
+        <option value="">Todos los estados</option>
+        <option value="pending">Pendiente</option>
+        <option value="confirmed">Confirmado</option>
+        <option value="completed">Completado</option>
+        <option value="cancelled">Cancelado</option>
+      </select>
+      <input type="date" id="filter-date-from" onchange="loadBookings()" class="admin-select" placeholder="Desde">
+      <input type="date" id="filter-date-to" onchange="loadBookings()" class="admin-select" placeholder="Hasta">
+      <input type="text" id="filter-search" oninput="debounceSearch()" class="admin-select" placeholder="Buscar cliente...">
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-jet-card border border-white/5 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-xs">
+        <thead>
+          <tr class="bg-jet-lighter text-smoke/40 tracking-widest uppercase text-[0.6rem]">
+            <th class="px-4 py-3 text-left">Cliente</th>
+            <th class="px-4 py-3 text-left">Teléfono</th>
+            <th class="px-4 py-3 text-left">Servicio</th>
+            <th class="px-4 py-3 text-left">Barbero</th>
+            <th class="px-4 py-3 text-left">Fecha</th>
+            <th class="px-4 py-3 text-left">Hora</th>
+            <th class="px-4 py-3 text-left">Precio</th>
+            <th class="px-4 py-3 text-left">Estado</th>
+            <th class="px-4 py-3 text-left">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="bookings-table" class="divide-y divide-white/5"></tbody>
+      </table>
+    </div>
+    <div id="empty-state" class="hidden text-center py-12 text-smoke/30 text-sm">No se encontraron reservas</div>
+  </div>
+</div>
+
+<script>
+let searchTimeout = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/barbers/').then(r => r.json()).then(barbers => {
+    const sel = document.getElementById('filter-barber');
+    barbers.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id; opt.textContent = b.display_name;
+      sel.appendChild(opt);
+    });
+  });
+  loadBookings();
+});
+
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(loadBookings, 400);
+}
+
+function loadBookings() {
+  const params = new URLSearchParams();
+  const barber = document.getElementById('filter-barber').value;
+  const status = document.getElementById('filter-status').value;
+  const dateFrom = document.getElementById('filter-date-from').value;
+  const dateTo = document.getElementById('filter-date-to').value;
+  const search = document.getElementById('filter-search').value;
+
+  if (barber) params.set('barber', barber);
+  if (status) params.set('status', status);
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  if (search) params.set('search', search);
+
+  fetch('/api/admin/bookings/?' + params.toString())
+    .then(r => r.json())
+    .then(renderTable)
+    .catch(() => {
+      document.getElementById('bookings-table').innerHTML = '';
+      document.getElementById('empty-state').classList.remove('hidden');
+    });
+}
+
+function renderTable(bookings) {
+  const tbody = document.getElementById('bookings-table');
+  const empty = document.getElementById('empty-state');
+
+  if (!bookings.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  const statusBadge = {
+    pending: '<span class="inline-flex px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[0.6rem]">Pendiente</span>',
+    confirmed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[0.6rem]">Confirmado</span>',
+    completed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[0.6rem]">Completado</span>',
+    cancelled: '<span class="inline-flex px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[0.6rem]">Cancelado</span>',
+  };
+
+  tbody.innerHTML = bookings.map(b => `
+    <tr class="hover:bg-white/[0.02] transition-colors">
+      <td class="px-4 py-3">
+        <div class="text-white font-medium">${b.client_name}</div>
+        ${b.client_email ? `<div class="text-[0.6rem] text-smoke/30">${b.client_email}</div>` : ''}
+      </td>
+      <td class="px-4 py-3 text-smoke/60">${b.client_phone}</td>
+      <td class="px-4 py-3 text-smoke/80">${b.service_name || ''}</td>
+      <td class="px-4 py-3">
+        <span class="inline-flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full" style="background: ${b.barber_color || '#D4AF37'}"></span>
+          <span class="text-smoke/80">${b.barber_name || ''}</span>
+        </span>
+      </td>
+      <td class="px-4 py-3 text-smoke/60">${b.date}</td>
+      <td class="px-4 py-3 text-smoke/60">${b.time}</td>
+      <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price||0).toLocaleString('es-CO')}</td>
+      <td class="px-4 py-3">${statusBadge[b.status] || statusBadge.pending}</td>
+      <td class="px-4 py-3">
+        <div class="flex gap-1">
+          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem]">
+            <option value="">Cambiar...</option>
+            <option value="pending">Pendiente</option>
+            <option value="confirmed">Confirmado</option>
+            <option value="completed">Completado</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function quickStatus(id, newStatus) {
+  if (!newStatus) return;
+  fetch(`/api/admin/bookings/${id}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify({ status: newStatus })
+  }).then(() => loadBookings());
+}
+
+function exportCSV() {
+  const params = new URLSearchParams();
+  const barber = document.getElementById('filter-barber').value;
+  const status = document.getElementById('filter-status').value;
+  const dateFrom = document.getElementById('filter-date-from').value;
+  const dateTo = document.getElementById('filter-date-to').value;
+  if (barber) params.set('barber', barber);
+  if (status) params.set('status', status);
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  window.open('/api/admin/bookings/export/?' + params.toString());
+}
+
+function getCSRF() {
+  const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+  return cookie ? cookie.split('=')[1] : '';
+}
+</script>
+{% endblock %}

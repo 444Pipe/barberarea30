@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reserva VIP - Área 30 Barber Club en Restrepo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+                  jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' }, smoke: '#F5F5F5' },
+        fontFamily: { sans: ['Montserrat','sans-serif'], serif: ['Playfair Display','serif'] }
+      }}
+    }
+  </script>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>
+    .step-indicator { display: flex; gap: 0.5rem; align-items: center; }
+    .step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700; border: 2px solid rgba(255,255,255,0.1); color: rgba(245,245,245,0.3);
+      transition: all 0.3s; }
+    .step-dot.active { border-color: #D4AF37; color: #D4AF37; background: rgba(212,175,55,0.08); }
+    .step-dot.completed { border-color: #22c55e; color: #22c55e; background: rgba(34,197,94,0.08); }
+    .step-line { width: 2rem; height: 1px; background: rgba(255,255,255,0.08); }
+    .step-line.completed { background: #22c55e; }
+    .barber-card { background: #111; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.75rem; padding: 1.25rem;
+      cursor: pointer; transition: all 0.3s; text-align: center; }
+    .barber-card:hover { border-color: rgba(212,175,55,0.3); transform: translateY(-2px); }
+    .barber-card.selected { border-color: #D4AF37; background: rgba(212,175,55,0.05);
+      box-shadow: 0 0 20px rgba(212,175,55,0.1); }
+    .time-slot { padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 500;
+      cursor: pointer; transition: all 0.2s; text-align: center; }
+    .time-slot.available { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); color: #22c55e; }
+    .time-slot.available:hover { background: rgba(34,197,94,0.15); border-color: #22c55e; }
+    .time-slot.available.selected { background: #22c55e; color: #0a0a0a; border-color: #22c55e; }
+    .time-slot.unavailable { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+      color: rgba(245,245,245,0.15); cursor: not-allowed; text-decoration: line-through; }
+    .availability-badge { font-size: 0.55rem; padding: 0.15rem 0.5rem; border-radius: 2rem; font-weight: 600; }
+    .avail-available { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .avail-partial { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .avail-unavailable { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .wizard-step { display: none; } .wizard-step.active { display: block; }
+  </style>
+</head>
+<body class="bg-jet text-smoke font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-jet/90 backdrop-blur-md border-b border-gold/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <a href="/" class="text-2xl font-serif font-bold tracking-widest text-gold hover:text-gold-light transition-colors">ÁREA 30</a>
+      <a href="/" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">← Volver al Club</a>
+    </div>
+  </nav>
+
+  <section class="py-16 px-4 bg-jet-lighter border-b border-gold/10 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold/5 via-transparent to-transparent"></div>
+    <div class="max-w-4xl mx-auto text-center relative z-10">
+      <div class="flex justify-center gap-2 mb-4 text-gold text-sm">★★★★★</div>
+      <h1 class="text-4xl md:text-5xl font-serif font-bold mb-4 text-white">Reserva <span class="text-gold italic font-light">VIP</span></h1>
+      <p class="text-smoke/70 font-light max-w-md mx-auto">Selecciona tu servicio, barbero preferido y horario ideal.</p>
+    </div>
+  </section>
+
+  <div class="max-w-4xl mx-auto px-4 py-12">
+    <!-- Step Indicators -->
+    <div class="flex justify-center mb-10">
+      <div class="step-indicator">
+        <div class="step-dot active" id="step-dot-1">1</div>
+        <div class="step-line" id="step-line-1"></div>
+        <div class="step-dot" id="step-dot-2">2</div>
+        <div class="step-line" id="step-line-2"></div>
+        <div class="step-dot" id="step-dot-3">3</div>
+        <div class="step-line" id="step-line-3"></div>
+        <div class="step-dot" id="step-dot-4">4</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: Service Selection -->
+    <div class="wizard-step active" id="step-1">
+      <h2 class="text-xl font-serif text-white mb-6">Selecciona tu <span class="text-gold italic">Servicio</span></h2>
+      <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <p class="text-smoke/40 text-sm col-span-full text-center py-8">Cargando servicios...</p>
+      </div>
+    </div>
+
+    <!-- STEP 2: Date + Barber Selection -->
+    <div class="wizard-step" id="step-2">
+      <h2 class="text-xl font-serif text-white mb-6">Elige <span class="text-gold italic">Fecha y Barbero</span></h2>
+      <div class="mb-6">
+        <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Fecha Deseada</label>
+        <input type="date" id="booking-date" class="w-full md:w-64 px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all">
+      </div>
+      <div id="barbers-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <p class="text-smoke/40 text-sm col-span-full text-center py-8">Selecciona una fecha para ver barberos disponibles</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="goStep(1)" class="px-6 py-3 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-gold transition-colors">← Atrás</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Time Slot Selection -->
+    <div class="wizard-step" id="step-3">
+      <h2 class="text-xl font-serif text-white mb-6">Elige tu <span class="text-gold italic">Hora</span></h2>
+      <div id="selected-barber-info" class="mb-6 text-sm text-smoke/60"></div>
+      <div id="time-slots" class="grid grid-cols-4 md:grid-cols-6 gap-2 mb-8"></div>
+      <div class="flex gap-3">
+        <button onclick="goStep(2)" class="px-6 py-3 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-gold transition-colors">← Atrás</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Client Info + Confirm -->
+    <div class="wizard-step" id="step-4">
+      <h2 class="text-xl font-serif text-white mb-6">Tus <span class="text-gold italic">Datos</span></h2>
+      <div id="booking-summary" class="bg-jet-lighter border border-gold/10 rounded-sm p-6 mb-8">
+        <h3 class="text-xs tracking-widest uppercase text-gold mb-4 font-semibold">Resumen de tu reserva</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-smoke/50">Servicio</span><span id="summary-service" class="text-white"></span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Barbero</span><span id="summary-barber" class="text-gold"></span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Fecha</span><span id="summary-date" class="text-white"></span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Hora</span><span id="summary-time" class="text-white"></span></div>
+          <div class="flex justify-between border-t border-white/5 pt-2 mt-2"><span class="text-smoke/50">Precio</span><span id="summary-price" class="text-emerald-400 font-bold"></span></div>
+        </div>
+      </div>
+      <form id="booking-form" class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Nombre Completo</label>
+            <input type="text" name="name" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Ej: Carlos Santodomingo">
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Teléfono / WhatsApp</label>
+            <input type="tel" name="phone" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="+57 312 487 9250">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Email (opcional)</label>
+          <input type="email" name="email" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="tu@email.com">
+        </div>
+        <div>
+          <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Notas (opcional)</label>
+          <textarea name="notes" rows="2" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Preferencias, indicaciones especiales..."></textarea>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" onclick="goStep(3)" class="px-6 py-3 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-gold transition-colors">← Atrás</button>
+          <button type="submit" class="flex-1 px-8 py-3 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm shadow-lg">Confirmar Reserva</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Success Message -->
+    <div class="wizard-step" id="step-success">
+      <div class="text-center py-16">
+        <div class="text-6xl mb-6">✅</div>
+        <h2 class="text-2xl font-serif font-bold text-white mb-4">¡Reserva <span class="text-gold italic">Confirmada!</span></h2>
+        <p class="text-smoke/60 mb-8">Te contactaremos pronto por WhatsApp para confirmar todos los detalles.</p>
+        <a href="/" class="px-8 py-3 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm inline-block">Volver al Club</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-black pt-12 pb-8 px-4 border-t border-white/5">
+    <div class="max-w-7xl mx-auto text-center flex flex-col md:flex-row justify-between items-center gap-4">
+      <p class="text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
+      <a href="/admin-panel/login/" class="text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase hover:text-gold transition-colors">Acceso Staff</a>
+    </div>
+  </footer>
+
+  <!-- FAB -->
+  <div class="fab-container">
+    <div id="fab-list" class="fab-social-list">
+      <a href="https://wa.me/573124879250" target="_blank" class="social-item" data-label="WhatsApp">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      </a>
+      <a href="https://www.instagram.com/area30barberclub" target="_blank" class="social-item" data-label="Instagram">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      </a>
+    </div>
+    <button id="fab-main" class="fab-main">30</button>
+  </div>
+
+<script>
+// ═══ Booking Wizard State ═══
+const state = {
+  service: null, barber: null, date: null, time: null, slots: [],
+  barbersAvailability: {}
+};
+
+let debounceTimer = null;
+
+// ─── Step Navigation ─────────────────────────
+function goStep(n) {
+  document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+  document.getElementById(`step-${n}`).classList.add('active');
+
+  for (let i = 1; i <= 4; i++) {
+    const dot = document.getElementById(`step-dot-${i}`);
+    dot.classList.remove('active', 'completed');
+    if (i < n) dot.classList.add('completed');
+    else if (i === n) dot.classList.add('active');
+
+    if (i < 4) {
+      const line = document.getElementById(`step-line-${i}`);
+      line.classList.toggle('completed', i < n);
+    }
+  }
+}
+
+// ─── Step 1: Load Services ─────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/services/')
+    .then(r => r.json())
+    .then(services => {
+      const grid = document.getElementById('services-grid');
+      grid.innerHTML = services.map(s => `
+        <div class="service-card p-6 rounded-sm cursor-pointer group hover:border-gold/40 transition-all" data-service='${JSON.stringify(s)}' onclick="selectService(this)">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="text-lg font-serif text-white group-hover:text-gold transition-colors">${s.name}</h3>
+            <span class="text-gold font-semibold">$${Number(s.price).toLocaleString('es-CO')}</span>
+          </div>
+          <p class="text-smoke/50 text-xs mb-3">${s.duration_minutes} minutos</p>
+          ${s.features && s.features.length ? `<ul class="text-[0.65rem] text-smoke/40 space-y-1">${s.features.map(f => `<li>• ${f}</li>`).join('')}</ul>` : ''}
+          ${s.is_popular ? '<span class="inline-block mt-3 text-[0.55rem] tracking-widest uppercase bg-gold/10 text-gold px-2 py-0.5 rounded-full font-semibold">Popular</span>' : ''}
+        </div>
+      `).join('');
+    });
+
+  // Date change handler
+  document.getElementById('booking-date').addEventListener('change', function() {
+    state.date = this.value;
+    if (state.date) loadBarberAvailability();
+  });
+
+  // Set min date to today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('booking-date').setAttribute('min', today);
+
+  // FAB
+  document.getElementById('fab-main').addEventListener('click', () => {
+    document.getElementById('fab-list').classList.toggle('active');
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.fab-container')) document.getElementById('fab-list').classList.remove('active');
+  });
+});
+
+function selectService(el) {
+  state.service = JSON.parse(el.dataset.service);
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('border-gold', 'bg-jet'));
+  el.classList.add('border-gold', 'bg-jet');
+  setTimeout(() => goStep(2), 300);
+}
+
+// ─── Step 2: Load Barber Availability ─────────────────────────
+function loadBarberAvailability() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    fetch('/api/barbers/')
+      .then(r => r.json())
+      .then(barbers => {
+        const grid = document.getElementById('barbers-grid');
+        grid.innerHTML = '<p class="text-smoke/40 text-sm col-span-full text-center py-4">Consultando disponibilidad...</p>';
+
+        const promises = barbers.map(b =>
+          fetch(`/api/barbers/${b.id}/availability/?date=${state.date}`)
+            .then(r => r.json())
+            .then(avail => ({ ...b, avail }))
+        );
+
+        Promise.all(promises).then(results => {
+          grid.innerHTML = results.map(b => {
+            const avail = b.avail;
+            let badgeClass = 'avail-available', badgeText = '🟢 Disponible';
+            if (avail.day_off || avail.availability_status === 'unavailable') {
+              badgeClass = 'avail-unavailable'; badgeText = '🔴 No disponible';
+            } else if (avail.availability_status === 'partial') {
+              badgeClass = 'avail-partial'; badgeText = '🟡 Parcial';
+            }
+
+            return `
+              <div class="barber-card ${avail.day_off || avail.availability_status === 'unavailable' ? 'opacity-50 cursor-not-allowed' : ''}"
+                   data-barber='${JSON.stringify(b)}' data-available='${!avail.day_off && avail.availability_status !== "unavailable"}'
+                   onclick="selectBarber(this)">
+                <div class="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl font-serif font-bold"
+                     style="background: ${b.color_tag}15; color: ${b.color_tag}; border: 2px solid ${b.color_tag}">
+                  ${b.display_name.charAt(0)}
+                </div>
+                <div class="availability-badge ${badgeClass} mb-2">${badgeText}</div>
+                <h3 class="text-white font-semibold text-sm">${b.display_name}</h3>
+                <p class="text-smoke/40 text-[0.6rem] mt-1">${b.specialties.map(s => s.name).join(', ')}</p>
+                <p class="text-smoke/30 text-[0.55rem] mt-2">★ ${b.rating} · ${b.total_cuts} cortes</p>
+              </div>
+            `;
+          }).join('');
+        });
+      });
+  }, 300);
+}
+
+function selectBarber(el) {
+  if (el.dataset.available === 'false') return;
+  state.barber = JSON.parse(el.dataset.barber);
+  document.querySelectorAll('.barber-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+
+  // Load time slots
+  fetch(`/api/barbers/${state.barber.id}/availability/?date=${state.date}`)
+    .then(r => r.json())
+    .then(data => {
+      state.slots = data.slots || [];
+      document.getElementById('selected-barber-info').textContent = `Horarios disponibles con ${state.barber.display_name} el ${state.date}`;
+      renderTimeSlots();
+      setTimeout(() => goStep(3), 300);
+    });
+}
+
+// ─── Step 3: Time Slots ─────────────────────────
+function renderTimeSlots() {
+  const container = document.getElementById('time-slots');
+  if (!state.slots.length) {
+    container.innerHTML = '<p class="text-smoke/40 text-sm col-span-full text-center py-4">No hay slots disponibles</p>';
+    return;
+  }
+  container.innerHTML = state.slots.map(s => {
+    const h = parseInt(s.time.split(':')[0]);
+    const m = s.time.split(':')[1];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const label = `${h12}:${m} ${ampm}`;
+
+    return `<div class="time-slot ${s.available ? 'available' : 'unavailable'}" data-time="${s.time}" onclick="${s.available ? `selectTime(this, '${s.time}')` : ''}">${label}</div>`;
+  }).join('');
+}
+
+function selectTime(el, time) {
+  state.time = time;
+  document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+
+  // Update summary
+  document.getElementById('summary-service').textContent = state.service.name;
+  document.getElementById('summary-barber').textContent = state.barber.display_name;
+  document.getElementById('summary-date').textContent = state.date;
+  const h = parseInt(time.split(':')[0]), m = time.split(':')[1];
+  document.getElementById('summary-time').textContent = `${h%12||12}:${m} ${h>=12?'PM':'AM'}`;
+  document.getElementById('summary-price').textContent = `$${Number(state.service.price).toLocaleString('es-CO')} COP`;
+
+  setTimeout(() => goStep(4), 300);
+}
+
+// ─── Step 4: Submit ─────────────────────────
+document.getElementById('booking-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+
+  fetch('/api/bookings/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_name: formData.get('name'),
+      client_phone: formData.get('phone'),
+      client_email: formData.get('email') || '',
+      notes: formData.get('notes') || '',
+      service_id: state.service.id,
+      barber_id: state.barber.id,
+      date: state.date,
+      time: state.time,
+      price: state.service.price,
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step-success').classList.add('active');
+    } else {
+      alert('Error: ' + (data.error || JSON.stringify(data.errors)));
+    }
+  })
+  .catch(() => alert('Error de conexión. Intenta de nuevo.'));
+});
+</script>
+</body>
+</html>

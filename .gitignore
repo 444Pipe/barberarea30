@@ -1,18 +1,23 @@
 # Python
-__pycache__/
 *.py[cod]
-*$py.class
-.venv/
-venv/
-ENV/
+__pycache__/
+*.so
+*.egg-info/
+dist/
+*.egg
 
-# Flask
-instance/
-.webassets-cache
+# Django
+db.sqlite3
+*.sqlite3
+staticfiles/
+media/
+
+# Environment
 .env
-.flaskenv
+venv/
+.venv/
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -21,3 +26,6 @@ instance/
 # OS
 .DS_Store
 Thumbs.db
+
+# Old Flask
+bookings.db

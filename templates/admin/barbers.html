@@ -1,0 +1,164 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Barberos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Barberos</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Gestión del equipo</p>
+    </div>
+    <button onclick="openAddBarber()" class="px-5 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold hover:shadow-lg hover:shadow-gold/20 transition-all">
+      + Agregar Barbero
+    </button>
+  </div>
+
+  <!-- Barber Cards -->
+  <div id="barber-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="text-center text-smoke/30 text-sm py-12 col-span-full">Cargando barberos...</div>
+  </div>
+</div>
+
+<!-- Add/Edit Barber Modal -->
+<div id="barber-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+  <div class="bg-jet-card border border-white/5 rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h3 class="text-sm tracking-[0.2em] uppercase text-smoke/50 font-semibold" id="barber-modal-title">Agregar Barbero</h3>
+      <button onclick="closeBarberModal()" class="text-smoke/40 hover:text-white">✕</button>
+    </div>
+    <form id="barber-form" class="px-6 py-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="admin-label">Nombre de trabajo</label>
+          <input type="text" name="display_name" required class="admin-input" placeholder="Carlos 'El Tigre'">
+        </div>
+        <div>
+          <label class="admin-label">Color</label>
+          <input type="color" name="color_tag" value="#D4AF37" class="w-full h-10 rounded-md bg-jet border border-white/10 cursor-pointer">
+        </div>
+      </div>
+      <div>
+        <label class="admin-label">Teléfono</label>
+        <input type="text" name="phone" class="admin-input" placeholder="+57 312 000 0000">
+      </div>
+      <div>
+        <label class="admin-label">Bio / Especialidades</label>
+        <textarea name="bio" rows="2" class="admin-input" placeholder="Especialista en fades, degradados..."></textarea>
+      </div>
+      <div class="flex items-center gap-3">
+        <input type="checkbox" name="is_available" checked id="barber-available" class="accent-gold w-4 h-4">
+        <label for="barber-available" class="text-xs text-smoke/60">Disponible para reservas</label>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="flex-1 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold">Guardar</button>
+        <button type="button" onclick="closeBarberModal()" class="px-6 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadBarbers);
+
+function loadBarbers() {
+  fetch('/api/admin/barbers/')
+    .then(r => r.json())
+    .then(renderBarberCards)
+    .catch(() => {
+      document.getElementById('barber-cards').innerHTML = '<div class="text-center text-smoke/30 text-sm py-12 col-span-full">Error al cargar barberos</div>';
+    });
+}
+
+function renderBarberCards(barbers) {
+  const container = document.getElementById('barber-cards');
+  if (!barbers.length) {
+    container.innerHTML = '<div class="text-center text-smoke/30 text-sm py-12 col-span-full">No hay barberos registrados</div>';
+    return;
+  }
+  container.innerHTML = barbers.map(b => `
+    <div class="bg-jet border border-white/5 rounded-xl p-6 hover:border-gold/20 transition-all group">
+      <div class="flex items-start gap-4 mb-4">
+        <div class="w-14 h-14 rounded-full flex items-center justify-center text-xl font-serif font-bold" style="background: ${b.color_tag}20; color: ${b.color_tag}; border: 2px solid ${b.color_tag}">
+          ${b.display_name.charAt(0)}
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-white font-semibold text-sm truncate">${b.display_name}</h3>
+          <p class="text-[0.6rem] text-smoke/40 mt-0.5">${b.specialties.map(s => s.name).join(', ') || 'Sin especialidades'}</p>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="w-1.5 h-1.5 rounded-full ${b.is_available ? 'bg-emerald-400' : 'bg-red-400'}"></span>
+            <span class="text-[0.6rem] ${b.is_available ? 'text-emerald-400' : 'text-red-400'}">${b.is_available ? 'Activo' : 'Inactivo'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between text-[0.65rem] text-smoke/40 mb-4 border-t border-white/5 pt-3">
+        <span>${b.total_cuts} cortes</span>
+        <span>★ ${b.rating}</span>
+      </div>
+      <div class="flex gap-2">
+        <a href="/admin-panel/barbers/my-agenda/?barber=${b.id}" class="flex-1 py-2 rounded-md bg-jet-lighter border border-white/10 text-center text-[0.65rem] tracking-wider uppercase text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">Ver Agenda</a>
+        <button onclick="editBarber(${b.id})" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddBarber() {
+  document.getElementById('barber-modal-title').textContent = 'Agregar Barbero';
+  document.getElementById('barber-form').reset();
+  document.getElementById('barber-form').dataset.mode = 'create';
+  document.getElementById('barber-modal').classList.remove('hidden');
+}
+
+function editBarber(id) {
+  fetch(`/api/admin/barbers/${id}/`)
+    .then(r => r.json())
+    .then(b => {
+      document.getElementById('barber-modal-title').textContent = 'Editar Barbero';
+      const form = document.getElementById('barber-form');
+      form.display_name.value = b.display_name;
+      form.color_tag.value = b.color_tag;
+      form.phone.value = b.phone || '';
+      form.bio.value = b.bio || '';
+      form.is_available.checked = b.is_available;
+      form.dataset.mode = 'edit';
+      form.dataset.barberId = id;
+      document.getElementById('barber-modal').classList.remove('hidden');
+    });
+}
+
+function closeBarberModal() {
+  document.getElementById('barber-modal').classList.add('hidden');
+}
+
+document.getElementById('barber-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const form = this;
+  const data = {
+    display_name: form.display_name.value,
+    color_tag: form.color_tag.value,
+    phone: form.phone.value,
+    bio: form.bio.value,
+    is_available: form.is_available.checked,
+  };
+
+  const isEdit = form.dataset.mode === 'edit';
+  const url = isEdit ? `/api/admin/barbers/${form.dataset.barberId}/` : '/api/admin/barbers/';
+  const method = isEdit ? 'PUT' : 'POST';
+
+  fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify(data),
+  }).then(r => {
+    if (r.ok) { closeBarberModal(); loadBarbers(); }
+  });
+});
+
+function getCSRF() {
+  const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+  return cookie ? cookie.split('=')[1] : '';
+}
+</script>
+{% endblock %}

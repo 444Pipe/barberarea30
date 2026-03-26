@@ -1,0 +1,138 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Dashboard</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Resumen del día — <span id="today-date"></span></p>
+    </div>
+    <a href="/" target="_blank" class="text-xs text-smoke/40 hover:text-gold transition-colors tracking-wider uppercase flex items-center gap-1">
+      Ver sitio →
+    </a>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-cards">
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Ingresos Hoy</div>
+      <div class="text-xl font-bold text-gold" id="kpi-revenue-day">$0</div>
+      <div class="flex gap-1 mt-2">
+        <button class="kpi-toggle active" data-period="day">Día</button>
+        <button class="kpi-toggle" data-period="week">Sem</button>
+        <button class="kpi-toggle" data-period="month">Mes</button>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Pendientes</div>
+      <div class="text-xl font-bold text-amber-400" id="kpi-pending">0</div>
+      <div class="text-[0.55rem] text-smoke/30 mt-2">reservas por confirmar</div>
+    </div>
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Top Barbero</div>
+      <div class="text-xl font-bold text-white truncate" id="kpi-top-barber">—</div>
+      <div class="text-[0.55rem] text-smoke/30 mt-2">este mes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Cancelación</div>
+      <div class="text-xl font-bold text-red-400" id="kpi-cancel-rate">0%</div>
+      <div class="text-[0.55rem] text-smoke/30 mt-2">tasa mensual</div>
+    </div>
+  </div>
+
+  <!-- Today Kanban View -->
+  <div class="bg-jet-card border border-white/5 rounded-xl p-6">
+    <h2 class="text-xs tracking-[0.3em] uppercase text-smoke/40 font-semibold mb-4">
+      Agenda de Hoy — <span class="text-gold" id="kanban-date"></span>
+    </h2>
+    <div id="kanban-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div class="text-center text-smoke/30 text-sm py-8 col-span-full">Cargando agenda...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date();
+  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const dateStr = today.toLocaleDateString('es-CO', opts);
+  document.getElementById('today-date').textContent = dateStr;
+  document.getElementById('kanban-date').textContent = dateStr;
+
+  let dashData = null;
+
+  fetch('/api/admin/stats/dashboard/')
+    .then(r => r.json())
+    .then(data => {
+      dashData = data;
+      updateRevenue('day');
+      document.getElementById('kpi-pending').textContent = data.pending_count;
+      document.getElementById('kpi-top-barber').textContent = data.top_barber;
+      document.getElementById('kpi-cancel-rate').textContent = data.cancel_rate + '%';
+      renderKanban(data.today_kanban);
+    })
+    .catch(() => {
+      document.getElementById('kanban-container').innerHTML = '<div class="text-center text-smoke/30 text-sm py-8 col-span-full">Sin datos disponibles</div>';
+    });
+
+  function updateRevenue(period) {
+    if (!dashData) return;
+    const val = dashData.revenue[period] || 0;
+    document.getElementById('kpi-revenue-day').textContent = '$' + val.toLocaleString('es-CO');
+  }
+
+  document.querySelectorAll('.kpi-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.kpi-toggle').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateRevenue(btn.dataset.period);
+    });
+  });
+
+  function renderKanban(kanban) {
+    const container = document.getElementById('kanban-container');
+    if (!kanban || Object.keys(kanban).length === 0) {
+      container.innerHTML = '<div class="text-center text-smoke/30 text-sm py-8 col-span-full">No hay citas programadas para hoy</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (const [barberName, bookings] of Object.entries(kanban)) {
+      const col = document.createElement('div');
+      col.className = 'bg-jet border border-white/5 rounded-lg overflow-hidden';
+      let html = `<div class="px-4 py-3 bg-jet-lighter border-b border-white/5">
+        <h3 class="text-sm font-bold text-white tracking-wider uppercase">${barberName}</h3>
+        <span class="text-[0.6rem] text-smoke/40">${bookings.length} cita(s)</span>
+      </div><div class="p-3 space-y-2">`;
+
+      bookings.forEach(b => {
+        const statusColors = {
+          'pending': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+          'confirmed': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+          'completed': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+          'cancelled': 'bg-red-500/20 text-red-400 border-red-500/30',
+        };
+        const statusIcons = { pending: '⏳', confirmed: '✓', completed: '✅', cancelled: '🚫' };
+        const cls = statusColors[b.status] || statusColors.pending;
+        html += `<div class="flex items-center justify-between px-3 py-2 rounded-md border ${cls} text-xs">
+          <div>
+            <span class="font-semibold">${b.time}</span>
+            <span class="ml-2 text-white/80">${b.client}</span>
+          </div>
+          <span>${statusIcons[b.status] || '⏳'}</span>
+        </div>`;
+      });
+
+      html += '</div>';
+      col.innerHTML = html;
+      container.appendChild(col);
+    }
+  }
+});
+</script>
+{% endblock %}

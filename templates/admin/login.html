@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso — Área 30 Barber Club</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          gold: { DEFAULT: '#D4AF37', dark: '#b8962e', light: '#f3d97f' },
+          jet: { DEFAULT: '#0a0a0a', card: '#111111', lighter: '#1a1a1a' },
+          smoke: '#F5F5F5'
+        },
+        fontFamily: { sans: ['Montserrat','sans-serif'], serif: ['Playfair Display','serif'] }
+      }}
+    }
+  </script>
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    input:focus { outline: none; border-color: #D4AF37 !important; box-shadow: 0 0 0 1px #D4AF37; }
+  </style>
+</head>
+<body class="min-h-screen bg-jet flex items-center justify-center px-4">
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-gold/5 rounded-full blur-[120px]"></div>
+  </div>
+
+  <div class="w-full max-w-sm relative z-10">
+    <div class="text-center mb-10">
+      <div class="text-4xl font-serif font-bold tracking-widest text-gold mb-2">ÁREA 30</div>
+      <div class="flex items-center justify-center gap-3">
+        <div class="h-[1px] w-8 bg-gold/40"></div>
+        <span class="text-[0.6rem] tracking-[0.4em] text-smoke/50 uppercase font-semibold">Barber Club</span>
+        <div class="h-[1px] w-8 bg-gold/40"></div>
+      </div>
+    </div>
+
+    <div class="bg-jet-card border border-white/5 rounded-lg p-8 shadow-2xl backdrop-blur-sm">
+      <h1 class="text-xs tracking-[0.3em] uppercase text-smoke/40 mb-6 text-center font-semibold">Panel Administrativo</h1>
+
+      {% if error %}
+      <div class="mb-5 text-sm text-red-400 bg-red-950/30 border border-red-600/30 rounded-md px-4 py-2.5 text-center">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div>
+          <label class="block text-[0.65rem] tracking-widest uppercase text-smoke/50 mb-2 font-semibold">Usuario</label>
+          <input type="text" name="username" required autofocus
+            class="w-full px-4 py-3 bg-jet border border-white/10 text-white text-sm rounded-md transition-all"
+            placeholder="Tu usuario">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] tracking-widest uppercase text-smoke/50 mb-2 font-semibold">Contraseña</label>
+          <input type="password" name="password" required
+            class="w-full px-4 py-3 bg-jet border border-white/10 text-white text-sm rounded-md transition-all"
+            placeholder="••••••••">
+        </div>
+        <button type="submit"
+          class="w-full mt-2 py-3 rounded-md text-xs tracking-[0.3em] uppercase font-bold transition-all
+                 bg-gradient-to-r from-gold-dark to-gold text-jet hover:from-gold hover:to-gold-light
+                 shadow-lg hover:shadow-gold/20">
+          Entrar
+        </button>
+        <a href="/" class="block text-center mt-4 text-[0.6rem] tracking-[0.2em] text-smoke/40 hover:text-gold transition-colors uppercase font-medium">
+          ← Volver al Sitio
+        </a>
+      </form>
+    </div>
+
+    <p class="text-center mt-8 text-[0.55rem] tracking-[0.2em] text-smoke/20 uppercase">
+      © 2026 Área 30 Barber Club · Restrepo, Meta
+    </p>
+  </div>
+</body>
+</html>

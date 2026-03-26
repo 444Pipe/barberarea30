@@ -1,0 +1,110 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div>
+    <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Clientes</h1>
+    <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Historial de clientes</p>
+  </div>
+
+  <div class="bg-jet-card border border-white/5 rounded-xl p-4">
+    <input type="text" id="client-search" oninput="debounceClientSearch()" class="admin-input w-full lg:w-80" placeholder="Buscar por nombre o teléfono...">
+  </div>
+
+  <div class="bg-jet-card border border-white/5 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-xs">
+        <thead>
+          <tr class="bg-jet-lighter text-smoke/40 tracking-widest uppercase text-[0.6rem]">
+            <th class="px-4 py-3 text-left">Cliente</th>
+            <th class="px-4 py-3 text-left">Teléfono</th>
+            <th class="px-4 py-3 text-left">Visitas</th>
+            <th class="px-4 py-3 text-left">Total Gastado</th>
+            <th class="px-4 py-3 text-left">Última Visita</th>
+            <th class="px-4 py-3 text-left">Barbero Preferido</th>
+            <th class="px-4 py-3 text-left">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="clients-table" class="divide-y divide-white/5"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Client History Modal -->
+<div id="client-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+  <div class="bg-jet-card border border-white/5 rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[80vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h3 class="text-sm tracking-[0.2em] uppercase text-smoke/50 font-semibold" id="client-modal-name">Cliente</h3>
+      <button onclick="closeClientModal()" class="text-smoke/40 hover:text-white">✕</button>
+    </div>
+    <div id="client-history" class="px-6 py-4 space-y-3"></div>
+    <div class="px-6 py-3 border-t border-white/5">
+      <button onclick="closeClientModal()" class="w-full py-2 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase hover:text-white">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let clientSearchTimeout = null;
+
+document.addEventListener('DOMContentLoaded', loadClients);
+
+function debounceClientSearch() {
+  clearTimeout(clientSearchTimeout);
+  clientSearchTimeout = setTimeout(loadClients, 400);
+}
+
+function loadClients() {
+  const search = document.getElementById('client-search').value;
+  const params = search ? `?search=${encodeURIComponent(search)}` : '';
+
+  fetch('/api/admin/clients/' + params)
+    .then(r => r.json())
+    .then(clients => {
+      const tbody = document.getElementById('clients-table');
+      tbody.innerHTML = clients.map(c => `
+        <tr class="hover:bg-white/[0.02]">
+          <td class="px-4 py-3 text-white font-medium">${c.name}</td>
+          <td class="px-4 py-3 text-smoke/60">${c.phone}</td>
+          <td class="px-4 py-3 text-smoke/80">${c.total_visits}</td>
+          <td class="px-4 py-3 text-emerald-400 font-medium">$${(c.total_spent||0).toLocaleString('es-CO')}</td>
+          <td class="px-4 py-3 text-smoke/60">${c.last_visit}</td>
+          <td class="px-4 py-3 text-gold">${c.preferred_barber}</td>
+          <td class="px-4 py-3">
+            <button onclick="viewHistory('${c.phone}')" class="text-[0.65rem] text-smoke/50 hover:text-gold tracking-wider uppercase transition-colors">Ver historial</button>
+          </td>
+        </tr>
+      `).join('');
+    });
+}
+
+function viewHistory(phone) {
+  fetch(`/api/admin/clients/${encodeURIComponent(phone)}/history/`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('client-modal-name').textContent = data.name;
+      const container = document.getElementById('client-history');
+      container.innerHTML = `
+        <div class="text-xs text-smoke/40 mb-2">${data.phone} · ${data.total_visits} visitas</div>
+        ${data.history.map(h => `
+          <div class="flex items-center justify-between py-2 border-b border-white/5 text-xs">
+            <div>
+              <span class="text-white">${h.date}</span>
+              <span class="text-smoke/40 ml-2">${h.time}</span>
+              <span class="text-smoke/60 ml-2">${h.service}</span>
+            </div>
+            <span class="text-emerald-400">$${(h.price||0).toLocaleString('es-CO')}</span>
+          </div>
+        `).join('')}
+      `;
+      document.getElementById('client-modal').classList.remove('hidden');
+    });
+}
+
+function closeClientModal() {
+  document.getElementById('client-modal').classList.add('hidden');
+}
+</script>
+{% endblock %}
