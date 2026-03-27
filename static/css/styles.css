@@ -223,3 +223,34 @@ textarea:focus {
 .social-item:hover::after {
   opacity: 1;
 }
+<<<<<<< HEAD
+=======
+
+/* Ajustes responsive para móvil */
+@media (max-width: 640px) {
+  .fab-container {
+    bottom: 1.25rem;
+    right: 1.25rem;
+  }
+
+  .fab-main {
+    width: 52px;
+    height: 52px;
+    font-size: 1.1rem;
+  }
+
+  .fab-social-list {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .social-item {
+    width: 44px;
+    height: 44px;
+  }
+
+  .social-item::after {
+    display: none;
+  }
+}
+>>>>>>> 33d633d7e30239bdfeb32aca0e3c8201c45d5fc6
