@@ -27,7 +27,8 @@
       }
     }
   </script>
-  <link rel="stylesheet" href="/static/css/admin.css">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/admin.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-jet text-smoke font-sans antialiased">
@@ -134,7 +135,7 @@
       overlay.classList.toggle('hidden');
     }
   </script>
-  <script src="/static/js/admin.js"></script>
+  <script src="{% static 'js/admin.js' %}"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

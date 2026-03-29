@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -27,7 +28,7 @@
       }
     }
   </script>
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
   
@@ -111,7 +112,7 @@
     </div>
   </footer>
 
-  <script src="/static/js/services.js"></script>
+  <script src="{% static 'js/services.js' %}"></script>
   
   <!-- Botón Flotante de Redes Sociales (FAB) -->
   <div class="fab-container">

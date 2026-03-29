@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="es">
 
 <head>
@@ -41,8 +42,8 @@
     }
   </script>
 
-  <link rel="stylesheet" href="/static/css/styles.css">
-  <link rel="stylesheet" href="/static/css/modal.css">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/modal.css' %}">
 </head>
 
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
@@ -96,7 +97,7 @@
   <section class="hero-section relative min-h-screen flex items-center justify-center px-4 overflow-hidden pt-20">
     <!-- Background Image with Parallax & Lujo -->
     <div class="absolute inset-0 z-0">
-      <img src="/static/images/hero_luxury.png" alt="Área 30 Club" class="w-full h-full object-cover scale-110">
+      <img src="{% static 'images/hero_luxury.png' %}" alt="Área 30 Club" class="w-full h-full object-cover scale-110">
       <div class="absolute inset-0 bg-gradient-to-r from-jet via-jet/40 to-transparent z-10"></div>
       <div class="absolute inset-0 bg-gradient-to-b from-jet/60 via-transparent to-jet z-10"></div>
       <div class="absolute top-1/2 left-0 w-full h-1/2 bg-gold/5 blur-[120px] -translate-y-1/2 z-10"></div>
@@ -157,7 +158,7 @@
           <div class="absolute -inset-4 border border-gold/20 rounded-sm transform translate-x-4 -translate-y-4"></div>
           <div class="aspect-[4/5] bg-jet border border-white/5 relative z-10 flex items-center justify-center overflow-hidden group">
             <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10 duration-500"></div>
-            <img src="/static/images/area30_silla.jpeg" alt="Interior VIP Área 30" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
+            <img src="{% static 'images/area30_silla.jpeg' %}" alt="Interior VIP Área 30" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
           </div>
         </div>
         <div class="order-1 lg:order-2">
@@ -441,6 +442,6 @@
     </div>
   </div>
 
-  <script src="/static/js/booking-modal.js"></script>
+  <script src="{% static 'js/booking-modal.js' %}"></script>
 </body>
 </html>
