@@ -28,3 +28,7 @@ CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
     'https://*.up.railway.app'
 ).split(',')
+
+# WhiteNoise: en Railway preferimos usar los finders de Django
+# para servir directamente desde la carpeta "static/".
+WHITENOISE_USE_FINDERS = True
