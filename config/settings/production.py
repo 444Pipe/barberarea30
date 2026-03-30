@@ -7,15 +7,22 @@ import dj_database_url
 
 from .base import *  # noqa: F401,F403
 
-DEBUG = False
+
+def _split_env(value: str) -> list:
+    """Convierte 'a, b, c' en ['a', 'b', 'c'] sin espacios vacíos."""
+    return [v.strip() for v in value.split(',') if v.strip()]
+
+
+# ── Core ─────────────────────────────────────────────────────────
+SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)            # noqa: F405
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-# Permite usar ALLOWED_HOSTS o, si no existe, ALLOWED_HOST (como fallback)
-ALLOWED_HOSTS = os.environ.get(
+ALLOWED_HOSTS = _split_env(os.environ.get(
     'ALLOWED_HOSTS',
-    os.environ.get('ALLOWED_HOST', '*')
-).split(',')
+    'barberarea30-production.up.railway.app,localhost,127.0.0.1'
+))
 
+# ── Database (PostgreSQL via DATABASE_URL) ───────────────────────
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
@@ -24,18 +31,19 @@ DATABASES = {
     )
 }
 
-# Security
+# ── Security ─────────────────────────────────────────────────────
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
-CSRF_TRUSTED_ORIGINS = os.environ.get(
+CSRF_TRUSTED_ORIGINS = _split_env(os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
     'https://barberarea30-production.up.railway.app'
-).split(',')
+))
 
-# WhiteNoise: en Railway preferimos usar los finders de Django
-# para servir directamente desde la carpeta "static/".
+# ── Static files (WhiteNoise) ───────────────────────────────────
+# STATIC_ROOT y STATICFILES_STORAGE ya vienen de base.py
+# Activar finders para servir además desde STATICFILES_DIRS
 WHITENOISE_USE_FINDERS = True
