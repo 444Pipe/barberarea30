@@ -8,7 +8,13 @@ import dj_database_url
 from .base import *  # noqa: F401,F403
 
 DEBUG = False
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+
+# Permite usar ALLOWED_HOSTS o, si no existe, ALLOWED_HOST (como fallback)
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS',
+    os.environ.get('ALLOWED_HOST', '*')
+).split(',')
 
 DATABASES = {
     'default': dj_database_url.config(
@@ -27,7 +33,7 @@ CSRF_COOKIE_SECURE = True
 
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://*.up.railway.app'
+    'https://barberarea30-production.up.railway.app'
 ).split(',')
 
 # WhiteNoise: en Railway preferimos usar los finders de Django
