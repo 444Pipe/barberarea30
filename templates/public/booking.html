@@ -45,6 +45,10 @@
     .avail-partial { background: rgba(245,158,11,0.15); color: #f59e0b; }
     .avail-unavailable { background: rgba(239,68,68,0.15); color: #ef4444; }
     .wizard-step { display: none; } .wizard-step.active { display: block; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body class="bg-jet text-smoke font-sans antialiased">
@@ -211,19 +215,22 @@ function goStep(n) {
 
 // ─── Step 1: Load Services ─────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
-  fetch('/api/services/')
+  fetch('/api/servicios-nativos/')
     .then(r => r.json())
-    .then(services => {
+    .then(data => {
       const grid = document.getElementById('services-grid');
-      grid.innerHTML = services.map(s => `
-        <div class="service-card p-6 rounded-sm cursor-pointer group hover:border-gold/40 transition-all" data-service='${JSON.stringify(s)}' onclick="selectService(this)">
-          <div class="flex justify-between items-start mb-3">
+      grid.innerHTML = data.servicios.map((s, idx) => `
+        <div class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group hover:border-gold/60 border border-white/5 bg-jet transition-all duration-300 shadow-2xl" 
+             style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${idx*100}ms; opacity: 0;"
+             data-service='${JSON.stringify(s)}' onclick="selectService(this)">
+          <div class="flex justify-between items-start mb-4">
             <h3 class="text-lg font-serif text-white group-hover:text-gold transition-colors">${s.name}</h3>
-            <span class="text-gold font-semibold">$${Number(s.price).toLocaleString('es-CO')}</span>
+            <span class="text-gold font-semibold tracking-widest">$${parseFloat(s.price).toLocaleString('es-CO')}</span>
           </div>
-          <p class="text-smoke/50 text-xs mb-3">${s.duration_minutes} minutos</p>
-          ${s.features && s.features.length ? `<ul class="text-[0.65rem] text-smoke/40 space-y-1">${s.features.map(f => `<li>• ${f}</li>`).join('')}</ul>` : ''}
-          ${s.is_popular ? '<span class="inline-block mt-3 text-[0.55rem] tracking-widest uppercase bg-gold/10 text-gold px-2 py-0.5 rounded-full font-semibold">Popular</span>' : ''}
+          <p class="text-smoke/60 font-light text-xs mb-3 leading-relaxed italic">Duración: ${s.duration_minutes} min</p>
+          <div class="mt-4 flex items-center gap-2 text-[0.65rem] text-gold uppercase tracking-widest font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+            Seleccionar <span class="text-sm">→</span>
+          </div>
         </div>
       `).join('');
     });
@@ -258,11 +265,12 @@ function selectService(el) {
 function loadBarberAvailability() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    fetch('/api/barbers/')
+    fetch('/api/barberos-nativos/')
       .then(r => r.json())
-      .then(barbers => {
+      .then(data => {
         const grid = document.getElementById('barbers-grid');
         grid.innerHTML = '<p class="text-smoke/40 text-sm col-span-full text-center py-4">Consultando disponibilidad...</p>';
+        const barbers = data.barberos;
 
         const promises = barbers.map(b =>
           fetch(`/api/barbers/${b.id}/availability/?date=${state.date}`)
@@ -271,7 +279,7 @@ function loadBarberAvailability() {
         );
 
         Promise.all(promises).then(results => {
-          grid.innerHTML = results.map(b => {
+          grid.innerHTML = results.map((b, idx) => {
             const avail = b.avail;
             let badgeClass = 'avail-available', badgeText = '🟢 Disponible';
             if (avail.day_off || avail.availability_status === 'unavailable') {
@@ -281,17 +289,21 @@ function loadBarberAvailability() {
             }
 
             return `
-              <div class="barber-card ${avail.day_off || avail.availability_status === 'unavailable' ? 'opacity-50 cursor-not-allowed' : ''}"
-                   data-barber='${JSON.stringify(b)}' data-available='${!avail.day_off && avail.availability_status !== "unavailable"}'
+              <div class="barber-card p-6 rounded-sm relative overflow-hidden group border border-white/5 bg-jet transition-all duration-300 hover:border-gold/60 flex flex-col items-center ${avail.day_off || avail.availability_status === 'unavailable' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
+                   style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${idx*100}ms; opacity: 0;"
+                   data-barber='${JSON.stringify({id: b.id, display_name: b.nombre})}' 
+                   data-available='${!avail.day_off && avail.availability_status !== "unavailable"}'
                    onclick="selectBarber(this)">
-                <div class="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl font-serif font-bold"
-                     style="background: ${b.color_tag}15; color: ${b.color_tag}; border: 2px solid ${b.color_tag}">
-                  ${b.display_name.charAt(0)}
+                
+                <div class="w-16 h-16 rounded-full border border-gold/40 flex items-center justify-center text-gold mb-4 group-hover:scale-110 transition-transform duration-500">
+                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                     </svg>
                 </div>
-                <div class="availability-badge ${badgeClass} mb-2">${badgeText}</div>
-                <h3 class="text-white font-semibold text-sm">${b.display_name}</h3>
-                <p class="text-smoke/40 text-[0.6rem] mt-1">${b.specialties.map(s => s.name).join(', ')}</p>
-                <p class="text-smoke/30 text-[0.55rem] mt-2">★ ${b.rating} · ${b.total_cuts} cortes</p>
+                <div class="availability-badge ${badgeClass} mb-3">${badgeText}</div>
+                <h3 class="text-white font-serif text-lg group-hover:text-gold transition-colors mb-2">${b.nombre}</h3>
+                <div class="h-[1px] w-8 bg-gold/50 mx-auto my-2"></div>
+                <p class="text-smoke/60 font-light text-[0.6rem] uppercase tracking-widest italic">${b.especialidad || 'Grooming Expert'}</p>
               </div>
             `;
           }).join('');
