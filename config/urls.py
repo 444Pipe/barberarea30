@@ -13,6 +13,7 @@ urlpatterns = [
 
     # Public pages
     path('', include('apps.bookings.urls_pages')),
+    path('barbero/', include('apps.barbers.urls_pages')),
 
     # Public API
     path('api/', include('apps.services.urls')),

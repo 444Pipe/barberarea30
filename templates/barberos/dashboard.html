@@ -1,0 +1,329 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | {{ barbero.display_name }}</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Estilos base */
+    .btn-gold {
+      background: linear-gradient(135deg, theme('colors.gold.light') 0%, theme('colors.gold.DEFAULT') 50%, theme('colors.gold.dark') 100%);
+      color: theme('colors.jet.DEFAULT');
+      transition: all 0.3s ease;
+    }
+    .btn-gold:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  </style>
+</head>
+
+<body class="bg-jet text-smoke font-sans antialiased min-h-screen">
+  
+  <!-- Navbar -->
+  <nav class="sticky top-0 z-40 bg-jet border-b border-gold/20 flex items-center justify-between px-4 py-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full border border-gold/40 flex items-center justify-center overflow-hidden">
+        {% if barbero.avatar %}
+          <img src="{{ barbero.avatar.url }}" alt="{{ barbero.display_name }}" class="w-full h-full object-cover">
+        {% else %}
+          <span class="text-gold font-serif font-bold">{{ barbero.display_name|make_list|first|upper }}</span>
+        {% endif %}
+      </div>
+      <div>
+        <h1 class="text-lg font-serif font-bold text-white tracking-wide">{{ barbero.display_name }}</h1>
+        <p class="text-[0.65rem] tracking-[0.2em] uppercase text-gold/80">Barber Club</p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'barbero_logout' %}" class="inline">
+      {% csrf_token %}
+      <button type="submit" class="text-xs uppercase tracking-widest text-smoke/50 hover:text-gold transition-colors">
+        Salir
+      </button>
+    </form>
+  </nav>
+
+  <!-- Contenido -->
+  <main class="max-w-xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-xl font-serif text-white">Mi Agenda</h2>
+      <span class="text-xs tracking-widest uppercase text-smoke/40">{{ citas|length }} citas</span>
+    </div>
+
+    {% if error_perfil %}
+      <div class="bg-red-500/10 border border-red-500/50 p-6 rounded-sm text-center">
+        <p class="text-sm text-red-200">El usuario actual no tiene un perfil de barbero asociado. Contacta al administrador.</p>
+      </div>
+    {% else %}
+      {% if not citas %}
+        <!-- Empty State -->
+        <div class="border border-white/5 bg-jet-card rounded-sm p-12 text-center mt-12">
+          <svg class="w-16 h-16 mx-auto text-gold/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <h3 class="text-lg font-serif text-white mb-2">Agenda Libre</h3>
+          <p class="text-sm text-smoke/50 tracking-wide font-light">No tienes cortes pendientes por el momento.</p>
+        </div>
+      {% else %}
+        <!-- Cards List -->
+        <div class="space-y-4">
+          {% for cita in citas %}
+            <div class="card-cita border border-gold/20 bg-jet-lighter p-5 rounded-sm flex flex-col gap-4 relative overflow-hidden transition-all"
+                 id="card-{{ cita.id }}"
+                 data-id="{{ cita.id }}"
+                 data-cliente="{{ cita.client_name }}"
+                 data-barbero="{{ barbero.display_name }}"
+                 data-servicio="{% if cita.service %}{{ cita.service.name }}{% else %}Servicio general{% endif %}"
+                 data-precio="{{ cita.price|floatformat:0 }}">
+              
+              <!-- Detalles Superiores -->
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-serif font-medium text-lg text-white mb-1">{{ cita.client_name }}</h3>
+                  <p class="text-xs uppercase tracking-widest text-gold">{% if cita.service %}{{ cita.service.name }}{% else %}Corte general{% endif %}</p>
+                </div>
+                <!-- Status/Price -->
+                <div class="text-right">
+                  <div class="text-sm font-semibold text-white tracking-widest mb-1">${{ cita.price|floatformat:0 }}</div>
+                  <div class="text-[0.6rem] uppercase tracking-wider px-2 py-0.5 rounded-sm {% if cita.status == 'confirmed' %}bg-green-500/10 text-green-400 border border-green-500/20{% else %}bg-gold/10 text-gold border border-gold/20{% endif %} inline-block">
+                    {{ cita.get_status_display }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Info hora y fecha -->
+              <div class="flex flex-wrap items-center gap-4 text-xs font-light text-smoke/60 mt-2">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-gold/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  <span>{{ cita.date|date:"d M Y" }}</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-gold/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span>{{ cita.time|time:"h:i A" }}</span>
+                </div>
+              </div>
+              
+              <div class="h-[1px] w-full bg-white/5 my-2"></div>
+
+              <!-- Accion -->
+              <button class="btn-finalizar btn-gold w-full py-3 text-xs tracking-[0.2em] font-bold uppercase rounded-sm"
+                      data-id="{{ cita.id }}">
+                 Terminar y Check-out
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endif %}
+  </main>
+
+  <!-- Modal Finalizar Cita -->
+  <div id="modal-finalizar" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-jet-card w-full max-w-sm rounded-[4px] border border-gold/20 shadow-2xl transform scale-95 transition-transform duration-300" id="modal-content">
+      
+      <!-- Header mod -->
+      <div class="flex items-center justify-between p-5 border-b border-white/5">
+        <h3 class="text-sm font-serif text-white uppercase tracking-widest font-semibold">Finalizar Cita</h3>
+        <button id="btn-close-modal" class="text-smoke/50 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Body mod -->
+      <div class="p-5 space-y-4">
+        <div id="modal-error" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-sm text-center">
+        </div>
+
+        <div>
+          <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Cliente</label>
+          <div id="m-cliente" class="text-white text-sm font-medium pb-2 border-b border-white/5"></div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Servicio</label>
+            <div id="m-servicio" class="text-gold text-sm"></div>
+          </div>
+          <div>
+            <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Precio</label>
+            <div id="m-precio" class="text-white text-sm font-semibold tracking-wide"></div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[0.6rem] uppercase tracking-widest text-gold/80 mb-2 mt-2">Observaciones / Notas</label>
+          <textarea id="m-observaciones" rows="3" class="w-full bg-jet p-3 rounded-sm border border-white/10 text-smoke text-sm focus:border-gold/50 focus:ring-0 transition-colors resize-none placeholder:text-smoke/30" placeholder="Ej: Se realizó diseño de barba, cliente pagó en efectivo..."></textarea>
+        </div>
+
+        {% csrf_token %}
+        <input type="hidden" id="m-cita-id">
+      </div>
+
+      <!-- Footer mod -->
+      <div class="p-5 pt-2">
+        <button id="btn-confirmar" class="w-full btn-gold py-4 text-xs font-bold tracking-[0.2em] uppercase rounded-sm flex items-center justify-center gap-2">
+          <span>Confirmar y Guardar</span>
+          <!-- Loading spinner (hidden por defecto) -->
+          <svg id="spinner" class="animate-spin h-4 w-4 hidden text-jet" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('modal-finalizar');
+      const modalContent = document.getElementById('modal-content');
+      const btnClose = document.getElementById('btn-close-modal');
+      const btnConfirmar = document.getElementById('btn-confirmar');
+      const spinner = document.getElementById('spinner');
+      const errorBox = document.getElementById('modal-error');
+      
+      // DOM elements in modal
+      const inId = document.getElementById('m-cita-id');
+      const inCliente = document.getElementById('m-cliente');
+      const inServicio = document.getElementById('m-servicio');
+      const inPrecio = document.getElementById('m-precio');
+      const inObservaciones = document.getElementById('m-observaciones');
+
+      // Funciones para abrir/cerrar modal
+      const openModal = () => {
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modalContent.classList.remove('scale-95');
+        modalContent.classList.add('scale-100');
+        errorBox.classList.add('hidden');
+        inObservaciones.value = '';
+      };
+
+      const closeModal = () => {
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-95');
+      };
+
+      // Listener para botones de "Terminar" en cada card
+      document.querySelectorAll('.btn-finalizar').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const card = e.target.closest('.card-cita');
+          
+          // Inyectar data en el modal
+          inId.value = card.dataset.id;
+          inCliente.textContent = card.dataset.cliente;
+          inServicio.textContent = card.dataset.servicio;
+          
+          // Formateo sencillo para el precio
+          const priceValue = parseFloat(card.dataset.precio || 0);
+          inPrecio.textContent = `$${priceValue.toLocaleString('es-CO')}`;
+
+          openModal();
+        });
+      });
+
+      // Cerrar con botones
+      btnClose.addEventListener('click', closeModal);
+      
+      // Cerrar al clickear fuera del form (en el overlay)
+      modal.addEventListener('click', (e) => {
+        if(e.target === modal) closeModal();
+      });
+
+      // Cerrar con Escape
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape' && !modal.classList.contains('pointer-events-none')) {
+          closeModal();
+        }
+      });
+
+      // Confirmar (Fetch POST)
+      btnConfirmar.addEventListener('click', () => {
+        const idCita = inId.value;
+        const observaciones = inObservaciones.value.trim();
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // UI loading state
+        btnConfirmar.disabled = true;
+        spinner.classList.remove('hidden');
+        errorBox.classList.add('hidden');
+
+        // FormData for Django
+        const formData = new FormData();
+        formData.append('cita_id', idCita);
+        formData.append('observaciones', observaciones);
+
+        fetch('/barbero/finalizar-cita/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken
+            // No enviar Content-Type si usamos FormData, el navgador lo pone (multipart)
+          },
+          body: formData
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(err => { throw err; }).catch(() => { throw new Error('Error en el servidor'); });
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.ok) {
+            closeModal();
+            // Remover card del DOM suavemente
+            const cardElement = document.getElementById('card-' + idCita);
+            if(cardElement) {
+              cardElement.style.height = cardElement.offsetHeight + 'px';
+              cardElement.style.opacity = '0';
+              cardElement.style.overflow = 'hidden';
+              setTimeout(() => {
+                cardElement.style.height = '0px';
+                cardElement.style.marginTop = '0px';
+                cardElement.style.marginBottom = '0px';
+                cardElement.style.paddingTop = '0px';
+                cardElement.style.paddingBottom = '0px';
+                cardElement.style.borderWidth = '0px';
+              }, 300);
+              setTimeout(() => { cardElement.remove(); }, 600);
+            }
+          } else {
+            throw new Error(data.error || 'Error inesperado al procesar.');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          errorBox.textContent = err.error || err.message || 'No se pudo conectar con el servidor.';
+          errorBox.classList.remove('hidden');
+        })
+        .finally(() => {
+          btnConfirmar.disabled = false;
+          spinner.classList.add('hidden');
+        });
+
+      });
+    });
+  </script>
+</body>
+</html>

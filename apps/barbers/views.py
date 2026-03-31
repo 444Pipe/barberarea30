@@ -6,6 +6,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove
 from apps.bookings.models import Booking
 from .models import Barber
@@ -193,3 +197,58 @@ def obtener_barberos_nativos(request):
             'especialidad': especialidades
         })
     return JsonResponse({'barberos': barberos}, safe=False)
+
+
+# ─── Dashboard Barberos (Panel Web) ──────────────────────
+
+@login_required
+def dashboard_barbero(request):
+    """Vista para el panel privado del barbero.
+    Lista sus reservas pendientes/confirmadas del día o futuras.
+    """
+    try:
+        barbero = request.user.barber_profile
+    except Barber.DoesNotExist:
+        # En caso de que un admin u otro rol sin perfil de barbero ingrese
+        return render(request, 'barberos/dashboard.html', {
+            'error_perfil': True
+        })
+
+    # Citas asignadas al barbero en estado pendente o confirmado
+    citas = Booking.objects.filter(
+        barber=barbero,
+        status__in=['pending', 'confirmed']
+    ).order_by('date', 'time')
+
+    return render(request, 'barberos/dashboard.html', {
+        'barbero': barbero,
+        'citas': citas,
+    })
+
+
+@login_required
+@require_POST
+def finalizar_cita(request):
+    """Endpoint llamado por el dashboard del barbero al finalizar una cita."""
+    cita_id = request.POST.get('cita_id')
+    observaciones = request.POST.get('observaciones', '').strip()
+    
+    if not observaciones:
+        observaciones = 'Sin observaciones'
+
+    cita = get_object_or_404(Booking, id=cita_id)
+
+    # SEGURIDAD IDOR: validar que solo el barbero dueño de la cita pueda completarla
+    if not hasattr(request.user, 'barber_profile') or cita.barber.user != request.user:
+        return JsonResponse({'ok': False, 'error': 'No autorizado para modificar esta cita'}, status=403)
+
+    cita.status = 'completed'
+    cita.notes = observaciones
+    
+    # También fijar el timestamp de finalización usando datetime.now
+    from django.utils import timezone
+    cita.completed_at = timezone.now()
+    
+    cita.save()
+    
+    return JsonResponse({'ok': True})
