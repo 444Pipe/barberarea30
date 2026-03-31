@@ -82,11 +82,15 @@
 
       <div class="mb-8 relative z-10">
         <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Servicio Deseado</label>
-        <select name="service" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
-          <option value="" class="bg-jet">Selecciona un servicio premium</option>
-          <option value="Corte Imperial" class="bg-jet">Corte Imperial - $30.000</option>
-          <option value="Club Experience" class="bg-jet">Club Experience - $60.000</option>
-          <option value="Ritual de Barba" class="bg-jet">Ritual de Barba - $25.000</option>
+        <select id="service-select" name="service" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
+          <option value="" class="bg-jet">Cargando servicios...</option>
+        </select>
+      </div>
+
+      <div class="mb-8 relative z-10">
+        <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Selecciona tu Barbero</label>
+        <select id="barber-select" name="barber" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
+          <option value="" class="bg-jet">Cargando barberos...</option>
         </select>
       </div>
 
@@ -182,7 +186,58 @@
     // Activar animación para elementos con fade-in-up en esta página
     document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.fade-in-up').forEach(el => el.classList.add('visible'));
+
+      // Cargar APIs nativas dinámicamente
+      cargarServiciosSelect();
+      cargarBarberosSelect();
     });
+
+    function cargarServiciosSelect() {
+      fetch('/api/servicios-nativos/')
+        .then(response => {
+          if (!response.ok) throw new Error("Error en servicios");
+          return response.json();
+        })
+        .then(data => {
+          const select = document.getElementById('service-select');
+          if (!select) return;
+          
+          let optionsHtml = '<option value="" class="bg-jet">Selecciona un servicio premium</option>';
+          data.servicios.forEach(servicio => {
+            const precioFormat = parseFloat(servicio.price).toLocaleString('es-CO');
+            optionsHtml += `<option value="${servicio.name}" class="bg-jet">${servicio.name} - $${precioFormat}</option>`;
+          });
+          select.innerHTML = optionsHtml;
+        })
+        .catch(err => {
+          console.error(err);
+          const select = document.getElementById('service-select');
+          if (select) select.innerHTML = '<option value="" class="bg-jet">Error al cargar servicios</option>';
+        });
+    }
+
+    function cargarBarberosSelect() {
+      fetch('/api/barberos-nativos/')
+        .then(response => {
+          if (!response.ok) throw new Error("Error en barberos");
+          return response.json();
+        })
+        .then(data => {
+          const select = document.getElementById('barber-select');
+          if (!select) return;
+          
+          let optionsHtml = '<option value="" class="bg-jet">Selecciona tu barbero preferido</option>';
+          data.barberos.forEach(barbero => {
+            optionsHtml += `<option value="${barbero.id}" class="bg-jet">${barbero.nombre} (${barbero.especialidad || 'Grooming Expert'})</option>`;
+          });
+          select.innerHTML = optionsHtml;
+        })
+        .catch(err => {
+          console.error(err);
+          const select = document.getElementById('barber-select');
+          if (select) select.innerHTML = '<option value="" class="bg-jet">Error al cargar barberos</option>';
+        });
+    }
   </script>
   <script src="{% static 'js/booking.js' %}"></script>
 </body>
