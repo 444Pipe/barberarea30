@@ -43,3 +43,18 @@ class Booking(models.Model):
 
     def __str__(self):
         return f'{self.client_name} — {self.service} ({self.date} {self.time})'
+
+
+class BlockedDate(models.Model):
+    """Fechas en las que la barbería está cerrada o no disponible."""
+    date = models.DateField(unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Fecha Bloqueada'
+        verbose_name_plural = 'Fechas Bloqueadas'
+        ordering = ['date']
+
+    def __str__(self):
+        return f'{self.date} — {self.description or "Bloqueado"}'

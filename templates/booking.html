@@ -28,6 +28,10 @@
       }
     }
   </script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
@@ -94,15 +98,18 @@
         </select>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 relative z-10">
-        <div>
-          <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Fecha Deseada</label>
-          <input type="date" name="date" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all scheme-dark">
+      <div class="col-span-full mb-8 relative z-10">
+        <label class="block text-xs uppercase tracking-widest font-semibold mb-4 text-smoke/70">Fecha Deseada</label>
+        <div id="calendar-carousel" class="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
+          <!-- Dinámico: Se llena con JS -->
         </div>
-        <div>
-          <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Hora Preferida</label>
-          <select name="time" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
-            <option value="" class="bg-jet">Selecciona una hora</option>
+        <input type="hidden" name="date" id="selected-date-input" required>
+      </div>
+
+      <div class="mb-8 relative z-10 col-span-full md:col-span-1">
+        <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Hora Preferida</label>
+        <select name="time" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
+          <option value="" class="bg-jet">Selecciona una hora</option>
             <option value="09:00" class="bg-jet">09:00 AM</option>
             <option value="10:00" class="bg-jet">10:00 AM</option>
             <option value="11:00" class="bg-jet">11:00 AM</option>
@@ -190,7 +197,57 @@
       // Cargar APIs nativas dinámicamente
       cargarServiciosSelect();
       cargarBarberosSelect();
+      renderCustomCalendar();
     });
+
+    function renderCustomCalendar() {
+      const carousel = document.getElementById('calendar-carousel');
+      const hiddenInput = document.getElementById('selected-date-input');
+      const daysToRender = 30;
+      const today = new Date();
+      
+      let html = '';
+      for (let i = 0; i < daysToRender; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() + i);
+        
+        // CORRECCIÓN: Generar YYYY-MM-DD en hora local, no UTC
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
+        const dayNum = date.getDate();
+        
+        html += `
+          <div class="calendar-day bg-jet-lighter border border-white/5 min-w-[70px] py-4 flex flex-col items-center rounded-sm cursor-pointer transition-all duration-300 snap-start hover:border-gold/30 group"
+               onclick="selectDate('${dateStr}', this)" data-date="${dateStr}">
+            <span class="text-[10px] tracking-widest text-smoke/40 group-hover:text-gold/60 transition-colors">${dayName}</span>
+            <span class="text-xl font-serif mt-1 text-smoke group-hover:text-gold transition-colors">${dayNum}</span>
+          </div>
+        `;
+      }
+      carousel.innerHTML = html;
+    }
+
+    function selectDate(dateStr, element) {
+      // Remover activas anteriores
+      document.querySelectorAll('.calendar-day').forEach(el => {
+        el.classList.remove('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
+        el.classList.add('border-white/5');
+      });
+      
+      // Activar actual
+      element.classList.remove('border-white/5');
+      element.classList.add('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
+      
+      const hiddenInput = document.getElementById('selected-date-input');
+      hiddenInput.value = dateStr;
+      
+      // Disparar evento change para que booking.js lo detecte
+      hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
 
     function cargarServiciosSelect() {
       fetch('/api/servicios-nativos/')

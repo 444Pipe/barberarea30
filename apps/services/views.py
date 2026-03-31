@@ -12,7 +12,13 @@ class ServiceListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     pagination_class = None
 
+from django.core.serializers.json import DjangoJSONEncoder
+
 def obtener_servicios_nativos(request):
     """Endpoint nativo de servicios para JS Vanilla"""
-    servicios = list(Service.objects.filter(is_active=True).values('id', 'name', 'price', 'duration_minutes'))
-    return JsonResponse({'servicios': servicios}, safe=False)
+    try:
+        servicios = list(Service.objects.filter(is_active=True).values('id', 'name', 'price', 'duration_minutes'))
+        return JsonResponse({'servicios': servicios}, safe=False, encoder=DjangoJSONEncoder)
+    except Exception as e:
+        import traceback
+        return JsonResponse({'error': str(e), 'trace': traceback.format_exc()}, status=500)

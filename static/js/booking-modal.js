@@ -49,7 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Establecer fecha mínima (hoy) para cualquier input de fecha
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
   document.querySelectorAll('input[type="date"]').forEach(input => {
     input.setAttribute('min', todayStr);
   });
@@ -104,7 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Validar que la fecha no sea anterior a hoy
-      const todayStr = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       if (date < todayStr) {
         showErrorMessage('La fecha debe ser hoy o una fecha futura');
         return;

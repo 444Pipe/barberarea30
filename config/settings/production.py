@@ -14,8 +14,9 @@ def _split_env(value: str) -> list:
 
 
 # ── Core ─────────────────────────────────────────────────────────
+IS_LOCAL = not os.environ.get('DATABASE_URL')
 SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)            # noqa: F405
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'True' if IS_LOCAL else 'False').lower() == 'true'
 
 ALLOWED_HOSTS = _split_env(os.environ.get(
     'ALLOWED_HOSTS',
@@ -23,11 +24,12 @@ ALLOWED_HOSTS = _split_env(os.environ.get(
 ))
 
 # ── Database (PostgreSQL via DATABASE_URL) ───────────────────────
+_db_url = os.environ.get('DATABASE_URL', f"sqlite:///{BASE_DIR / 'bookings.db'}")
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+        default=_db_url,
         conn_max_age=600,
-        ssl_require=True,
+        ssl_require=True if 'postgresql' in _db_url or 'postgres' in _db_url else False,
     )
 }
 
@@ -35,12 +37,14 @@ DATABASES = {
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+
+# Estos deben ser False localmente (si no usas HTTPS)
+SESSION_COOKIE_SECURE = not (IS_LOCAL or DEBUG)
+CSRF_COOKIE_SECURE = not (IS_LOCAL or DEBUG)
 
 CSRF_TRUSTED_ORIGINS = _split_env(os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://barberarea30-production.up.railway.app'
+    'https://barberarea30-production.up.railway.app,http://127.0.0.1:8000,http://localhost:8000'
 ))
 
 # ── Static files (WhiteNoise) ───────────────────────────────────

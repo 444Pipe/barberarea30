@@ -45,6 +45,8 @@
     .avail-partial { background: rgba(245,158,11,0.15); color: #f59e0b; }
     .avail-unavailable { background: rgba(239,68,68,0.15); color: #ef4444; }
     .wizard-step { display: none; } .wizard-step.active { display: block; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
@@ -94,9 +96,12 @@
     <!-- STEP 2: Date + Barber Selection -->
     <div class="wizard-step" id="step-2">
       <h2 class="text-xl font-serif text-white mb-6">Elige <span class="text-gold italic">Fecha y Barbero</span></h2>
-      <div class="mb-6">
-        <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Fecha Deseada</label>
-        <input type="date" id="booking-date" class="w-full md:w-64 px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all">
+      <div class="mb-8">
+        <label class="block text-xs uppercase tracking-widest font-semibold mb-4 text-smoke/70">Fecha Deseada</label>
+        <div id="calendar-carousel" class="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
+          <!-- Se llena dinámicamente -->
+        </div>
+        <input type="hidden" id="booking-date">
       </div>
       <div id="barbers-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <p class="text-smoke/40 text-sm col-span-full text-center py-8">Selecciona una fecha para ver barberos disponibles</p>
@@ -235,11 +240,13 @@ document.addEventListener('DOMContentLoaded', function() {
       `).join('');
     });
 
-  // Date change handler
+  // Date change handler (ahora disparado por el calendario custom)
   document.getElementById('booking-date').addEventListener('change', function() {
     state.date = this.value;
     if (state.date) loadBarberAvailability();
   });
+
+  renderCustomCalendar();
 
   // Set min date to today
   const today = new Date().toISOString().split('T')[0];
@@ -368,9 +375,18 @@ document.getElementById('booking-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData(this);
 
+  // Intentar obtener CSRF en caso de que el usuario tenga sesión activa de admin
+  const csrfCookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+  const csrfToken = csrfCookie ? csrfCookie.split('=')[1] : '';
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (csrfToken) {
+    headers['X-CSRFToken'] = csrfToken;
+  }
+
   fetch('/api/bookings/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: JSON.stringify({
       client_name: formData.get('name'),
       client_phone: formData.get('phone'),
@@ -385,15 +401,82 @@ document.getElementById('booking-form').addEventListener('submit', function(e) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) {
+    if (data.ok || data.id) { // por si solo llega id sin ok
       document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
       document.getElementById('step-success').classList.add('active');
     } else {
-      alert('Error: ' + (data.error || JSON.stringify(data.errors)));
+      const errorMsg = data.error || data.detail || (data.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+      alert('Error al reservar: ' + errorMsg);
     }
   })
-  .catch(() => alert('Error de conexión. Intenta de nuevo.'));
+  .catch((err) => {
+    console.error(err);
+    alert('Error de conexión. Intenta de nuevo.');
+  });
 });
+
+function renderCustomCalendar() {
+  const carousel = document.getElementById('calendar-carousel');
+  const daysToRender = 14; // Limitado a 2 semanas
+  const today = new Date();
+  
+  // Obtener fechas bloqueadas antes de renderizar
+  fetch('/api/blocked-dates/')
+    .then(r => r.json())
+    .then(blockedData => {
+      const blockedDates = blockedData.map(b => b.date);
+      let html = '';
+      
+      for (let i = 0; i < daysToRender; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() + i);
+        
+        // CORRECCIÓN: Generar YYYY-MM-DD en hora local, no UTC
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
+        const dayNum = date.getDate();
+        const isBlocked = blockedDates.includes(dateStr);
+        
+        html += `
+          <div class="calendar-day bg-jet-lighter border border-white/5 min-w-[70px] py-4 flex flex-col items-center rounded-sm transition-all duration-300 snap-start 
+               ${isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'cursor-pointer hover:border-gold/30 group'}"
+               ${isBlocked ? '' : `onclick="selectDate('${dateStr}', this)"`} data-date="${dateStr}">
+            <span class="text-[10px] tracking-widest text-smoke/40 ${isBlocked ? '' : 'group-hover:text-gold/60'} transition-colors">${dayName}</span>
+            <span class="text-xl font-serif mt-1 text-smoke ${isBlocked ? '' : 'group-hover:text-gold'} transition-colors">${dayNum}</span>
+            ${isBlocked ? '<span class="text-[8px] text-gold/40 mt-1 uppercase font-bold">Bloqueado</span>' : ''}
+          </div>
+        `;
+      }
+      carousel.innerHTML = html;
+    })
+    .catch(err => {
+      console.error("Error al cargar fechas bloqueadas:", err);
+      // Fallback simple si falla la API
+      carousel.innerHTML = '<p class="text-smoke/30 text-xs">Error al cargar disponibilidad</p>';
+    });
+}
+
+function selectDate(dateStr, element) {
+  // Remover activas anteriores
+  document.querySelectorAll('.calendar-day').forEach(el => {
+    el.classList.remove('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
+    el.classList.add('border-white/5');
+  });
+  
+  // Activar actual
+  element.classList.remove('border-white/5');
+  element.classList.add('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
+  
+  const input = document.getElementById('booking-date');
+  input.value = dateStr;
+  
+  // Disparar evento para actualizar barberos
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
 </script>
 </body>
 </html>

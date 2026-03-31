@@ -124,8 +124,9 @@ function initCalendar() {
     },
     eventDrop: function(info) {
       const props = info.event.extendedProps;
-      const newDate = info.event.start.toISOString().split('T')[0];
-      const newTime = info.event.start.toTimeString().substring(0, 5);
+      const d = info.event.start;
+      const newDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const newTime = d.toTimeString().substring(0, 5);
       fetch(`/api/admin/bookings/${props.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },

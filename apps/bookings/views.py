@@ -6,20 +6,31 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove
 from apps.barbers.models import Barber
 from apps.services.models import Service
-from .models import Booking
-from .serializers import BookingCreateSerializer, BookingAdminSerializer
+from .models import Booking, BlockedDate
+from .serializers import BookingCreateSerializer, BookingAdminSerializer, BlockedDateSerializer
 
 
 # ─── Public ──────────────────────────────────────────────
 
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def public_blocked_dates_list(request):
+    """GET /api/blocked-dates/ — listar fechas bloqueadas para el frontend."""
+    blocked = BlockedDate.objects.filter(date__gte=timezone.now().date())
+    serializer = BlockedDateSerializer(blocked, many=True)
+    return Response(serializer.data)
+
+
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def create_booking_view(request):
     """POST /api/bookings/ — crear nueva reserva desde el frontend público."""
@@ -200,3 +211,34 @@ def admin_bookings_export_csv(request):
         ])
 
     return response
+
+
+# ─── Admin Blocked Dates ─────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminOrAbove])
+def admin_blocked_dates_view(request):
+    """GET/POST /api/admin/blocked-dates/"""
+    if request.method == 'GET':
+        blocked = BlockedDate.objects.all().order_by('-date') # Recientes primero
+        serializer = BlockedDateSerializer(blocked, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = BlockedDateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAdminOrAbove])
+def admin_blocked_date_detail_view(request, pk):
+    """DELETE /api/admin/blocked-dates/{id}/"""
+    try:
+        blocked = BlockedDate.objects.get(pk=pk)
+        blocked.delete()
+        return Response({'ok': True}, status=204)
+    except BlockedDate.DoesNotExist:
+        return Response({'error': 'No encontrado'}, status=404)

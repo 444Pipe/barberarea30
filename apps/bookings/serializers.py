@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking
+from .models import Booking, BlockedDate
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):
@@ -28,3 +28,10 @@ class BookingAdminSerializer(serializers.ModelSerializer):
                   'service', 'service_name',
                   'date', 'time', 'duration_minutes', 'status',
                   'notes', 'price', 'created_at', 'updated_at', 'completed_at']
+
+
+class BlockedDateSerializer(serializers.ModelSerializer):
+    """Serializer para fechas bloqueadas."""
+    class Meta:
+        model = BlockedDate
+        fields = '__all__'

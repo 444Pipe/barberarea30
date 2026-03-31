@@ -39,10 +39,55 @@
       <p class="text-smoke/30 text-sm">Cargando...</p>
     </div>
   </div>
+
+  <!-- Blocked Dates -->
+  <div class="bg-jet-card border border-white/5 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xs tracking-[0.3em] uppercase text-smoke/40 font-semibold">Fechas Bloqueadas</h2>
+      <button onclick="document.getElementById('modal-block-date').classList.remove('hidden')" 
+              class="text-[0.6rem] tracking-widest uppercase font-bold text-gold hover:text-white transition-colors">
+        + Bloquear Fecha
+      </button>
+    </div>
+    
+    <div id="blocked-dates-list" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <p class="text-smoke/30 text-sm col-span-full">Cargando...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Bloqueo -->
+<div id="modal-block-date" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+  <div class="bg-jet-card border border-white/10 p-8 rounded-2xl max-w-sm w-full shadow-2xl">
+    <h3 class="text-lg font-serif text-white mb-2">Bloquear Fecha</h3>
+    <p class="text-xs text-smoke/40 mb-6 uppercase tracking-widest">Los clientes no podrán reservar este día</p>
+    
+    <form id="form-block-date" class="space-y-4">
+      <div>
+        <label class="admin-label">Selecciona el día</label>
+        <input type="date" id="input-block-date" required class="admin-input">
+      </div>
+      <div>
+        <label class="admin-label">Motivo (opcional)</label>
+        <input type="text" id="input-block-reason" placeholder="Ej: Festivo" class="admin-input">
+      </div>
+      
+      <div class="flex gap-3 pt-4">
+        <button type="button" onclick="document.getElementById('modal-block-date').classList.add('hidden')"
+                class="flex-1 py-3 border border-white/5 text-smoke/40 text-[0.65rem] tracking-widest uppercase font-bold hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button type="submit" class="flex-1 py-3 bg-gold text-jet text-[0.65rem] tracking-widest uppercase font-bold hover:bg-gold-light transition-colors rounded-sm">
+          Bloquear
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Cargar servicios actuales
   fetch('/api/services/')
     .then(r => r.json())
     .then(services => {
@@ -57,6 +102,86 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       `).join('');
     });
+
+  // Cargar fechas bloqueadas
+  renderBlockedDates();
+
+  // Formulario de bloqueo
+  document.getElementById('form-block-date').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const date = document.getElementById('input-block-date').value;
+    const description = document.getElementById('input-block-reason').value;
+
+    fetch('/api/admin/blocked-dates/', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ date, description })
+    })
+    .then(r => {
+      if (!r.ok) throw new Error('Error al bloquear');
+      return r.json();
+    })
+    .then(() => {
+      document.getElementById('modal-block-date').classList.add('hidden');
+      renderBlockedDates();
+      this.reset();
+    })
+    .catch(err => alert(err.message));
+  });
 });
+
+function renderBlockedDates() {
+  fetch('/api/admin/blocked-dates/')
+    .then(r => r.json())
+    .then(dates => {
+      const container = document.getElementById('blocked-dates-list');
+      if (dates.length === 0) {
+        container.innerHTML = '<p class="text-smoke/20 text-xs col-span-full py-4 uppercase tracking-widest text-center">No hay fechas bloqueadas</p>';
+        return;
+      }
+      container.innerHTML = dates.map(d => {
+        const dateObj = new Date(d.date + 'T00:00:00');
+        const dateStr = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        return `
+          <div class="p-4 bg-jet border border-white/5 rounded-lg flex flex-col justify-between group h-24">
+            <div>
+              <p class="text-white text-sm font-bold">${dateStr}</p>
+              <p class="text-[0.6rem] text-smoke/40 uppercase tracking-widest truncate">${d.description || 'Sin motivo'}</p>
+            </div>
+            <button onclick="deleteBlockedDate(${d.id})" class="text-[0.55rem] text-rose-500/60 hover:text-rose-500 uppercase font-bold tracking-tighter self-end transition-colors opacity-0 group-hover:opacity-100">
+              Eliminar
+            </button>
+          </div>
+        `;
+      }).join('');
+    });
+}
+
+function deleteBlockedDate(id) {
+  if (!confirm('¿Seguro que quieres habilitar esta fecha de nuevo?')) return;
+  fetch(`/api/admin/blocked-dates/${id}/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+  })
+  .then(() => renderBlockedDates());
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+        }
+    }
+  }
+  return cookieValue;
+}
 </script>
 {% endblock %}
