@@ -178,3 +178,18 @@ def barber_stats_view(request, barber_id):
         'unique_clients': unique_clients,
         'top_services': list(top_services),
     })
+
+from django.http import JsonResponse
+
+def obtener_barberos_nativos(request):
+    """Endpoint nativo de barberos para JS Vanilla"""
+    barberos_qs = Barber.objects.filter(is_available=True).prefetch_related('specialties')
+    barberos = []
+    for b in barberos_qs:
+        especialidades = ', '.join([s.name for s in b.specialties.all()])
+        barberos.append({
+            'id': b.id,
+            'nombre': b.display_name,
+            'especialidad': especialidades
+        })
+    return JsonResponse({'barberos': barberos}, safe=False)

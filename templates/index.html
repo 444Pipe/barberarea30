@@ -196,31 +196,15 @@
            Servicios <span class="italic text-gold font-light">Elite.</span>
         </h2>
         <!-- (Rest of services as before) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60">
-              <div class="flex justify-between items-start mb-8">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Corte Imperial</h3>
-                <span class="text-gold font-medium tracking-widest">$30k</span>
-              </div>
-              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Asesoría visajista, precisión milimétrica y acabado impecable."</p>
-              <a href="booking.html?service=Corte%20Imperial" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
-            </div>
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up border-gold/40 bg-jet shadow-2xl" style="transition-delay: 100ms;">
-              <div class="flex justify-between items-start mb-8">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Club Experience</h3>
-                <span class="text-gold font-medium tracking-widest">$60k</span>
-              </div>
-              <p class="text-smoke/70 font-light text-sm mb-10 leading-relaxed">Nuestro ritual insignia: Corte imperial, arreglo de barba ritual, vapor ozono y mascarilla.</p>
-              <a href="booking.html?service=Club%20Experience" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
-            </div>
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60" style="transition-delay: 200ms;">
-              <div class="flex justify-between items-start mb-8">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Ritual de Barba</h3>
-                <span class="text-gold font-medium tracking-widest">$25k</span>
-              </div>
-              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Perfilación a navaja, toallas calientes aromáticas y aceites."</p>
-              <a href="booking.html?service=Ritual%20de%20Barba" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
-            </div>
+        <div id="lista-servicios" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <!-- Los servicios se cargarán dinámicamente aquí -->
+        </div>
+
+        <h2 class="text-4xl md:text-5xl font-serif font-bold text-white tracking-tight mt-32 mb-16">
+           Nuestro <span class="italic text-gold font-light">Equipo.</span>
+        </h2>
+        <div id="lista-barberos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <!-- Los barberos se cargarán dinámicamente aquí -->
         </div>
     </div>
   </section>
@@ -443,5 +427,6 @@
   </div>
 
   <script src="{% static 'js/booking-modal.js' %}"></script>
+  <script src="{% static 'js/main.js' %}"></script>
 </body>
 </html>
