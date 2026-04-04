@@ -30,6 +30,13 @@ class BarberAdminSerializer(serializers.ModelSerializer):
                   'bio', 'specialties', 'specialty_ids', 'is_available',
                   'schedule', 'color_tag', 'total_cuts', 'rating', 'created_at']
 
+    def validate(self, attrs):
+        from .models import Barber
+        if self.instance is None:
+            if Barber.objects.count() >= 8:
+                raise serializers.ValidationError("Se ha alcanzado el límite máximo de 8 barberos permitidos.")
+        return super().validate(attrs)
+
     def create(self, validated_data):
         from django.contrib.auth.models import User
         from apps.users.models import Barbershop, UserProfile
@@ -49,7 +56,7 @@ class BarberAdminSerializer(serializers.ModelSerializer):
         
         user = User.objects.create_user(
             username=username,
-            password=get_random_string(32)
+            password='area30barber'
         )
         
         # 2. Assign default Barbershop
@@ -69,7 +76,7 @@ class BarberAdminSerializer(serializers.ModelSerializer):
             barber.specialties.set(specialties)
 
         # 4. Optional: Create a UserProfile for role management
-        UserProfile.objects.get_or_create(user=user, role='barbero')
+        UserProfile.objects.get_or_create(user=user, role='barber')
             
         return barber
 

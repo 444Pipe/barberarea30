@@ -15,6 +15,7 @@
     </div>
   </div>
 
+  {% if user_role != 'barber' %}
   <!-- Barber Filter -->
   <div class="bg-jet-card border border-white/5 rounded-xl p-4">
     <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 font-semibold mb-3">Filtrar por Barbero</div>
@@ -24,6 +25,7 @@
       </label>
     </div>
   </div>
+  {% endif %}
 
   <!-- Calendar Container -->
   <div class="bg-jet-card border border-white/5 rounded-xl p-4 lg:p-6">
@@ -66,25 +68,27 @@ let allEvents = [];
 let currentBookingId = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Load barbers for filter
-  fetch('/api/barbers/')
-    .then(r => r.json())
-    .then(barbers => {
-      const container = document.getElementById('barber-filters');
-      barbers.forEach(b => {
-        const label = document.createElement('label');
-        label.className = 'barber-filter-chip active';
-        label.dataset.barber = b.id;
-        label.style.setProperty('--chip-color', b.color_tag);
-        label.innerHTML = `<input type="checkbox" checked class="hidden">
-          <span class="w-2 h-2 rounded-full inline-block mr-1" style="background: ${b.color_tag}"></span>${b.display_name}`;
-        label.addEventListener('click', () => {
-          label.classList.toggle('active');
-          filterCalendar();
+  // Load barbers for filter if container exists
+  if (document.getElementById('barber-filters')) {
+    fetch('/api/barbers/')
+      .then(r => r.json())
+      .then(barbers => {
+        const container = document.getElementById('barber-filters');
+        barbers.forEach(b => {
+          const label = document.createElement('label');
+          label.className = 'barber-filter-chip active';
+          label.dataset.barber = b.id;
+          label.style.setProperty('--chip-color', b.color_tag);
+          label.innerHTML = `<input type="checkbox" checked class="hidden">
+            <span class="w-2 h-2 rounded-full inline-block mr-1" style="background: ${b.color_tag}"></span>${b.display_name}`;
+          label.addEventListener('click', () => {
+            label.classList.toggle('active');
+            filterCalendar();
+          });
+          container.appendChild(label);
         });
-        container.appendChild(label);
       });
-    });
+  }
 
   // Load bookings and init calendar
   fetch('/api/admin/bookings/')

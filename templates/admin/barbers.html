@@ -8,9 +8,12 @@
       <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Barberos</h1>
       <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Gestión del equipo</p>
     </div>
-    <button onclick="openAddBarber()" class="px-5 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold hover:shadow-lg hover:shadow-gold/20 transition-all">
-      + Agregar Barbero
-    </button>
+    <div class="flex flex-col items-end">
+      <button id="btn-add-barber" onclick="openAddBarber()" class="px-5 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold hover:shadow-lg hover:shadow-gold/20 transition-all">
+        + Agregar Barbero
+      </button>
+      <span id="limit-warning" class="hidden text-[0.6rem] text-red-400 tracking-widest uppercase mt-2 font-bold">Límite de 8 barberos alcanzado</span>
+    </div>
   </div>
 
   <!-- Barber Cards -->
@@ -63,7 +66,20 @@ document.addEventListener('DOMContentLoaded', loadBarbers);
 function loadBarbers() {
   fetch('/api/admin/barbers/')
     .then(r => r.json())
-    .then(renderBarberCards)
+    .then(barbers => {
+      renderBarberCards(barbers);
+      
+      // Control barber limit
+      const btnAdd = document.getElementById('btn-add-barber');
+      const warning = document.getElementById('limit-warning');
+      if (barbers.length >= 8) {
+        btnAdd.style.display = 'none';
+        warning.classList.remove('hidden');
+      } else {
+        btnAdd.style.display = 'block';
+        warning.classList.add('hidden');
+      }
+    })
     .catch(() => {
       document.getElementById('barber-cards').innerHTML = '<div class="text-center text-smoke/30 text-sm py-12 col-span-full">Error al cargar barberos</div>';
     });

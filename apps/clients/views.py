@@ -12,9 +12,19 @@ from apps.bookings.models import Booking
 @permission_classes([IsAdminOrAbove])
 def clients_list_view(request):
     """GET /api/admin/clients/ — lista de clientes únicos."""
+    queryset = Booking.objects.exclude(status='cancelled')
+
+    search = request.query_params.get('search')
+    if search:
+        from django.db.models import Q
+        queryset = queryset.filter(
+            Q(client_name__icontains=search) | Q(client_phone__icontains=search)
+        )
+
+    # Agrupar SOLAMENTE por teléfono
     clients = (
-        Booking.objects.exclude(status='cancelled')
-        .values('client_phone', 'client_name', 'client_email')
+        queryset
+        .values('client_phone')
         .annotate(
             total_visits=Count('id'),
             total_spent=Sum('price'),
@@ -23,19 +33,18 @@ def clients_list_view(request):
         .order_by('-last_visit')
     )
 
-    search = request.query_params.get('search')
-    if search:
-        from django.db.models import Q
-        clients = clients.filter(
-            Q(client_name__icontains=search) | Q(client_phone__icontains=search)
-        )
-
-    # Add preferred barber for each client
     result = []
     for client in clients[:100]:
+        phone = client['client_phone']
+        
+        # Obtener el nombre de la cita más reciente
+        latest_booking = Booking.objects.filter(client_phone=phone).order_by('-date', '-time').first()
+        name = latest_booking.client_name if latest_booking else 'Desconocido'
+        email = latest_booking.client_email if latest_booking else ''
+
         # Get most visited barber
         preferred = (
-            Booking.objects.filter(client_phone=client['client_phone'])
+            Booking.objects.filter(client_phone=phone)
             .exclude(status='cancelled')
             .values('barber__display_name')
             .annotate(count=Count('id'))
@@ -43,9 +52,9 @@ def clients_list_view(request):
             .first()
         )
         result.append({
-            'name': client['client_name'],
-            'phone': client['client_phone'],
-            'email': client['client_email'] or '',
+            'name': name,
+            'phone': phone,
+            'email': email,
             'total_visits': client['total_visits'],
             'total_spent': client['total_spent'] or 0,
             'last_visit': str(client['last_visit']) if client['last_visit'] else '',
