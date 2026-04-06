@@ -24,9 +24,18 @@ from .serializers import BookingCreateSerializer, BookingAdminSerializer, Blocke
 @permission_classes([AllowAny])
 def public_blocked_dates_list(request):
     """GET /api/blocked-dates/ — listar fechas bloqueadas para el frontend."""
-    blocked = BlockedDate.objects.filter(date__gte=timezone.now().date())
-    serializer = BlockedDateSerializer(blocked, many=True)
-    return Response(serializer.data)
+    try:
+        blocked = BlockedDate.objects.filter(date__gte=timezone.now().date())
+        serializer = BlockedDateSerializer(blocked, many=True)
+        return Response(serializer.data)
+    except Exception as e:
+        import traceback
+        from django.http import JsonResponse
+        return JsonResponse({
+            'ok': False, 
+            'error': str(e), 
+            'trace': traceback.format_exc()
+        }, status=500)
 
 
 @api_view(['POST'])
