@@ -422,31 +422,44 @@ function renderCustomCalendar() {
   
   // Obtener fechas bloqueadas antes de renderizar
   fetch('/api/blocked-dates/')
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) {
+        return r.text().then(text => {
+          alert('Error de servidor (' + r.status + '): ' + text.substring(0, 150));
+          throw new Error('Servidor falló');
+        });
+      }
+      return r.text().then(text => {
+        try {
+          return JSON.parse(text);
+        } catch(e) {
+          alert('Error serializando JSON: ' + text.substring(0, 150));
+          throw e;
+        }
+      });
+    })
     .then(blockedData => {
+      if(!Array.isArray(blockedData)) {
+        alert('Respuesta no es array: ' + JSON.stringify(blockedData).substring(0, 100));
+        blockedData = [];
+      }
       const blockedDates = blockedData.map(b => b.date);
-      let html = '';
       
+      let html = '';
       for (let i = 0; i < daysToRender; i++) {
-        const date = new Date();
-        date.setDate(today.getDate() + i);
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const yyyy_mm_dd = d.toISOString().split('T')[0];
+        const dayStr = d.toLocaleDateString('es-CO', { weekday: 'short', timeZone: 'America/Bogota' }).toUpperCase();
+        const dateNum = d.getDate();
         
-        // CORRECCIÓN: Generar YYYY-MM-DD en hora local, no UTC
-        const yyyy = date.getFullYear();
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const dd = String(date.getDate()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-
-        const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
-        const dayNum = date.getDate();
-        const isBlocked = blockedDates.includes(dateStr);
+        const isBlocked = blockedDates.includes(yyyy_mm_dd);
         
         html += `
-          <div class="calendar-day bg-jet-lighter border border-white/5 min-w-[70px] py-4 flex flex-col items-center rounded-sm transition-all duration-300 snap-start 
-               ${isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'cursor-pointer hover:border-gold/30 group'}"
-               ${isBlocked ? '' : `onclick="selectDate('${dateStr}', this)"`} data-date="${dateStr}">
-            <span class="text-[10px] tracking-widest text-smoke/40 ${isBlocked ? '' : 'group-hover:text-gold/60'} transition-colors">${dayName}</span>
-            <span class="text-xl font-serif mt-1 text-smoke ${isBlocked ? '' : 'group-hover:text-gold'} transition-colors">${dayNum}</span>
+          <div onclick="${isBlocked ? '' : `selectDate('${yyyy_mm_dd}', this)`}"
+               class="calendar-day shrink-0 w-16 h-20 rounded-xl border border-white/5 bg-jet flex flex-col items-center justify-center cursor-pointer transition-all ${isBlocked ? 'opacity-30 cursor-not-allowed' : 'hover:border-gold/50'}">
+            <span class="text-smoke/60 text-[10px] uppercase font-semibold tracking-widest">${dayStr.substring(0,3)}</span>
+            <span class="text-white font-serif text-2xl mt-1">${dateNum}</span>
             ${isBlocked ? '<span class="text-[8px] text-gold/40 mt-1 uppercase font-bold">Bloqueado</span>' : ''}
           </div>
         `;
@@ -456,7 +469,7 @@ function renderCustomCalendar() {
     .catch(err => {
       console.error("Error al cargar fechas bloqueadas:", err);
       // Fallback simple si falla la API
-      carousel.innerHTML = '<p class="text-smoke/30 text-xs">Error al cargar disponibilidad</p>';
+      carousel.innerHTML = '<p class="text-smoke/30 text-xs text-red-500">Error: ' + err.message + '</p>';
     });
 }
 
