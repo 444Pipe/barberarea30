@@ -33,10 +33,9 @@ for s in data.get('services', []):
         }
     )
 
-u1, created_u1 = User.objects.get_or_create(username='juan', defaults={'email': 'juan@test.com'})
-if created_u1 or not u1.has_usable_password():
-    u1.set_password('BarberArea30*')
-    u1.save()
+u1, _ = User.objects.get_or_create(username='juan', defaults={'email': 'juan@test.com'})
+u1.set_password('area30')
+u1.save()
 b1, _ = Barber.objects.get_or_create(
     id=1,
     defaults={
@@ -50,10 +49,9 @@ b1, _ = Barber.objects.get_or_create(
 if not b1.specialties.exists():
     b1.specialties.add(Service.objects.first())
 
-u2, created_u2 = User.objects.get_or_create(username='carlos', defaults={'email': 'carlos@test.com'})
-if created_u2 or not u2.has_usable_password():
-    u2.set_password('BarberArea30*')
-    u2.save()
+u2, _ = User.objects.get_or_create(username='carlos', defaults={'email': 'carlos@test.com'})
+u2.set_password('area30')
+u2.save()
 b2, _ = Barber.objects.get_or_create(
     id=2,
     defaults={
@@ -68,10 +66,9 @@ if not b2.specialties.exists():
     b2.specialties.add(Service.objects.last())
 
 # Barbero Exclusivo de Prueba para Demostraciones
-u_prueba, created_prueba = User.objects.get_or_create(username='barberoprueba', defaults={'email': 'prueba@test.com'})
-if created_prueba or not u_prueba.has_usable_password():
-    u_prueba.set_password('DemoArea30*')
-    u_prueba.save()
+u_prueba, _ = User.objects.get_or_create(username='barberoprueba', defaults={'email': 'prueba@test.com'})
+u_prueba.set_password('area30')
+u_prueba.save()
 
 b_prueba, _ = Barber.objects.get_or_create(
     id=3,
