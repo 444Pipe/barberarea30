@@ -48,7 +48,7 @@ class Command(BaseCommand):
             defaults={
                 'address': 'C.C. Sunrise, Restrepo - Meta, Colombia',
                 'phone': '+57 312 487 9250',
-                'whatsapp': '573124879250',
+                'whatsapp': '573112651032',
                 'instagram': '@area30barberclub',
                 'tiktok': '@area30barberclub',
             }
