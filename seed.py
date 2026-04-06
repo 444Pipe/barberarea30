@@ -67,6 +67,26 @@ b2, _ = Barber.objects.get_or_create(
 if not b2.specialties.exists():
     b2.specialties.add(Service.objects.last())
 
+# Barbero Exclusivo de Prueba para Demostraciones
+u_prueba, created_prueba = User.objects.get_or_create(username='barberoprueba', defaults={'email': 'prueba@test.com'})
+if created_prueba or not u_prueba.has_usable_password():
+    u_prueba.set_password('DemoArea30*')
+    u_prueba.save()
+
+b_prueba, _ = Barber.objects.get_or_create(
+    id=3,
+    defaults={
+        'user': u_prueba,
+        'barbershop': shop,
+        'display_name': 'Barbero Prueba',
+        'is_available': True,
+        'color_tag': '#22C55E'  # Verde distintivo
+    }
+)
+if not b_prueba.specialties.exists() and Service.objects.exists():
+    # Asignarle todos los servicios existentes para flexibilidad en las pruebas
+    b_prueba.specialties.set(Service.objects.all())
+
 print("Datos cargados correctamente")
 # Asegurarnos de que la tabla bookings_blockeddate exista en producción si la migración falló misteriosamente
 from django.db import connection
