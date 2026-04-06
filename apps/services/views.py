@@ -5,12 +5,26 @@ from .models import Service
 from .serializers import ServiceSerializer
 
 
-class ServiceListView(generics.ListAPIView):
-    """GET /api/services/ — lista pública de servicios activos."""
+from django.utils.text import slugify
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
+class ServiceListView(generics.ListCreateAPIView):
+    """GET /api/services/ — lista pública, POST crea nuevo servicio."""
     queryset = Service.objects.filter(is_active=True)
     serializer_class = ServiceSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = None
+
+    def perform_create(self, serializer):
+        name = serializer.validated_data.get('name', '')
+        base_slug = slugify(name)
+        slug = base_slug
+        counter = 1
+        while Service.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        serializer.save(slug=slug)
 
 from django.core.serializers.json import DjangoJSONEncoder
 

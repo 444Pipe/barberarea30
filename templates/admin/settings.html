@@ -34,7 +34,13 @@
 
   <!-- Services -->
   <div class="bg-jet-card border border-white/5 rounded-xl p-6">
-    <h2 class="text-xs tracking-[0.3em] uppercase text-smoke/40 font-semibold mb-4">Servicios</h2>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xs tracking-[0.3em] uppercase text-smoke/40 font-semibold">Servicios</h2>
+      <button onclick="document.getElementById('modal-create-service').classList.remove('hidden')" 
+              class="text-[0.6rem] tracking-widest uppercase font-bold text-gold hover:text-white transition-colors">
+        + Crear Servicio
+      </button>
+    </div>
     <div id="services-list" class="space-y-2">
       <p class="text-smoke/30 text-sm">Cargando...</p>
     </div>
@@ -85,23 +91,73 @@
   </div>
 </div>
 
+<!-- Modal Crear Servicio -->
+<div id="modal-create-service" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+  <div class="bg-jet-card border border-white/10 p-8 rounded-2xl max-w-sm w-full shadow-2xl">
+    <h3 class="text-lg font-serif text-white mb-2">Nuevo Servicio</h3>
+    <p class="text-xs text-smoke/40 mb-6 uppercase tracking-widest">Añade un servicio al catálogo</p>
+    
+    <form id="form-create-service" class="space-y-4">
+      <div>
+        <label class="admin-label">Nombre del Servicio</label>
+        <input type="text" id="input-service-name" required class="admin-input" placeholder="Ej: Corte Imperial">
+      </div>
+      <div>
+        <label class="admin-label">Precio (Sin puntos)</label>
+        <input type="number" id="input-service-price" required class="admin-input" placeholder="Ej: 35000">
+      </div>
+      <div>
+        <label class="admin-label">Duración (Minutos)</label>
+        <input type="number" id="input-service-duration" required class="admin-input" value="30">
+      </div>
+      
+      <div class="flex gap-3 pt-4">
+        <button type="button" onclick="document.getElementById('modal-create-service').classList.add('hidden')"
+                class="flex-1 py-3 border border-white/5 text-smoke/40 text-[0.65rem] tracking-widest uppercase font-bold hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button type="submit" class="flex-1 py-3 bg-gold text-jet text-[0.65rem] tracking-widest uppercase font-bold hover:bg-gold-light transition-colors rounded-sm">
+          Crear
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   // Cargar servicios actuales
-  fetch('/api/services/')
-    .then(r => r.json())
-    .then(services => {
-      const container = document.getElementById('services-list');
-      container.innerHTML = services.map(s => `
-        <div class="flex items-center justify-between py-3 px-4 rounded-lg bg-jet border border-white/5">
-          <div>
-            <span class="text-white text-sm">${s.name}</span>
-            <span class="text-smoke/30 text-xs ml-2">${s.duration_minutes} min</span>
-          </div>
-          <span class="text-gold font-semibold text-sm">$${Number(s.price).toLocaleString('es-CO')}</span>
-        </div>
-      `).join('');
-    });
+  renderServices();
+
+  // Cargar fechas bloqueadas
+  renderBlockedDates();
+
+  // Formulario Crear Servicio
+  document.getElementById('form-create-service').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = document.getElementById('input-service-name').value;
+    const price = document.getElementById('input-service-price').value;
+    const duration_minutes = document.getElementById('input-service-duration').value;
+
+    fetch('/api/services/', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ name, price, duration_minutes })
+    })
+    .then(r => {
+      if (!r.ok) throw new Error('Error al crear el servicio');
+      return r.json();
+    })
+    .then(() => {
+      document.getElementById('modal-create-service').classList.add('hidden');
+      renderServices();
+      this.reset();
+    })
+    .catch(err => alert(err.message));
+  });
 
   // Cargar fechas bloqueadas
   renderBlockedDates();
@@ -132,6 +188,27 @@ document.addEventListener('DOMContentLoaded', function() {
     .catch(err => alert(err.message));
   });
 });
+
+function renderServices() {
+  fetch('/api/services/')
+    .then(r => r.json())
+    .then(services => {
+      const container = document.getElementById('services-list');
+      if (services.length === 0) {
+        container.innerHTML = '<p class="text-smoke/20 text-xs col-span-full py-4 uppercase tracking-widest text-center">No hay servicios creados</p>';
+        return;
+      }
+      container.innerHTML = services.map(s => `
+        <div class="flex items-center justify-between py-3 px-4 rounded-lg bg-jet border border-white/5">
+          <div>
+            <span class="text-white text-sm">${s.name}</span>
+            <span class="text-smoke/30 text-xs ml-2">${s.duration_minutes} min</span>
+          </div>
+          <span class="text-gold font-semibold text-sm">$${Number(s.price).toLocaleString('es-CO')}</span>
+        </div>
+      `).join('');
+    });
+}
 
 function renderBlockedDates() {
   fetch('/api/admin/blocked-dates/')
