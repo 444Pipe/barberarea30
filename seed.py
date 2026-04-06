@@ -6,7 +6,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 django.setup()
 
 from django.contrib.auth.models import User
-from apps.users.models import Barbershop
+from apps.users.models import Barbershop, UserProfile
 from apps.services.models import Service
 from apps.barbers.models import Barber
 
@@ -36,6 +36,7 @@ for s in data.get('services', []):
 u1, _ = User.objects.get_or_create(username='juan', defaults={'email': 'juan@test.com'})
 u1.set_password('area30')
 u1.save()
+UserProfile.objects.get_or_create(user=u1, defaults={'role': 'barber', 'barbershop': shop})
 b1, _ = Barber.objects.get_or_create(
     id=1,
     defaults={
@@ -52,6 +53,7 @@ if not b1.specialties.exists():
 u2, _ = User.objects.get_or_create(username='carlos', defaults={'email': 'carlos@test.com'})
 u2.set_password('area30')
 u2.save()
+UserProfile.objects.get_or_create(user=u2, defaults={'role': 'barber', 'barbershop': shop})
 b2, _ = Barber.objects.get_or_create(
     id=2,
     defaults={
@@ -69,6 +71,7 @@ if not b2.specialties.exists():
 u_prueba, _ = User.objects.get_or_create(username='barberoprueba', defaults={'email': 'prueba@test.com'})
 u_prueba.set_password('area30')
 u_prueba.save()
+UserProfile.objects.get_or_create(user=u_prueba, defaults={'role': 'barber', 'barbershop': shop})
 
 b_prueba, _ = Barber.objects.get_or_create(
     id=3,

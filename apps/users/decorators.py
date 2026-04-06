@@ -13,6 +13,8 @@ def role_required(*roles):
                 return redirect('admin_login')
             profile = getattr(request.user, 'profile', None)
             if not profile or profile.role not in roles:
+                from django.contrib.auth import logout
+                logout(request)
                 messages.error(request, 'No tienes permisos para acceder a esta sección.')
                 return redirect('admin_login')
             return view_func(request, *args, **kwargs)
