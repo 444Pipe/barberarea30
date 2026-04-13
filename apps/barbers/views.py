@@ -5,6 +5,7 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -133,6 +134,7 @@ class BarberAdminListCreateView(generics.ListCreateAPIView):
     queryset = Barber.objects.all().prefetch_related('specialties')
     serializer_class = BarberAdminSerializer
     permission_classes = [IsAdminOrAbove]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
 
@@ -141,6 +143,7 @@ class BarberAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Barber.objects.all()
     serializer_class = BarberAdminSerializer
     permission_classes = [IsAdminOrAbove]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
 @api_view(['GET'])

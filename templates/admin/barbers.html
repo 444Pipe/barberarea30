@@ -29,7 +29,19 @@
       <h3 class="text-sm tracking-[0.2em] uppercase text-smoke/50 font-semibold" id="barber-modal-title">Agregar Barbero</h3>
       <button onclick="closeBarberModal()" class="text-smoke/40 hover:text-white">✕</button>
     </div>
-    <form id="barber-form" class="px-6 py-5 space-y-4">
+    <form id="barber-form" class="px-6 py-5 space-y-4" enctype="multipart/form-data">
+      <!-- Avatar Upload -->
+      <div class="flex flex-col items-center gap-3">
+        <div id="avatar-preview" class="w-20 h-20 rounded-full bg-jet border-2 border-white/10 flex items-center justify-center overflow-hidden cursor-pointer relative group" onclick="document.getElementById('avatar-input').click()">
+          <img id="avatar-img" src="" alt="" class="w-full h-full object-cover hidden">
+          <span id="avatar-placeholder" class="text-2xl font-serif font-bold text-smoke/30">+</span>
+          <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+        </div>
+        <input type="file" id="avatar-input" name="avatar" accept="image/*" class="hidden" onchange="previewAvatar(this)">
+        <span class="text-[0.6rem] text-smoke/30 tracking-wider">Toca para subir foto</span>
+      </div>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="admin-label">Nombre de trabajo</label>
@@ -94,8 +106,8 @@ function renderBarberCards(barbers) {
   container.innerHTML = barbers.map(b => `
     <div class="bg-jet border border-white/5 rounded-xl p-6 hover:border-gold/20 transition-all group">
       <div class="flex items-start gap-4 mb-4">
-        <div class="w-14 h-14 rounded-full flex items-center justify-center text-xl font-serif font-bold" style="background: ${b.color_tag}20; color: ${b.color_tag}; border: 2px solid ${b.color_tag}">
-          ${b.display_name.charAt(0)}
+        <div class="w-14 h-14 rounded-full flex items-center justify-center text-xl font-serif font-bold overflow-hidden" style="background: ${b.color_tag}20; color: ${b.color_tag}; border: 2px solid ${b.color_tag}">
+          ${b.avatar ? `<img src="${b.avatar}" alt="${b.display_name}" class="w-full h-full object-cover">` : b.display_name.charAt(0)}
         </div>
         <div class="flex-1 min-w-0">
           <h3 class="text-white font-semibold text-sm truncate">${b.display_name}</h3>
@@ -120,10 +132,30 @@ function renderBarberCards(barbers) {
   `).join('');
 }
 
+function previewAvatar(input) {
+  const file = input.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('avatar-img').src = e.target.result;
+      document.getElementById('avatar-img').classList.remove('hidden');
+      document.getElementById('avatar-placeholder').classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function resetAvatarPreview() {
+  document.getElementById('avatar-img').src = '';
+  document.getElementById('avatar-img').classList.add('hidden');
+  document.getElementById('avatar-placeholder').classList.remove('hidden');
+}
+
 function openAddBarber() {
   document.getElementById('barber-modal-title').textContent = 'Agregar Barbero';
   document.getElementById('barber-form').reset();
   document.getElementById('barber-form').dataset.mode = 'create';
+  resetAvatarPreview();
   document.getElementById('barber-modal').classList.remove('hidden');
 }
 
@@ -140,6 +172,14 @@ function editBarber(id) {
       form.is_available.checked = b.is_available;
       form.dataset.mode = 'edit';
       form.dataset.barberId = id;
+      // Show current avatar if exists
+      if (b.avatar) {
+        document.getElementById('avatar-img').src = b.avatar;
+        document.getElementById('avatar-img').classList.remove('hidden');
+        document.getElementById('avatar-placeholder').classList.add('hidden');
+      } else {
+        resetAvatarPreview();
+      }
       document.getElementById('barber-modal').classList.remove('hidden');
     });
 }
@@ -151,13 +191,18 @@ function closeBarberModal() {
 document.getElementById('barber-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const form = this;
-  const data = {
-    display_name: form.display_name.value,
-    color_tag: form.color_tag.value,
-    phone: form.phone.value,
-    bio: form.bio.value,
-    is_available: form.is_available.checked,
-  };
+  const formData = new FormData();
+  formData.append('display_name', form.display_name.value);
+  formData.append('color_tag', form.color_tag.value);
+  formData.append('phone', form.phone.value);
+  formData.append('bio', form.bio.value);
+  formData.append('is_available', form.is_available.checked);
+
+  // Append avatar only if a new file was selected
+  const avatarFile = document.getElementById('avatar-input').files[0];
+  if (avatarFile) {
+    formData.append('avatar', avatarFile);
+  }
 
   const isEdit = form.dataset.mode === 'edit';
   const url = isEdit ? `/api/admin/barbers/${form.dataset.barberId}/` : '/api/admin/barbers/';
@@ -165,8 +210,8 @@ document.getElementById('barber-form').addEventListener('submit', function(e) {
 
   fetch(url, {
     method,
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
-    body: JSON.stringify(data),
+    headers: { 'X-CSRFToken': getCSRF() },
+    body: formData,
   }).then(r => {
     if (r.ok) { closeBarberModal(); loadBarbers(); }
   });
