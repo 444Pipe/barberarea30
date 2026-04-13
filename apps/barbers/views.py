@@ -197,7 +197,8 @@ def obtener_barberos_nativos(request):
         barberos.append({
             'id': b.id,
             'nombre': b.display_name,
-            'especialidad': especialidades
+            'especialidad': especialidades,
+            'avatar': b.avatar.url if b.avatar else None,
         })
     return JsonResponse({'barberos': barberos}, safe=False)
 
