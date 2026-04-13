@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
+    'cloudinary_storage',
+    'cloudinary',
     # Local apps
     'apps.users',
     'apps.services',

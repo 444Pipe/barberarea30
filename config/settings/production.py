@@ -51,3 +51,11 @@ CSRF_TRUSTED_ORIGINS = _split_env(os.environ.get(
 # STATIC_ROOT y STATICFILES_STORAGE ya vienen de base.py
 # Activar finders para servir además desde STATICFILES_DIRS
 WHITENOISE_USE_FINDERS = True
+
+# ── Cloudinary (media storage) ────────────────────────────────
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME', ''),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY', ''),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', ''),
+}
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
