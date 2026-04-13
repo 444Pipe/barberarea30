@@ -127,6 +127,9 @@ function renderBarberCards(barbers) {
         <button onclick="editBarber(${b.id})" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         </button>
+        <button onclick="confirmDeleteBarber(${b.id}, '${b.display_name.replace(/'/g, "\\'")}')" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-red-400 hover:border-red-400/30 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
       </div>
     </div>
   `).join('');
@@ -221,5 +224,40 @@ function getCSRF() {
   const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
   return cookie ? cookie.split('=')[1] : '';
 }
+
+function confirmDeleteBarber(id, name) {
+  document.getElementById('delete-barber-name').textContent = name;
+  document.getElementById('delete-modal').dataset.barberId = id;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+}
+
+function deleteBarber() {
+  const id = document.getElementById('delete-modal').dataset.barberId;
+  fetch(`/api/admin/barbers/${id}/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': getCSRF() },
+  }).then(r => {
+    if (r.ok) { closeDeleteModal(); loadBarbers(); }
+  });
+}
 </script>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+  <div class="bg-jet-card border border-white/5 rounded-xl w-full max-w-sm mx-4 shadow-2xl p-6 text-center">
+    <div class="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </div>
+    <h3 class="text-white font-semibold text-sm mb-2">¿Eliminar barbero?</h3>
+    <p class="text-smoke/50 text-xs mb-6">Se eliminará a <span id="delete-barber-name" class="text-gold font-semibold"></span> y todas sus reservas asociadas. Esta acción no se puede deshacer.</p>
+    <div class="flex gap-2">
+      <button onclick="closeDeleteModal()" class="flex-1 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+      <button onclick="deleteBarber()" class="flex-1 py-2.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs tracking-wider uppercase font-bold transition-colors">Eliminar</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
