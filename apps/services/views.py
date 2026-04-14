@@ -26,6 +26,13 @@ class ServiceListView(generics.ListCreateAPIView):
         
         serializer.save(slug=slug)
 
+
+class ServiceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PUT/DELETE /api/services/{id}/"""
+    queryset = Service.objects.filter(is_active=True)
+    serializer_class = ServiceSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
 from django.core.serializers.json import DjangoJSONEncoder
 
 def obtener_servicios_nativos(request):
