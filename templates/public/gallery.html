@@ -150,10 +150,10 @@
       empty.classList.add('hidden');
 
       grid.innerHTML = filtered.map(img => `
-        <div class="break-inside-avoid group cursor-pointer" onclick="openLightbox('${img.image}', '${(img.title || '').replace(/'/g, "\\'")}', '${(img.barber_name || '').replace(/'/g, "\\'")}')">
+        <div class="break-inside-avoid group cursor-pointer gallery-item" onclick="openLightbox('${img.image}', '${(img.title || '').replace(/'/g, "\\'")}', '${(img.barber_name || '').replace(/'/g, "\\'")}')">
           <div class="relative overflow-hidden rounded-sm border border-white/5 hover:border-gold/30 transition-all duration-500">
             <img src="${img.image}" alt="${img.title || 'Galería'}" class="w-full object-cover group-hover:scale-105 transition-transform duration-700" loading="lazy">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
               <div>
                 ${img.title ? `<p class="text-gold font-serif text-sm">${img.title}</p>` : ''}
                 ${img.barber_name ? `<p class="text-smoke/60 text-xs tracking-wider uppercase mt-1">${img.barber_name}</p>` : ''}
@@ -162,6 +162,25 @@
           </div>
         </div>
       `).join('');
+
+      // Animate items on scroll for mobile
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.style.opacity = '1';
+              entry.target.style.transform = 'translateY(0)';
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.gallery-item').forEach(item => {
+          item.style.opacity = '0';
+          item.style.transform = 'translateY(20px)';
+          item.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+          observer.observe(item);
+        });
+      }
     }
 
     function openLightbox(src, title, barber) {
