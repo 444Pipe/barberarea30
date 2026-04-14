@@ -148,7 +148,11 @@
           <div class="absolute -inset-4 border border-gold/20 rounded-sm transform translate-x-4 -translate-y-4"></div>
           <div class="aspect-[4/5] bg-jet border border-white/5 relative z-10 flex items-center justify-center overflow-hidden group">
             <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10 duration-500"></div>
-            <video src="{% static 'images/videoarea30.mp4' %}" autoplay muted loop playsinline class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"></video>
+            <video id="club-video" src="{% static 'images/videoarea30.mp4' %}" autoplay muted loop playsinline class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"></video>
+            <button id="unmute-btn" onclick="toggleMute()" class="absolute bottom-4 right-4 z-20 w-10 h-10 bg-black/60 hover:bg-gold/80 rounded-full flex items-center justify-center text-white transition-colors">
+              <svg id="mute-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+              <svg id="unmute-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+            </button>
           </div>
         </div>
         <div class="order-1 lg:order-2">
@@ -314,6 +318,13 @@
     // Toggle FAB
     const fabMain = document.getElementById('fab-main');
     const fabList = document.getElementById('fab-list');
+
+    function toggleMute() {
+      const video = document.getElementById('club-video');
+      video.muted = !video.muted;
+      document.getElementById('mute-icon').classList.toggle('hidden', !video.muted);
+      document.getElementById('unmute-icon').classList.toggle('hidden', video.muted);
+    }
     
     fabMain.addEventListener('click', () => {
       fabList.classList.toggle('active');
