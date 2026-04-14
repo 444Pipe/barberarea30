@@ -117,3 +117,13 @@ def admin_settings_view(request):
         'active_section': 'settings',
     }
     return render(request, 'admin/settings.html', context)
+
+
+@admin_required
+def admin_gallery_view(request):
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'gallery',
+    }
+    return render(request, 'admin/gallery.html', context)

@@ -62,6 +62,142 @@
     </div>
   </section>
 
+  <!-- Galería de imágenes -->
+  <section class="py-20 px-4">
+    <div class="max-w-7xl mx-auto">
+
+      <!-- Filtro por barbero -->
+      <div class="flex flex-wrap justify-center gap-3 mb-12" id="gallery-filters">
+        <button onclick="filterGallery('')" class="filter-btn active px-5 py-2 text-xs tracking-widest uppercase border border-gold/30 rounded-sm text-smoke/70 hover:text-gold hover:border-gold transition-all" data-filter="">
+          Todos
+        </button>
+      </div>
+
+      <!-- Grid de imágenes -->
+      <div id="gallery-grid" class="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
+        <!-- Se carga dinámicamente -->
+      </div>
+
+      <!-- Estado vacío -->
+      <div id="gallery-empty" class="hidden text-center py-20">
+        <svg class="w-16 h-16 mx-auto mb-4 text-smoke/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <p class="text-smoke/40 text-sm tracking-widest uppercase">Próximamente nuevas fotos</p>
+      </div>
+
+      <!-- Loading -->
+      <div id="gallery-loading" class="text-center py-20">
+        <div class="inline-block w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal lightbox -->
+  <div id="lightbox" class="fixed inset-0 z-50 bg-black/95 hidden items-center justify-center p-4 cursor-zoom-out" onclick="closeLightbox()">
+    <button onclick="closeLightbox()" class="absolute top-6 right-6 text-smoke/60 hover:text-gold text-3xl transition-colors">&times;</button>
+    <img id="lightbox-img" src="" alt="" class="max-w-full max-h-[90vh] object-contain rounded-sm cursor-default" onclick="event.stopPropagation()">
+    <div id="lightbox-caption" class="absolute bottom-6 left-0 right-0 text-center">
+      <p id="lightbox-title" class="text-gold font-serif text-lg"></p>
+      <p id="lightbox-barber" class="text-smoke/50 text-xs tracking-widest uppercase mt-1"></p>
+    </div>
+  </div>
+
+  <script>
+    let allImages = [];
+    let currentFilter = '';
+
+    async function loadGallery() {
+      try {
+        const resp = await fetch('/api/gallery/');
+        if (!resp.ok) throw new Error('Error');
+        allImages = await resp.json();
+        buildFilters();
+        renderGallery();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        document.getElementById('gallery-loading').classList.add('hidden');
+      }
+    }
+
+    function buildFilters() {
+      const container = document.getElementById('gallery-filters');
+      const barbers = [...new Set(allImages.filter(i => i.barber_name).map(i => JSON.stringify({id: i.barber, name: i.barber_name})))].map(b => JSON.parse(b));
+      barbers.forEach(b => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-btn px-5 py-2 text-xs tracking-widest uppercase border border-gold/30 rounded-sm text-smoke/70 hover:text-gold hover:border-gold transition-all';
+        btn.dataset.filter = b.id;
+        btn.textContent = b.name;
+        btn.onclick = () => filterGallery(b.id);
+        container.appendChild(btn);
+      });
+    }
+
+    function filterGallery(barberId) {
+      currentFilter = barberId;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', String(btn.dataset.filter) === String(barberId));
+        if (btn.classList.contains('active')) {
+          btn.classList.add('bg-gold/10', 'text-gold', 'border-gold');
+        } else {
+          btn.classList.remove('bg-gold/10', 'text-gold', 'border-gold');
+        }
+      });
+      renderGallery();
+    }
+
+    function renderGallery() {
+      const grid = document.getElementById('gallery-grid');
+      const empty = document.getElementById('gallery-empty');
+      const filtered = currentFilter ? allImages.filter(i => i.barber == currentFilter) : allImages;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      grid.innerHTML = filtered.map(img => `
+        <div class="break-inside-avoid group cursor-pointer" onclick="openLightbox('${img.image}', '${(img.title || '').replace(/'/g, "\\'")}', '${(img.barber_name || '').replace(/'/g, "\\'")}')">
+          <div class="relative overflow-hidden rounded-sm border border-white/5 hover:border-gold/30 transition-all duration-500">
+            <img src="${img.image}" alt="${img.title || 'Galería'}" class="w-full object-cover group-hover:scale-105 transition-transform duration-700" loading="lazy">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+              <div>
+                ${img.title ? `<p class="text-gold font-serif text-sm">${img.title}</p>` : ''}
+                ${img.barber_name ? `<p class="text-smoke/60 text-xs tracking-wider uppercase mt-1">${img.barber_name}</p>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openLightbox(src, title, barber) {
+      const lb = document.getElementById('lightbox');
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox-title').textContent = title;
+      document.getElementById('lightbox-barber').textContent = barber;
+      lb.classList.remove('hidden');
+      lb.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      const lb = document.getElementById('lightbox');
+      lb.classList.add('hidden');
+      lb.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+    // Activar el filtro "Todos" por defecto
+    filterGallery('');
+    loadGallery();
+  </script>
+
   <footer class="bg-black pt-24 pb-12 px-4 border-t border-white/5">
     <div class="max-w-7xl mx-auto">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-16 mb-20">

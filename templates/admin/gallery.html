@@ -1,0 +1,191 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Galería{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Galería</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Fotos de trabajos realizados</p>
+    </div>
+    <button onclick="openUploadModal()" class="px-5 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold hover:shadow-lg hover:shadow-gold/20 transition-all">
+      + Subir Foto
+    </button>
+  </div>
+
+  <!-- Gallery Grid -->
+  <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <p class="text-smoke/30 text-sm col-span-full text-center py-12">Cargando galería...</p>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+  <div class="bg-jet-card border border-white/5 rounded-xl w-full max-w-md mx-4 shadow-2xl">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h3 class="text-sm tracking-[0.2em] uppercase text-smoke/50 font-semibold">Subir Foto</h3>
+      <button onclick="closeUploadModal()" class="text-smoke/40 hover:text-white">✕</button>
+    </div>
+    <form id="upload-form" class="px-6 py-5 space-y-4" enctype="multipart/form-data">
+      <!-- Image Preview -->
+      <div id="drop-zone" class="border-2 border-dashed border-white/10 rounded-lg p-8 text-center cursor-pointer hover:border-gold/40 transition-colors" onclick="document.getElementById('gallery-file').click()">
+        <img id="upload-preview" src="" class="hidden w-full max-h-48 object-contain rounded-md mb-3 mx-auto">
+        <div id="upload-placeholder">
+          <svg class="w-10 h-10 text-smoke/20 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <p class="text-smoke/30 text-xs tracking-wider">Toca para seleccionar una imagen</p>
+          <p class="text-smoke/20 text-[0.6rem] mt-1">JPG, PNG o WEBP</p>
+        </div>
+      </div>
+      <input type="file" id="gallery-file" name="image" accept="image/*" class="hidden" onchange="previewUpload(this)" required>
+
+      <div>
+        <label class="admin-label">Título (opcional)</label>
+        <input type="text" name="title" class="admin-input" placeholder="Ej: Fade clásico con diseño">
+      </div>
+      <div>
+        <label class="admin-label">Barbero (opcional)</label>
+        <select name="barber" id="barber-select" class="admin-input">
+          <option value="">— Sin asignar —</option>
+        </select>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="flex-1 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold">Subir</button>
+        <button type="button" onclick="closeUploadModal()" class="px-6 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-gallery-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+  <div class="bg-jet-card border border-white/5 rounded-xl w-full max-w-sm mx-4 shadow-2xl p-6 text-center">
+    <div class="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </div>
+    <h3 class="text-white font-semibold text-sm mb-2">¿Eliminar esta foto?</h3>
+    <p class="text-smoke/50 text-xs mb-6">Esta acción no se puede deshacer.</p>
+    <div class="flex gap-2">
+      <button onclick="closeDeleteGalleryModal()" class="flex-1 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+      <button onclick="deleteGalleryImage()" class="flex-1 py-2.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs tracking-wider uppercase font-bold transition-colors">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadGallery();
+  loadBarbers();
+});
+
+function loadGallery() {
+  fetch('/api/admin/gallery/')
+    .then(r => r.json())
+    .then(images => {
+      const grid = document.getElementById('gallery-grid');
+      if (!images.length) {
+        grid.innerHTML = '<p class="text-smoke/30 text-sm col-span-full text-center py-12">No hay fotos en la galería. ¡Sube la primera!</p>';
+        return;
+      }
+      grid.innerHTML = images.map(img => `
+        <div class="relative group rounded-lg overflow-hidden bg-jet border border-white/5 aspect-square">
+          <img src="${img.image}" alt="${img.title || ''}" class="w-full h-full object-cover">
+          <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+            ${img.title ? `<p class="text-white text-xs font-semibold text-center px-2">${img.title}</p>` : ''}
+            ${img.barber_name ? `<p class="text-gold text-[0.6rem] tracking-wider uppercase">${img.barber_name}</p>` : ''}
+            <button onclick="confirmDeleteImage(${img.id})" class="mt-2 px-3 py-1.5 rounded-md bg-red-600/80 hover:bg-red-600 text-white text-[0.6rem] tracking-wider uppercase font-bold transition-colors">
+              Eliminar
+            </button>
+          </div>
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      document.getElementById('gallery-grid').innerHTML = '<p class="text-smoke/30 text-sm col-span-full text-center py-12">Error al cargar la galería</p>';
+    });
+}
+
+function loadBarbers() {
+  fetch('/api/admin/barbers/')
+    .then(r => r.json())
+    .then(barbers => {
+      const select = document.getElementById('barber-select');
+      barbers.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.display_name;
+        select.appendChild(opt);
+      });
+    });
+}
+
+function previewUpload(input) {
+  const file = input.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('upload-preview').src = e.target.result;
+      document.getElementById('upload-preview').classList.remove('hidden');
+      document.getElementById('upload-placeholder').classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function openUploadModal() {
+  document.getElementById('upload-form').reset();
+  document.getElementById('upload-preview').classList.add('hidden');
+  document.getElementById('upload-placeholder').classList.remove('hidden');
+  document.getElementById('upload-modal').classList.remove('hidden');
+}
+
+function closeUploadModal() {
+  document.getElementById('upload-modal').classList.add('hidden');
+}
+
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = new FormData();
+  const file = document.getElementById('gallery-file').files[0];
+  if (!file) return;
+
+  formData.append('image', file);
+  formData.append('title', this.title.value);
+  const barberId = this.barber.value;
+  if (barberId) formData.append('barber', barberId);
+
+  fetch('/api/admin/gallery/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCSRF() },
+    body: formData,
+  }).then(r => {
+    if (r.ok) { closeUploadModal(); loadGallery(); }
+  });
+});
+
+let deleteImageId = null;
+
+function confirmDeleteImage(id) {
+  deleteImageId = id;
+  document.getElementById('delete-gallery-modal').classList.remove('hidden');
+}
+
+function closeDeleteGalleryModal() {
+  document.getElementById('delete-gallery-modal').classList.add('hidden');
+}
+
+function deleteGalleryImage() {
+  if (!deleteImageId) return;
+  fetch(`/api/admin/gallery/${deleteImageId}/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': getCSRF() },
+  }).then(r => {
+    if (r.ok) { closeDeleteGalleryModal(); loadGallery(); }
+  });
+}
+
+function getCSRF() {
+  const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+  return cookie ? cookie.split('=')[1] : '';
+}
+</script>
+{% endblock %}

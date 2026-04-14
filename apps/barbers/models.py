@@ -53,3 +53,23 @@ class Barber(models.Model):
         if not self.schedule:
             self.schedule = self.get_default_schedule()
         super().save(*args, **kwargs)
+
+
+class GalleryImage(models.Model):
+    """Imagen de galería — trabajos realizados."""
+    image = models.ImageField(upload_to='gallery/')
+    title = models.CharField(max_length=150, blank=True)
+    barber = models.ForeignKey(
+        Barber, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='gallery_images'
+    )
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Imagen de Galería'
+        verbose_name_plural = 'Imágenes de Galería'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title or f'Imagen #{self.pk}'

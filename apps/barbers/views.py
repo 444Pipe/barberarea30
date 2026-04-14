@@ -13,8 +13,8 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove
 from apps.bookings.models import Booking
-from .models import Barber
-from .serializers import BarberListSerializer, BarberAdminSerializer
+from .models import Barber, GalleryImage
+from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer
 
 
 # ─── Public ──────────────────────────────────────────────
@@ -201,6 +201,33 @@ def obtener_barberos_nativos(request):
             'avatar': b.avatar.url if b.avatar else None,
         })
     return JsonResponse({'barberos': barberos}, safe=False)
+
+
+# ─── Gallery ─────────────────────────────────────────────
+
+class GalleryPublicListView(generics.ListAPIView):
+    """GET /api/gallery/ — lista pública de imágenes."""
+    queryset = GalleryImage.objects.select_related('barber').all()
+    serializer_class = GalleryImageSerializer
+    permission_classes = [AllowAny]
+    pagination_class = None
+
+
+class GalleryAdminListCreateView(generics.ListCreateAPIView):
+    """GET/POST /api/admin/gallery/"""
+    queryset = GalleryImage.objects.select_related('barber').all()
+    serializer_class = GalleryImageSerializer
+    permission_classes = [IsAdminOrAbove]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+
+
+class GalleryAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PUT/DELETE /api/admin/gallery/{id}/"""
+    queryset = GalleryImage.objects.all()
+    serializer_class = GalleryImageSerializer
+    permission_classes = [IsAdminOrAbove]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
 # ─── Dashboard Barberos (Panel Web) ──────────────────────

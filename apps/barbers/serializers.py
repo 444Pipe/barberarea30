@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Barber
+from .models import Barber, GalleryImage
 from apps.services.serializers import ServiceSerializer
 
 
@@ -90,6 +90,14 @@ class BarberAdminSerializer(serializers.ModelSerializer):
             instance.specialties.set(specialties)
             
         return instance
+
+
+class GalleryImageSerializer(serializers.ModelSerializer):
+    barber_name = serializers.CharField(source='barber.display_name', read_only=True, default=None)
+
+    class Meta:
+        model = GalleryImage
+        fields = ['id', 'image', 'title', 'barber', 'barber_name', 'display_order', 'created_at']
 
 
 class AvailabilitySlotSerializer(serializers.Serializer):
