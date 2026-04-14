@@ -47,13 +47,13 @@
     </div>
   </nav>
 
-  <section class="py-24 px-4 bg-jet-lighter border-b border-gold/10 relative overflow-hidden">
+  <section class="py-12 px-4 bg-jet-lighter border-b border-gold/10 relative overflow-hidden">
     <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold/5 via-transparent to-transparent"></div>
     <div class="max-w-4xl mx-auto text-center relative z-10 fade-in-up">
       <div class="flex justify-center gap-2 mb-6 text-gold text-sm">
         <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
       </div>
-      <h1 class="text-4xl md:text-5xl font-serif font-bold mb-6 text-white tracking-wide">
+      <h1 class="text-3xl md:text-4xl font-serif font-bold mb-4 text-white tracking-wide">
         Galería de <span class="text-gold italic font-light">Maestros</span>
       </h1>
       <p class="text-smoke/70 text-lg font-light max-w-xl mx-auto leading-relaxed">
@@ -63,11 +63,11 @@
   </section>
 
   <!-- Galería de imágenes -->
-  <section class="py-20 px-4">
+  <section class="py-10 px-4">
     <div class="max-w-7xl mx-auto">
 
       <!-- Filtro por barbero -->
-      <div class="flex flex-wrap justify-center gap-3 mb-12" id="gallery-filters">
+      <div class="flex flex-wrap justify-center gap-3 mb-8" id="gallery-filters">
         <button onclick="filterGallery('')" class="filter-btn active px-5 py-2 text-xs tracking-widest uppercase border border-gold/30 rounded-sm text-smoke/70 hover:text-gold hover:border-gold transition-all" data-filter="">
           Todos
         </button>
@@ -79,7 +79,7 @@
       </div>
 
       <!-- Estado vacío -->
-      <div id="gallery-empty" class="hidden text-center py-20">
+      <div id="gallery-empty" class="hidden text-center py-12">
         <svg class="w-16 h-16 mx-auto mb-4 text-smoke/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
@@ -87,7 +87,7 @@
       </div>
 
       <!-- Loading -->
-      <div id="gallery-loading" class="text-center py-20">
+      <div id="gallery-loading" class="text-center py-10">
         <div class="inline-block w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></div>
       </div>
     </div>
