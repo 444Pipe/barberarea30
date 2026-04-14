@@ -194,32 +194,8 @@
         <h2 class="text-5xl md:text-7xl font-serif font-bold text-white tracking-tight mb-20">
            Servicios <span class="italic text-gold font-light">Elite.</span>
         </h2>
-        <!-- (Rest of services as before) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60">
-              <div class="flex justify-between items-start mb-8">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Corte Imperial</h3>
-                <span class="text-gold font-medium tracking-widest">$30k</span>
-              </div>
-              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Asesoría visajista, precisión milimétrica y acabado impecable."</p>
-              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
-            </div>
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up border-gold/40 bg-jet shadow-2xl" style="transition-delay: 100ms;">
-              <div class="flex justify-between items-start mb-8">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Club Experience</h3>
-                <span class="text-gold font-medium tracking-widest">$60k</span>
-              </div>
-              <p class="text-smoke/70 font-light text-sm mb-10 leading-relaxed">Nuestro ritual insignia: Corte imperial, arreglo de barba ritual, vapor ozono y mascarilla.</p>
-              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
-            </div>
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60" style="transition-delay: 200ms;">
-              <div class="flex justify-between items-start mb-8">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">Ritual de Barba</h3>
-                <span class="text-gold font-medium tracking-widest">$25k</span>
-              </div>
-              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">"Perfilación a navaja, toallas calientes aromáticas y aceites."</p>
-              <a href="booking.html" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Book <span class="text-xl">→</span></a>
-            </div>
+        <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <p class="text-smoke/40 text-sm col-span-full py-8">Cargando servicios...</p>
         </div>
     </div>
   </section>
@@ -364,6 +340,31 @@
       });
     }, { threshold: 0.1 });
     document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+    // Load services from API
+    fetch('/api/servicios-nativos/')
+      .then(r => r.json())
+      .then(data => {
+        const grid = document.getElementById('services-grid');
+        const servicios = data.servicios;
+        if (!servicios || !servicios.length) {
+          grid.innerHTML = '<p class="text-smoke/40 text-sm col-span-full py-8">No hay servicios disponibles</p>';
+          return;
+        }
+        grid.innerHTML = servicios.map((s, i) => {
+          const priceK = Number(s.price) >= 1000 ? `$${Math.round(Number(s.price)/1000)}k` : `$${Number(s.price).toLocaleString('es-CO')}`;
+          return `
+            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60 visible" style="transition-delay: ${i*100}ms;">
+              <div class="flex justify-between items-start mb-8">
+                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">${s.name}</h3>
+                <span class="text-gold font-medium tracking-widest">${priceK}</span>
+              </div>
+              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed">${s.duration_minutes} minutos</p>
+              <a href="/booking/" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reservar <span class="text-xl">→</span></a>
+            </div>
+          `;
+        }).join('');
+      });
   </script>
 </body>
 </html>
