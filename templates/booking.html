@@ -285,7 +285,7 @@
           
           let optionsHtml = '<option value="" class="bg-jet">Selecciona tu barbero preferido</option>';
           data.barberos.forEach(barbero => {
-            optionsHtml += `<option value="${barbero.id}" class="bg-jet">${barbero.nombre} (${barbero.especialidad || 'Grooming Expert'})</option>`;
+            optionsHtml += `<option value="${barbero.id}" class="bg-jet">${barbero.nombre} (${barbero.especialidad || 'Barbero'})</option>`;
           });
           select.innerHTML = optionsHtml;
         })
