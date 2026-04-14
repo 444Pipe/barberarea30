@@ -4,9 +4,13 @@ from django.views.generic import TemplateView
 
 urlpatterns = [
     path('', TemplateView.as_view(template_name='public/index.html'), name='home'),
-    path('services', TemplateView.as_view(template_name='public/services.html'), name='services'),
-    path('gallery', TemplateView.as_view(template_name='public/gallery.html'), name='gallery'),
-    path('booking', TemplateView.as_view(template_name='public/booking.html'), name='booking'),
+    path('services/', TemplateView.as_view(template_name='public/services.html'), name='services'),
+    path('gallery/', TemplateView.as_view(template_name='public/gallery.html'), name='gallery'),
+    path('booking/', TemplateView.as_view(template_name='public/booking.html'), name='booking'),
+    # Compatibilidad sin trailing slash
+    path('services', TemplateView.as_view(template_name='public/services.html')),
+    path('gallery', TemplateView.as_view(template_name='public/gallery.html')),
+    path('booking', TemplateView.as_view(template_name='public/booking.html')),
     # Compatibilidad con rutas .html directas
     path('index.html', TemplateView.as_view(template_name='public/index.html')),
     path('services.html', TemplateView.as_view(template_name='public/services.html')),
