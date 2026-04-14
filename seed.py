@@ -67,25 +67,9 @@ b2, _ = Barber.objects.get_or_create(
 if not b2.specialties.exists():
     b2.specialties.add(Service.objects.last())
 
-# Barbero Exclusivo de Prueba para Demostraciones
-u_prueba, _ = User.objects.get_or_create(username='barberoprueba', defaults={'email': 'prueba@test.com'})
-u_prueba.set_password('area30')
-u_prueba.save()
-UserProfile.objects.get_or_create(user=u_prueba, defaults={'role': 'barber', 'barbershop': shop})
-
-b_prueba, _ = Barber.objects.get_or_create(
-    id=3,
-    defaults={
-        'user': u_prueba,
-        'barbershop': shop,
-        'display_name': 'Barbero Prueba',
-        'is_available': True,
-        'color_tag': '#22C55E'  # Verde distintivo
-    }
-)
-if not b_prueba.specialties.exists() and Service.objects.exists():
-    # Asignarle todos los servicios existentes para flexibilidad en las pruebas
-    b_prueba.specialties.set(Service.objects.all())
+# Limpiar barbero de prueba si existe
+Barber.objects.filter(display_name='Barbero Prueba').delete()
+User.objects.filter(username='barberoprueba').delete()
 
 print("Datos cargados correctamente")
 # Asegurarnos de que la tabla bookings_blockeddate exista en producción si la migración falló misteriosamente
