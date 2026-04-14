@@ -13,6 +13,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE',
 if os.environ.get('DATABASE_URL'):
     print("⏳ Aplicando migraciones directamente en Postgres durante arranque WSGI...")
     os.system('python manage.py migrate --noinput')
+    os.system('python manage.py collectstatic --noinput')
     os.system('python seed.py')
     print("✅ Migraciones de arranque finalizaron.")
 
