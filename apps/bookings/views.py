@@ -44,17 +44,60 @@ def public_blocked_dates_list(request):
 def create_booking_view(request):
     """POST /api/bookings/ — crear nueva reserva desde el frontend público."""
     data = request.data
-
-    # Validate barber and service
-    try:
-        barber = Barber.objects.get(pk=data.get('barber_id'), is_available=True)
-    except Barber.DoesNotExist:
-        return Response({'error': 'Barbero no disponible'}, status=400)
-
+    
+    is_walk_in = str(data.get('is_walk_in', '')).lower() == 'true'
+    if is_walk_in:
+        data['client_name'] = data.get('client_name') or 'Cliente General'
+        data['privacy_accepted'] = True  # Admin creating walk-ins overrides this
+    else:
+        # Require explicit privacy acceptance for regular booking
+        if str(data.get('privacy_accepted', '')).lower() != 'true':
+            return Response({'error': 'Debe aceptar los términos y condiciones (Habeas Data).'}, status=400)
+    
+    # 1. Validar servicio
     try:
         service = Service.objects.get(pk=data.get('service_id'), is_active=True)
     except Service.DoesNotExist:
         return Response({'error': 'Servicio no válido'}, status=400)
+
+    # 2. Lógica "Cualquier barbero" vs barbero específico
+    barber_id = data.get('barber_id')
+    barber = None
+    
+    if not barber_id or str(barber_id).lower() == 'any':
+        date = data.get('date')
+        time = data.get('time')
+        
+        # Encontrar un barbero disponible
+        # Primero, buscamos todos los barberos activos
+        available_barbers = Barber.objects.filter(is_available=True)
+        
+        # Si el servicio excluye barberos (exclusive_barber), solo considerar el asignado o fallar
+        if service.exclusive_barber:
+            available_barbers = available_barbers.filter(id=service.exclusive_barber.id)
+            if not available_barbers.exists():
+                return Response({'error': 'El barbero asignado para este servicio exclusivo no está disponible.'}, status=400)
+
+        # Buscar quién está libre
+        for b in available_barbers:
+            # Check si b está libre en `date` y `time`
+            conflicts = Booking.objects.filter(
+                barber=b, date=date, time=time, status__in=['pending', 'confirmed']
+            ).exists()
+            if not conflicts:
+                barber = b
+                break
+                
+        if not barber:
+            return Response({'error': 'No hay barberos disponibles en la franja horaria seleccionada.'}, status=400)
+    else:
+        try:
+            barber = Barber.objects.get(pk=barber_id, is_available=True)
+            # Validar servicio exclusivo
+            if service.exclusive_barber and service.exclusive_barber.id != barber.id:
+                return Response({'error': 'Este servicio exclusivo solo puede ser realizado por otro barbero.'}, status=400)
+        except Barber.DoesNotExist:
+            return Response({'error': 'Barbero no disponible'}, status=400)
 
     serializer = BookingCreateSerializer(data=data)
     if serializer.is_valid():
@@ -64,14 +107,81 @@ def create_booking_view(request):
             price=data.get('price', service.price),
             duration_minutes=service.duration_minutes,
         )
+
+        try:
+            from .emails import send_booking_confirmation_email
+            send_booking_confirmation_email(booking)
+        except Exception as e:
+            print("Error enviando email:", e)
+
         return Response({
             'ok': True,
             'id': booking.id,
+            'barber_assigned': barber.id,
+            'barber_name': barber.display_name,
             'message': 'Reserva creada exitosamente'
         }, status=201)
 
     return Response({'ok': False, 'errors': serializer.errors}, status=400)
 
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def cancel_booking_view(request, booking_id):
+    """POST /api/bookings/{id}/cancel/ - Endpoint público para cancelar cita si faltan > 2 horas."""
+    try:
+        booking = Booking.objects.get(pk=booking_id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Reserva no encontrada'}, status=404)
+        
+    if not booking.can_cancel:
+        return Response({'error': 'No se puede cancelar la cita con menos de 2 horas de anticipación.'}, status=400)
+        
+    booking.status = 'cancelled'
+    booking.save()
+    
+    return Response({'ok': True, 'message': 'Cita cancelada exitosamente.'})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def add_review_view(request, booking_id):
+    """POST /api/bookings/{id}/review/ - Envia calificación de 1 a 5 para barbero y local."""
+    from .models import Review
+    from django.db.models import Avg
+
+    try:
+        booking = Booking.objects.get(pk=booking_id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Reserva no encontrada'}, status=404)
+
+    if booking.status != 'completed':
+        return Response({'error': 'Solo se pueden calificar servicios completados.'}, status=400)
+
+    if hasattr(booking, 'review'):
+        return Response({'error': 'Esta reserva ya tiene una calificación.'}, status=400)
+
+    barber_rating = int(request.data.get('barber_rating', 5))
+    shop_rating = int(request.data.get('shop_rating', 5))
+    comment = request.data.get('comment', '')
+
+    review = Review.objects.create(
+        booking=booking,
+        barber_rating=barber_rating,
+        shop_rating=shop_rating,
+        comment=comment
+    )
+
+    # Actualizar promedio del barbero
+    if booking.barber:
+        reviews = Review.objects.filter(booking__barber=booking.barber)
+        avg = reviews.aggregate(Avg('barber_rating'))['barber_rating__avg']
+        booking.barber.rating = round(avg, 1)
+        booking.barber.save()
+
+    return Response({'ok': True, 'message': 'Calificación guardada exitosamente.'})
 
 # ─── Admin ───────────────────────────────────────────────
 
