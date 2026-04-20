@@ -23,4 +23,6 @@ urlpatterns = [
     path('settings/', views.admin_settings_view, name='admin_settings'),
     path('gallery/', views.admin_gallery_view, name='admin_gallery'),
     path('cashflow/', views.admin_cashflow_view, name='admin_cashflow'),
+    path('expenses/', views.admin_expenses_view, name='admin_expenses'),
+    path('inventory/', views.admin_inventory_view, name='admin_inventory'),
 ]

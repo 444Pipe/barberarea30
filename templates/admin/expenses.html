@@ -1,0 +1,172 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Egresos - Área 30{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-serif text-white">Egresos Operativos</h1>
+            <p class="text-smoke/60 text-sm mt-1">Control de gastos fijos y variables del club.</p>
+        </div>
+        <button id="btn-new-expense" class="px-5 py-2.5 bg-gold hover:bg-gold-light text-jet font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Registrar Egreso
+        </button>
+    </div>
+
+    <!-- Expenses List -->
+    <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-white/5 bg-jet">
+            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Historial Reciente</h2>
+        </div>
+        
+        {% if expenses %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-jet-lighter border-b border-white/5">
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Fecha</th>
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Descripción</th>
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Tipo</th>
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Registrado Por</th>
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold text-right">Monto</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    {% for exp in expenses %}
+                    <tr class="hover:bg-white/[0.02] transition-colors">
+                        <td class="px-5 py-4 text-sm text-smoke/80">{{ exp.created_at|date:"d M Y, H:i" }}</td>
+                        <td class="px-5 py-4">
+                            <div class="text-sm text-white font-medium">{{ exp.description }}</div>
+                            {% if exp.notes %}<div class="text-[10px] text-smoke/40 mt-1">{{ exp.notes }}</div>{% endif %}
+                        </td>
+                        <td class="px-5 py-4">
+                            {% if exp.expense_type == 'variable' %}
+                                <span class="px-2 py-1 bg-blue-500/10 text-blue-400 text-[10px] uppercase tracking-widest rounded-sm border border-blue-500/20">Variable</span>
+                            {% elif exp.expense_type == 'fixed' %}
+                                <span class="px-2 py-1 bg-purple-500/10 text-purple-400 text-[10px] uppercase tracking-widest rounded-sm border border-purple-500/20">Fijo</span>
+                            {% else %}
+                                <span class="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] uppercase tracking-widest rounded-sm border border-emerald-500/20">Inventario</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-4 text-sm text-smoke/60">
+                            {{ exp.registered_by.get_full_name|default:exp.registered_by.username|default:"Sistema" }}
+                        </td>
+                        <td class="px-5 py-4 text-sm font-serif font-bold text-red-400 text-right">
+                            -${{ exp.amount|floatformat:0 }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-smoke/50 text-sm">
+            No se han registrado egresos aún.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Registrar Egreso -->
+<div id="modal-expense" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+        <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl overflow-hidden p-6">
+            <h3 class="text-xl font-serif text-white mb-4">Registrar Nuevo Egreso</h3>
+            
+            <form id="form-expense" class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Descripción</label>
+                    <input type="text" name="description" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Ej: Compra de café, Pago arriendo...">
+                </div>
+                
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Monto ($)</label>
+                    <input type="number" name="amount" required min="1" step="1" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Ej: 15000">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Tipo de Egreso</label>
+                    <select name="expense_type" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none">
+                        <option value="variable">Gasto Variable (Día a Día)</option>
+                        {% if user_role == 'superadmin' %}
+                        <option value="fixed">Gasto Fijo (Arriendo, Servicios)</option>
+                        <option value="inventory">Compra de Inventario</option>
+                        {% endif %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Notas (opcional)</label>
+                    <textarea name="notes" rows="2" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Detalles extra..."></textarea>
+                </div>
+
+                <div class="flex gap-3 justify-end pt-4">
+                    <button type="button" class="px-5 py-2 text-smoke hover:text-white transition-colors text-xs tracking-widest uppercase" onclick="document.getElementById('modal-expense').classList.add('hidden')">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-submit-expense" class="px-6 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-xs tracking-widest uppercase transition-colors">
+                        Guardar Egreso
+                    </button>
+                </div>
+                <div id="expense-error" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded-sm"></div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnOpen = document.getElementById('btn-new-expense');
+        const modal = document.getElementById('modal-expense');
+        const form = document.getElementById('form-expense');
+        const errorDiv = document.getElementById('expense-error');
+        const btnSubmit = document.getElementById('btn-submit-expense');
+
+        btnOpen.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+            form.reset();
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const originalText = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = 'Guardando...';
+            btnSubmit.disabled = true;
+            
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            data.amount = parseFloat(data.amount);
+
+            fetch('/api/admin/cashflow/expenses/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json().then(body => ({status: r.status, body: body})))
+            .then(res => {
+                if (res.status === 200 || res.status === 201 || res.body.ok) {
+                    window.location.reload();
+                } else {
+                    throw new Error(res.body.error || 'Error al guardar');
+                }
+            })
+            .catch(err => {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+            });
+        });
+    });
+</script>
+{% endblock %}

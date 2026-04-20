@@ -176,3 +176,51 @@ def daily_close_view(request):
         'close_id': daily_close.id,
         'net_income': daily_close.net_income
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def add_expense_view(request):
+    """POST /api/admin/cashflow/expenses/ - Registrar un egreso."""
+    from apps.cashflow.models import Expense
+    data = request.data
+    
+    description = data.get('description', '').strip()
+    amount = data.get('amount')
+    expense_type = data.get('expense_type', 'variable')
+    notes = data.get('notes', '')
+
+    if not description or not amount:
+        return Response({'error': 'Descripción y monto son obligatorios.'}, status=400)
+
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        return Response({'error': 'Monto inválido.'}, status=400)
+
+    # Solo superadmin puede registrar fijos/inventario si queremos ser estrictos,
+    # pero por ahora lo dejamos a nivel de IsOperationalAdminOrAbove y validamos rol:
+    profile = getattr(request.user, 'profile', None)
+    if profile and profile.role == 'operational_admin' and expense_type != 'variable':
+        return Response({'error': 'Solo los administradores principales pueden registrar egresos fijos o de inventario.'}, status=403)
+
+    expense = Expense.objects.create(
+        description=description,
+        amount=amount,
+        expense_type=expense_type,
+        notes=notes,
+        registered_by=request.user
+    )
+
+    log_audit(
+        user=request.user,
+        action='payment',
+        obj=expense,
+        changes={'amount': str(amount), 'type': expense_type},
+        request=request,
+        extra_data={'msg': f"Registró un egreso de ${amount:,.0f}: {description}"}
+    )
+
+    return Response({'ok': True, 'expense_id': expense.id, 'message': 'Egreso registrado correctamente.'})

@@ -170,3 +170,34 @@ def admin_cashflow_view(request):
         'net_income': net_income,
     }
     return render(request, 'admin/cashflow.html', context)
+
+
+@operational_admin_required
+def admin_expenses_view(request):
+    expenses = Expense.objects.all().order_by('-created_at')[:50]
+    
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'expenses',
+        'expenses': expenses,
+    }
+    return render(request, 'admin/expenses.html', context)
+
+
+@operational_admin_required
+def admin_inventory_view(request):
+    from apps.inventory.models import InventoryItem
+    items = InventoryItem.objects.all().order_by('category', 'name')
+    
+    # Calculate stats
+    low_stock_count = sum(1 for item in items if item.is_low_stock)
+    
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'inventory',
+        'items': items,
+        'low_stock_count': low_stock_count,
+    }
+    return render(request, 'admin/inventory.html', context)
