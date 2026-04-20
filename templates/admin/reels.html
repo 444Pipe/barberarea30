@@ -246,7 +246,7 @@ document.getElementById('reel-form').addEventListener('submit', function(e) {
   if (!isEdit && !videoFile) { alert('Debes seleccionar un video.'); return; }
 
   const url = isEdit ? `/api/admin/reels/${id}/` : '/api/admin/reels/';
-  const method = isEdit ? 'PUT' : 'POST';
+  const method = isEdit ? 'PATCH' : 'POST';
 
   btn.disabled = true;
   btn.textContent = 'Guardando...';
