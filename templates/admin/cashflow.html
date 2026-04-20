@@ -1,0 +1,133 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Caja y Finanzas - Área 30{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-serif text-white">Caja y Finanzas</h1>
+            <p class="text-smoke/60 text-sm mt-1">Resumen financiero del día: {{ today }}</p>
+        </div>
+        <div>
+            <button id="btn-daily-close" class="px-6 py-2.5 bg-gold hover:bg-gold-light text-jet font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-colors flex items-center gap-2" {% if pending_sales_count == 0 %}disabled style="opacity:0.5; cursor:not-allowed;"{% endif %}>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                EJECUTAR CIERRE DE CAJA
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
+            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Ventas Brutas</div>
+            <div class="text-2xl font-serif text-white">${{ total_sales|floatformat:0 }}</div>
+            <div class="text-xs text-smoke/40 mt-1">{{ pending_sales_count }} ventas pendientes</div>
+        </div>
+        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
+            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Propinas</div>
+            <div class="text-2xl font-serif text-white">${{ total_tips|floatformat:0 }}</div>
+        </div>
+        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
+            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Comisiones a Pagar</div>
+            <div class="text-2xl font-serif text-red-400">-${{ total_commissions|floatformat:0 }}</div>
+        </div>
+        <div class="bg-jet-card border border-gold/30 p-5 rounded-sm shadow-[0_0_15px_rgba(212,175,55,0.1)] relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-gold/10 to-transparent pointer-events-none"></div>
+            <div class="relative z-10">
+                <div class="text-gold text-xs tracking-widest uppercase mb-1 font-bold">Ingreso Neto (Aprox)</div>
+                <div class="text-3xl font-serif text-gold">${{ net_income|floatformat:0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Message -->
+    {% if pending_sales_count == 0 %}
+    <div class="bg-jet border border-white/5 rounded-sm p-8 text-center">
+        <svg class="w-12 h-12 text-smoke/20 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <h3 class="text-lg font-serif text-white mb-2">No hay ventas pendientes por cerrar</h3>
+        <p class="text-smoke/60 text-sm max-w-md mx-auto">Ya se realizó el cierre de caja para el día de hoy o aún no se han registrado nuevas ventas en el sistema.</p>
+    </div>
+    {% else %}
+    <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-white/5 flex justify-between items-center">
+            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Desglose antes del cierre</h2>
+        </div>
+        <div class="p-5">
+            <p class="text-smoke/60 text-sm">Asegúrate de que el dinero en caja (efectivo) coincida con los totales listados antes de ejecutar el cierre. Esta acción es <strong>irreversible</strong> y notificará a los administradores principales.</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- Modal Confirmación -->
+<div id="modal-daily-close" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+        <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl overflow-hidden p-6">
+            <h3 class="text-xl font-serif text-white mb-2">Confirmar Cierre de Caja</h3>
+            <p class="text-smoke/60 text-sm mb-6">Se liquidarán las comisiones de los barberos y se bloquearán las ventas del día. La ganancia neta reportada será de <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>. ¿Deseas continuar?</p>
+            
+            <div class="flex gap-3 justify-end">
+                <button type="button" class="px-5 py-2 text-smoke hover:text-white transition-colors text-xs tracking-widest uppercase" onclick="document.getElementById('modal-daily-close').classList.add('hidden')">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-close" class="px-6 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-xs tracking-widest uppercase transition-colors">
+                    Sí, Ejecutar Cierre
+                </button>
+            </div>
+            <div id="close-error" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded-sm"></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnOpen = document.getElementById('btn-daily-close');
+        const modal = document.getElementById('modal-daily-close');
+        const btnConfirm = document.getElementById('btn-confirm-close');
+        const errorDiv = document.getElementById('close-error');
+
+        if (btnOpen) {
+            btnOpen.addEventListener('click', () => {
+                modal.classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+            });
+        }
+
+        if (btnConfirm) {
+            btnConfirm.addEventListener('click', () => {
+                const originalText = btnConfirm.innerHTML;
+                btnConfirm.innerHTML = 'Procesando...';
+                btnConfirm.disabled = true;
+
+                fetch('/api/admin/cashflow/daily-close/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(r => r.json().then(data => ({status: r.status, body: data})))
+                .then(res => {
+                    if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
+                        window.location.reload();
+                    } else {
+                        throw new Error(res.body.error || 'Error al ejecutar cierre');
+                    }
+                })
+                .catch(err => {
+                    errorDiv.textContent = err.message;
+                    errorDiv.classList.remove('hidden');
+                    btnConfirm.innerHTML = originalText;
+                    btnConfirm.disabled = false;
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

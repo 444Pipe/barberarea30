@@ -131,3 +131,42 @@ def admin_gallery_view(request):
         'active_section': 'gallery',
     }
     return render(request, 'admin/gallery.html', context)
+
+
+from .decorators import operational_admin_required
+from apps.cashflow.models import Sale, Expense, Commission
+from django.db.models import Sum
+from django.utils import timezone
+
+@operational_admin_required
+def admin_cashflow_view(request):
+    today = timezone.localtime(timezone.now()).date()
+    
+    # Pendientes por cerrar
+    pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
+    pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
+    
+    # Totales parciales
+    total_sales = pending_sales.aggregate(t=Sum('final_price'))['t'] or 0
+    total_tips = pending_sales.aggregate(t=Sum('tip_amount'))['t'] or 0
+    total_expenses = pending_expenses.aggregate(t=Sum('amount'))['t'] or 0
+    
+    # Comisiones parciales
+    commissions = Commission.objects.filter(sale__in=pending_sales)
+    total_commissions = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
+    
+    net_income = total_sales - total_commissions - total_expenses
+
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'cashflow',
+        'today': today,
+        'pending_sales_count': pending_sales.count(),
+        'total_sales': total_sales,
+        'total_tips': total_tips,
+        'total_expenses': total_expenses,
+        'total_commissions': total_commissions,
+        'net_income': net_income,
+    }
+    return render(request, 'admin/cashflow.html', context)

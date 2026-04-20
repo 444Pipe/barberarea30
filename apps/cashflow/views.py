@@ -107,3 +107,72 @@ def checkout_booking_view(request, booking_id):
         'final_price': sale.final_price,
         'total_paid': sale.total_paid
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def daily_close_view(request):
+    """
+    POST /api/admin/cashflow/daily-close/
+    Genera el cierre de caja del día actual. Agrupa ventas no cerradas.
+    """
+    from apps.cashflow.models import DailyClose, Expense
+    from django.db.models import Sum
+
+    today = timezone.localtime(timezone.now()).date()
+    
+    # Solo un cierre por día
+    if DailyClose.objects.filter(date=today).exists():
+        return Response({'error': 'El cierre de caja para el día de hoy ya fue generado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Buscar ventas que no estén en un cierre
+    pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
+    if not pending_sales.exists():
+        return Response({'error': 'No hay ventas pendientes por cerrar.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        total_sales = pending_sales.aggregate(total=Sum('base_price'))['total'] or 0
+        total_tips = pending_sales.aggregate(total=Sum('tip_amount'))['total'] or 0
+        
+        # Comisiones
+        commissions = Commission.objects.filter(sale__in=pending_sales)
+        total_commissions = commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
+
+        # Egresos variables del día (no asignados a un cierre)
+        pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
+        total_expenses = pending_expenses.aggregate(total=Sum('amount'))['total'] or 0
+
+        # Ingreso neto: (Ventas Base) - (Comisiones) - (Descuentos asimilados por la empresa?) 
+        # Actually total_sales was based on base_price. The real income for the company from sales is the final_price.
+        total_final_prices = pending_sales.aggregate(total=Sum('final_price'))['total'] or 0
+        net_income = total_final_prices - total_commissions - total_expenses
+
+        daily_close = DailyClose.objects.create(
+            date=today,
+            closed_by=request.user,
+            total_sales=total_final_prices,
+            total_tips=total_tips,
+            total_commissions=total_commissions,
+            total_expenses=total_expenses,
+            net_income=net_income
+        )
+
+        # Update sales and expenses
+        pending_sales.update(included_in_daily_close=daily_close)
+        pending_expenses.update(included_in_daily_close=daily_close)
+
+        # Audit log
+        log_audit(
+            user=request.user,
+            action='daily_close',
+            obj=daily_close,
+            changes={},
+            request=request,
+            extra_data={'msg': f"Realizó el Cierre de Caja del {today} con Neto ${net_income:,.0f}"}
+        )
+
+    return Response({
+        'message': 'Cierre de caja exitoso',
+        'close_id': daily_close.id,
+        'net_income': daily_close.net_income
+    })
