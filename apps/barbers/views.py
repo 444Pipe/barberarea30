@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404
+from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove
 from apps.bookings.models import Booking
@@ -95,8 +96,8 @@ def barber_availability_view(request, barber_id):
                 break
 
         # If date is today, mark past times as unavailable
-        now = datetime.now()
-        if target_date == now.date() and current.time() <= now.time():
+        now_local = timezone.localtime()
+        if target_date == now_local.date() and current.time() <= now_local.time():
             is_available = False
 
         slots.append({
@@ -277,7 +278,6 @@ def finalizar_cita(request):
     cita.notes = observaciones
     
     # También fijar el timestamp de finalización usando datetime.now
-    from django.utils import timezone
     cita.completed_at = timezone.now()
     
     cita.save()
