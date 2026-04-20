@@ -279,11 +279,36 @@ def admin_booking_detail_view(request, booking_id):
             booking.time = data['time']
 
         booking.save()
+        
+        # Audit Log para cambios de estado (ej: cancelado)
+        if new_status != old_status and profile and profile.is_admin:
+            from apps.analytics.models import log_audit
+            msg = f"Cambió el estado de la reserva de {booking.client_name} a {new_status}"
+            log_audit(
+                user=request.user,
+                action='update',
+                obj=booking,
+                changes={'status': [old_status, new_status]},
+                request=request,
+                extra_data={'msg': msg}
+            )
+            
         serializer = BookingAdminSerializer(booking)
         return Response(serializer.data)
 
     elif request.method == 'DELETE':
+        client_name = booking.client_name
         booking.delete()
+        if profile and profile.is_admin:
+            from apps.analytics.models import log_audit
+            log_audit(
+                user=request.user,
+                action='delete',
+                obj=None,
+                changes={},
+                request=request,
+                extra_data={'msg': f"Eliminó la reserva de {client_name}"}
+            )
         return Response({'ok': True}, status=204)
 
 

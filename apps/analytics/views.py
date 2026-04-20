@@ -197,3 +197,31 @@ def dashboard_stats_view(request):
         'top_barber': top_barber['barber__display_name'] if top_barber else '-',
         'today_kanban': dict(kanban),
     })
+
+
+from apps.analytics.models import AuditLog
+
+@api_view(['GET'])
+@permission_classes([IsAdminOrAbove])
+def notifications_view(request):
+    """GET /api/admin/notifications/ — ultimos movimientos para superadmins."""
+    profile = getattr(request.user, 'profile', None)
+    if not profile or not profile.is_superadmin:
+        return Response({'error': 'Sin acceso a auditoría'}, status=403)
+
+    logs = AuditLog.objects.all().order_by('-created_at')[:20]
+    
+    result = []
+    for log in logs:
+        user_name = log.user.get_full_name() or log.user.username if log.user else 'Sistema'
+        msg = log.extra_data.get('msg', f"Realizó una acción: {log.get_action_display()}")
+        
+        result.append({
+            'id': log.id,
+            'user': user_name,
+            'action': log.action,
+            'message': msg,
+            'time': log.created_at.strftime('%d %b, %I:%M %p')
+        })
+
+    return Response(result)

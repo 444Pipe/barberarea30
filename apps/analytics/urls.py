@@ -7,4 +7,5 @@ urlpatterns = [
     path('stats/services/', views.services_stats_view, name='admin_services_stats'),
     path('stats/barbers/performance/', views.barber_performance_view, name='admin_barber_perf'),
     path('stats/heatmap/', views.heatmap_view, name='admin_heatmap'),
+    path('notifications/', views.notifications_view, name='admin_notifications'),
 ]

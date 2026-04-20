@@ -8,6 +8,7 @@ from apps.users.permissions import IsOperationalAdminOrAbove
 from apps.bookings.models import Booking
 from apps.cashflow.models import Sale, PaymentMethod, Commission
 from apps.inventory.models import InventoryItem, ServiceInventoryItem, InventoryMovement
+from apps.analytics.models import log_audit
 
 @api_view(['POST'])
 @permission_classes([IsOperationalAdminOrAbove])
@@ -84,6 +85,21 @@ def checkout_booking_view(request, booking_id):
         booking.status = 'completed'
         booking.completed_at = timezone.now()
         booking.save()
+
+        # 5. Registro de Auditoría
+        log_audit(
+            user=request.user,
+            action='payment',
+            obj=sale,
+            changes={
+                'total_paid': str(sale.total_paid),
+                'payment_method': payment_method.name if payment_method else 'Desconocido',
+                'tip': str(tip_amount),
+                'discount': str(discount_amount)
+            },
+            request=request,
+            extra_data={'msg': f"Completó la reserva de {booking.client_name} por ${sale.total_paid:,.0f}"}
+        )
 
     return Response({
         'message': 'Checkout completado correctamente',

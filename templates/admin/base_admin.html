@@ -116,12 +116,41 @@
     <!-- ═══ MAIN CONTENT ═══ -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <!-- Top bar (mobile) -->
-      <header class="lg:hidden flex items-center justify-between px-4 py-3 bg-jet-card border-b border-white/5">
-        <button onclick="toggleSidebar()" class="text-gold p-1">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
-        </button>
-        <span class="text-lg font-serif font-bold tracking-widest text-gold">ÁREA 30</span>
-        <a href="/" class="text-xs text-smoke/50 hover:text-gold transition-colors tracking-wider uppercase">Sitio</a>
+      <header class="flex items-center justify-between px-4 py-3 bg-jet-card border-b border-white/5 lg:justify-end">
+        <div class="lg:hidden flex items-center gap-3">
+          <button onclick="toggleSidebar()" class="text-gold p-1">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <span class="text-lg font-serif font-bold tracking-widest text-gold">ÁREA 30</span>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <a href="/" class="text-xs text-smoke/50 hover:text-gold transition-colors tracking-wider uppercase lg:hidden">Sitio</a>
+          
+          {% if user_role == 'superadmin' %}
+          <!-- Notification Bell -->
+          <div class="relative" id="notification-container">
+            <button onclick="toggleNotifications()" class="relative p-2 text-smoke/60 hover:text-gold transition-colors focus:outline-none">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+              <!-- Badge -->
+              <span id="notif-badge" class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full hidden"></span>
+            </button>
+
+            <!-- Dropdown -->
+            <div id="notif-dropdown" class="absolute right-0 mt-2 w-80 bg-jet-card border border-white/10 shadow-2xl rounded-xl overflow-hidden hidden z-50">
+              <div class="p-3 border-b border-white/5 bg-jet-lighter flex justify-between items-center">
+                <h3 class="text-xs font-bold tracking-widest uppercase text-gold">Movimientos Recientes</h3>
+                <button onclick="fetchNotifications()" class="text-smoke/40 hover:text-gold" title="Actualizar">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+              </div>
+              <div id="notif-list" class="max-h-72 overflow-y-auto divide-y divide-white/5">
+                <div class="p-4 text-center text-xs text-smoke/30">Cargando...</div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
       </header>
 
       <!-- Page content -->
@@ -138,6 +167,68 @@
       sidebar.classList.toggle('-translate-x-full');
       overlay.classList.toggle('hidden');
     }
+
+    {% if user_role == 'superadmin' %}
+    function toggleNotifications() {
+      const drop = document.getElementById('notif-dropdown');
+      if (drop.classList.contains('hidden')) {
+        drop.classList.remove('hidden');
+        fetchNotifications();
+      } else {
+        drop.classList.add('hidden');
+      }
+    }
+
+    function fetchNotifications() {
+      const list = document.getElementById('notif-list');
+      const badge = document.getElementById('notif-badge');
+      
+      list.innerHTML = '<div class="p-4 text-center text-xs text-smoke/30">Cargando...</div>';
+      
+      fetch('/api/admin/notifications/')
+        .then(r => r.json())
+        .then(data => {
+          if(data.error) {
+            list.innerHTML = `<div class="p-4 text-center text-xs text-red-400">${data.error}</div>`;
+            return;
+          }
+          if (data.length > 0) {
+            badge.classList.remove('hidden');
+            list.innerHTML = data.map(n => `
+              <div class="p-3 hover:bg-white/[0.02] transition-colors">
+                <div class="flex justify-between items-start mb-1">
+                  <span class="text-[0.65rem] font-bold text-gold uppercase tracking-wider">${n.user}</span>
+                  <span class="text-[0.6rem] text-smoke/30">${n.time}</span>
+                </div>
+                <p class="text-xs text-smoke/80 leading-relaxed">${n.message}</p>
+              </div>
+            `).join('');
+          } else {
+            badge.classList.add('hidden');
+            list.innerHTML = '<div class="p-4 text-center text-xs text-smoke/30">No hay movimientos recientes</div>';
+          }
+        })
+        .catch(() => {
+          list.innerHTML = '<div class="p-4 text-center text-xs text-red-400">Error al cargar</div>';
+        });
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const container = document.getElementById('notification-container');
+      const dropdown = document.getElementById('notif-dropdown');
+      if (container && !container.contains(e.target) && !dropdown.classList.contains('hidden')) {
+        dropdown.classList.add('hidden');
+      }
+    });
+
+    // Check periodically (every 60s)
+    setInterval(() => {
+      fetch('/api/admin/notifications/').then(r=>r.json()).then(data => {
+         if(data.length > 0) document.getElementById('notif-badge').classList.remove('hidden');
+      });
+    }, 60000);
+    {% endif %}
   </script>
   <script src="{% static 'js/admin.js' %}"></script>
   {% block extra_js %}{% endblock %}
