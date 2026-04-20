@@ -101,6 +101,12 @@ def checkout_booking_view(request, booking_id):
             extra_data={'msg': f"Completó la reserva de {booking.client_name} por ${sale.total_paid:,.0f}"}
         )
 
+    try:
+        from apps.bookings.emails import send_post_sale_survey_email
+        send_post_sale_survey_email(booking)
+    except Exception as e:
+        print("Error sending post sale survey email:", e)
+
     return Response({
         'message': 'Checkout completado correctamente',
         'sale_id': sale.id,

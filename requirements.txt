@@ -11,3 +11,4 @@ python-dotenv==1.0.1
 dj-database-url==2.2.0
 cloudinary
 django-cloudinary-storage
+APScheduler==3.10.4
