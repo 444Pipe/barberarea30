@@ -4,6 +4,15 @@ from django.contrib.auth.models import User
 from apps.users.models import Barbershop
 from apps.services.models import Service
 
+# Use RawMediaCloudinaryStorage for video uploads to bypass Pillow image validation.
+# Wrapped in try/except so local dev (no cloudinary) falls back gracefully.
+try:
+    from cloudinary_storage.storage import RawMediaCloudinaryStorage as _RawStorage
+    _video_storage = _RawStorage()
+except Exception:
+    from django.core.files.storage import default_storage
+    _video_storage = default_storage
+
 
 class Barber(models.Model):
     """Perfil de barbero con horario y especialidades."""
@@ -77,7 +86,11 @@ class GalleryImage(models.Model):
 
 class Reel(models.Model):
     """Video estilo reel — trabajos en video para la página pública."""
-    video = models.FileField(upload_to='reels/', help_text='Video MP4 vertical (9:16 recomendado)')
+    video = models.FileField(
+        upload_to='reels/',
+        storage=_video_storage,  # RawMediaCloudinaryStorage in prod, default locally
+        help_text='Video MP4 vertical (9:16 recomendado)'
+    )
     thumbnail = models.ImageField(upload_to='reels/thumbs/', null=True, blank=True,
         help_text='Miniatura opcional. Si no se sube se usa el primer frame del video.')
     title = models.CharField(max_length=150, blank=True)
