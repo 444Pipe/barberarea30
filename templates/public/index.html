@@ -206,55 +206,28 @@
     </div>
   </section>
 
-  <!-- Trabajos (Estilo Reels) -->
-  <section class="py-32 bg-jet border-y border-gold/5 relative overflow-hidden">
-    <div class="max-w-7xl mx-auto px-4">
-      <div class="text-center mb-16">
-        <h2 class="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight">Nuestros <span class="italic text-gold font-light">Trabajos.</span></h2>
-        <p class="text-smoke/60 mt-4 tracking-widest uppercase text-xs">Desliza para ver la excelencia</p>
+  <!-- Reels CTA — Invitación a ver /reels/ -->
+  <section class="py-24 bg-jet border-y border-gold/5 relative overflow-hidden">
+    <div class="absolute inset-0 pointer-events-none">
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-48 bg-gold/5 blur-[100px]"></div>
+    </div>
+    <div class="max-w-4xl mx-auto px-4 text-center relative z-10">
+      <div class="flex items-center justify-center gap-4 mb-6">
+        <div class="h-[1px] w-12 bg-gold/40"></div>
+        <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold">Nuestros Trabajos</span>
+        <div class="h-[1px] w-12 bg-gold/40"></div>
       </div>
-      
-      <!-- Contenedor del Carrusel Vertical "Reels" -->
-      <div class="relative max-w-sm mx-auto h-[600px] rounded-[2rem] overflow-hidden border-2 border-gold/20 shadow-[0_0_40px_rgba(212,175,55,0.1)] group bg-jet-card">
-        <!-- Overlay superior/inferior para el scroll -->
-        <div class="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-jet-card to-transparent z-10 pointer-events-none"></div>
-        <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-jet-card to-transparent z-10 pointer-events-none"></div>
-        
-        <!-- Carrusel Scroll Snap -->
-        <div class="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide flex flex-col relative z-0" style="scrollbar-width: none;">
-          
-          <!-- Reel 1 -->
-          <div class="w-full h-full flex-shrink-0 snap-start relative flex justify-center items-center bg-black">
-            <video src="{% static 'images/videoarea30.mp4' %}" autoplay muted loop playsinline class="w-full h-full object-cover opacity-90"></video>
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
-            <div class="absolute bottom-8 left-6 z-20">
-              <h3 class="text-gold font-serif text-xl font-bold mb-1">The CEO Cut</h3>
-              <p class="text-smoke text-xs font-light tracking-wide">Por: Camilo M.</p>
-            </div>
-            <div class="absolute bottom-8 right-4 flex flex-col gap-4 z-20">
-               <button class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:text-gold transition">♡</button>
-               <a href="booking.html" class="w-10 h-10 rounded-full bg-gold flex items-center justify-center text-jet font-bold hover:scale-110 transition">➔</a>
-            </div>
-          </div>
-          
-          <!-- Reel 2 -->
-          <div class="w-full h-full flex-shrink-0 snap-start relative flex justify-center items-center bg-jet-lighter">
-            <div class="absolute inset-0 bg-gradient-to-br from-jet to-jet-lighter flex items-center justify-center">
-               <span class="text-gold/20 text-5xl font-serif">ÁREA 30</span>
-            </div>
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
-            <div class="absolute bottom-8 left-6 z-20">
-              <h3 class="text-gold font-serif text-xl font-bold mb-1">Perfilación Barba</h3>
-              <p class="text-smoke text-xs font-light tracking-wide">Precisión Absoluta</p>
-            </div>
-             <div class="absolute bottom-8 right-4 flex flex-col gap-4 z-20">
-               <button class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:text-gold transition">♡</button>
-               <a href="booking.html" class="w-10 h-10 rounded-full bg-gold flex items-center justify-center text-jet font-bold hover:scale-110 transition">➔</a>
-            </div>
-          </div>
-          
-        </div>
-      </div>
+      <h2 class="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight mb-6">
+        Ve la <span class="italic text-gold font-light">Excelencia.</span>
+      </h2>
+      <p class="text-smoke/50 mb-10 font-light leading-relaxed max-w-lg mx-auto">
+        Cada corte cuenta una historia. Mira nuestros reels y descubre por qué Área 30 es el club de barbería que define identidades en Restrepo.
+      </p>
+      <a href="/reels/" class="group inline-flex items-center gap-4 px-10 py-4 bg-gold text-jet font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold-light transition-all duration-300 shadow-lg shadow-gold/20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Ver Reels
+        <span class="w-8 h-[1px] bg-jet/40 group-hover:w-12 transition-all duration-300"></span>
+      </a>
     </div>
   </section>
 
