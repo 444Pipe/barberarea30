@@ -64,11 +64,65 @@
         <input type="checkbox" name="is_available" checked id="barber-available" class="accent-gold w-4 h-4">
         <label for="barber-available" class="text-xs text-smoke/60">Disponible para reservas</label>
       </div>
+
+      <!-- Credenciales de acceso — solo al crear -->
+      <div id="credentials-section" class="border-t border-white/5 pt-4 space-y-3">
+        <p class="text-[0.65rem] text-gold/70 uppercase tracking-widest font-semibold">🔐 Acceso al panel</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="admin-label">Usuario</label>
+            <input type="text" id="cred-username" name="new_username" class="admin-input" placeholder="ej: carlos_barber">
+            <p class="text-[0.6rem] text-smoke/30 mt-1">Dejar vacío para generar automático</p>
+          </div>
+          <div>
+            <label class="admin-label">Contraseña</label>
+            <div class="relative">
+              <input type="text" id="cred-password" name="new_password" class="admin-input pr-9" placeholder="ej: Barber2024!">
+              <button type="button" onclick="generatePassword()" title="Generar contraseña" class="absolute right-2 top-1/2 -translate-y-1/2 text-smoke/40 hover:text-gold transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+            </div>
+            <p class="text-[0.6rem] text-smoke/30 mt-1">Vacío usa: area30barber</p>
+          </div>
+        </div>
+      </div>
+
       <div class="flex gap-2 pt-2">
-        <button type="submit" class="flex-1 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold">Guardar</button>
+        <button type="submit" id="barber-submit-btn" class="flex-1 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold">Guardar</button>
         <button type="button" onclick="closeBarberModal()" class="px-6 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modal de credenciales generadas -->
+<div id="credentials-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+  <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-sm mx-4 shadow-2xl p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center">
+        <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+      </div>
+      <div>
+        <h3 class="text-white font-semibold text-sm">Barbero creado</h3>
+        <p class="text-smoke/40 text-[0.65rem]">Comparte estas credenciales con el barbero</p>
+      </div>
+    </div>
+    <div class="bg-jet rounded-lg p-4 space-y-3 mb-4 border border-white/5">
+      <div class="flex justify-between items-center">
+        <span class="text-smoke/40 text-xs uppercase tracking-wider">Usuario</span>
+        <span id="cred-display-username" class="text-gold font-mono font-bold text-sm"></span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-smoke/40 text-xs uppercase tracking-wider">Contraseña</span>
+        <span id="cred-display-password" class="text-emerald-400 font-mono font-bold text-sm"></span>
+      </div>
+      <div class="flex justify-between items-center border-t border-white/5 pt-3">
+        <span class="text-smoke/40 text-xs uppercase tracking-wider">URL de acceso</span>
+        <span class="text-smoke/60 font-mono text-xs">/admin-panel/login/</span>
+      </div>
+    </div>
+    <p class="text-amber-400/70 text-[0.6rem] mb-4">⚠️ Anota estas credenciales antes de cerrar. No se volverán a mostrar.</p>
+    <button onclick="closeCredentialsModal()" class="w-full py-2.5 rounded-md bg-gold text-jet text-xs tracking-widest uppercase font-bold hover:bg-white transition-colors">Entendido</button>
   </div>
 </div>
 
@@ -154,10 +208,18 @@ function resetAvatarPreview() {
   document.getElementById('avatar-placeholder').classList.remove('hidden');
 }
 
+function generatePassword() {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#';
+  let pwd = '';
+  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  document.getElementById('cred-password').value = pwd;
+}
+
 function openAddBarber() {
   document.getElementById('barber-modal-title').textContent = 'Agregar Barbero';
   document.getElementById('barber-form').reset();
   document.getElementById('barber-form').dataset.mode = 'create';
+  document.getElementById('credentials-section').classList.remove('hidden');
   resetAvatarPreview();
   document.getElementById('barber-modal').classList.remove('hidden');
 }
@@ -175,7 +237,8 @@ function editBarber(id) {
       form.is_available.checked = b.is_available;
       form.dataset.mode = 'edit';
       form.dataset.barberId = id;
-      // Show current avatar if exists
+      // Ocultar credenciales en modo edición
+      document.getElementById('credentials-section').classList.add('hidden');
       if (b.avatar) {
         document.getElementById('avatar-img').src = b.avatar;
         document.getElementById('avatar-img').classList.remove('hidden');
@@ -194,6 +257,7 @@ function closeBarberModal() {
 document.getElementById('barber-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const form = this;
+  const btn = document.getElementById('barber-submit-btn');
   const formData = new FormData();
   formData.append('display_name', form.display_name.value);
   formData.append('color_tag', form.color_tag.value);
@@ -201,24 +265,57 @@ document.getElementById('barber-form').addEventListener('submit', function(e) {
   formData.append('bio', form.bio.value);
   formData.append('is_available', form.is_available.checked);
 
-  // Append avatar only if a new file was selected
-  const avatarFile = document.getElementById('avatar-input').files[0];
-  if (avatarFile) {
-    formData.append('avatar', avatarFile);
+  const isEdit = form.dataset.mode === 'edit';
+
+  // Credenciales solo en modo creación
+  if (!isEdit) {
+    const customUser = document.getElementById('cred-username').value.trim();
+    const customPass = document.getElementById('cred-password').value.trim();
+    if (customUser) formData.append('new_username', customUser);
+    if (customPass) formData.append('new_password', customPass);
   }
 
-  const isEdit = form.dataset.mode === 'edit';
+  // Avatar
+  const avatarFile = document.getElementById('avatar-input').files[0];
+  if (avatarFile) formData.append('avatar', avatarFile);
+
   const url = isEdit ? `/api/admin/barbers/${form.dataset.barberId}/` : '/api/admin/barbers/';
   const method = isEdit ? 'PUT' : 'POST';
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
 
   fetch(url, {
     method,
     headers: { 'X-CSRFToken': getCSRF() },
     body: formData,
-  }).then(r => {
-    if (r.ok) { closeBarberModal(); loadBarbers(); }
+  })
+  .then(r => r.json().then(data => ({ ok: r.ok, status: r.status, data })))
+  .then(({ ok, data }) => {
+    if (!ok) {
+      const msg = data.detail || data.new_username || JSON.stringify(data);
+      alert('Error: ' + msg);
+      return;
+    }
+    closeBarberModal();
+    loadBarbers();
+    // Mostrar credenciales solo al crear
+    if (!isEdit && data.created_username) {
+      document.getElementById('cred-display-username').textContent = data.created_username;
+      document.getElementById('cred-display-password').textContent = data.created_password || 'area30barber';
+      document.getElementById('credentials-modal').classList.remove('hidden');
+    }
+  })
+  .catch(err => alert('Error de conexión: ' + err))
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Guardar';
   });
 });
+
+function closeCredentialsModal() {
+  document.getElementById('credentials-modal').classList.add('hidden');
+}
 
 function getCSRF() {
   const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));

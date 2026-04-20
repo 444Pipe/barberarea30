@@ -265,31 +265,40 @@ function closeCheckout() {
 function submitCheckout(e) {
   e.preventDefault();
   const id = document.getElementById('checkout-booking-id').value;
-  
+  const btn = e.target.querySelector('[type="submit"]');
+
   const payload = {
     payment_method_id: document.getElementById('checkout-payment-method').value,
     payment_reference: document.getElementById('checkout-reference').value,
-    tip_amount: document.getElementById('checkout-tip').value || 0,
-    discount_amount: document.getElementById('checkout-discount').value || 0,
+    tip_amount: parseFloat(document.getElementById('checkout-tip').value) || 0,
+    discount_amount: parseFloat(document.getElementById('checkout-discount').value) || 0,
     discount_assumed_by: document.getElementById('checkout-assumed-by').value,
     notes: document.getElementById('checkout-notes').value
   };
+
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
 
   fetch('/api/admin/checkout/' + id + '/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
     body: JSON.stringify(payload)
   })
-  .then(res => res.json())
-  .then(data => {
-    if (data.error) {
-      alert('Error: ' + data.error);
+  .then(res => res.json().then(data => ({ ok: res.ok, status: res.status, data })))
+  .then(({ ok, status, data }) => {
+    if (!ok) {
+      const msg = data.error || data.detail || `Error ${status}`;
+      alert('Error: ' + msg);
     } else {
       closeCheckout();
       loadBookings();
     }
   })
-  .catch(err => alert('Error en la conexión.'));
+  .catch(err => alert('Error en la conexión: ' + err))
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Confirmar Pago';
+  });
 }
 
 function getCSRF() {

@@ -4,14 +4,14 @@ from rest_framework import status
 from django.db import transaction
 from django.utils import timezone
 
-from apps.users.permissions import IsOperationalAdminOrAbove
+from apps.users.permissions import IsOperationalAdminOrAbove, IsBarberOrAbove
 from apps.bookings.models import Booking
 from apps.cashflow.models import Sale, PaymentMethod, Commission
 from apps.inventory.models import InventoryItem, ServiceInventoryItem, InventoryMovement
 from apps.analytics.models import log_audit
 
 @api_view(['POST'])
-@permission_classes([IsOperationalAdminOrAbove])
+@permission_classes([IsBarberOrAbove])
 def checkout_booking_view(request, booking_id):
     """
     POST /api/admin/checkout/<booking_id>/

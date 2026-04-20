@@ -138,6 +138,17 @@ class BarberAdminListCreateView(generics.ListCreateAPIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        barber = serializer.save()
+        # Retornar credenciales generadas junto con los datos del barbero
+        response_data = serializer.data
+        response_data = dict(response_data)
+        response_data['created_username'] = getattr(barber, '_created_username', barber.user.username)
+        response_data['created_password'] = getattr(barber, '_created_password', '')
+        return Response(response_data, status=status.HTTP_201_CREATED)
+
 
 class BarberAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/admin/barbers/{id}/"""
