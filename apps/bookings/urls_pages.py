@@ -16,4 +16,5 @@ urlpatterns = [
     path('services.html', TemplateView.as_view(template_name='public/services.html')),
     path('gallery.html', TemplateView.as_view(template_name='public/gallery.html')),
     path('booking.html', TemplateView.as_view(template_name='public/booking.html')),
+    path('rate/<int:booking_id>/', TemplateView.as_view(template_name='public/rate.html'), name='rate_booking'),
 ]

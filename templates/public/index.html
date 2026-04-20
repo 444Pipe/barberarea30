@@ -204,8 +204,57 @@
     </div>
   </section>
 
-  <!-- Testimonios -->
-  <!-- ... (Testimonios as before) ... -->
+  <!-- Trabajos (Estilo Reels) -->
+  <section class="py-32 bg-jet border-y border-gold/5 relative overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight">Nuestros <span class="italic text-gold font-light">Trabajos.</span></h2>
+        <p class="text-smoke/60 mt-4 tracking-widest uppercase text-xs">Desliza para ver la excelencia</p>
+      </div>
+      
+      <!-- Contenedor del Carrusel Vertical "Reels" -->
+      <div class="relative max-w-sm mx-auto h-[600px] rounded-[2rem] overflow-hidden border-2 border-gold/20 shadow-[0_0_40px_rgba(212,175,55,0.1)] group bg-jet-card">
+        <!-- Overlay superior/inferior para el scroll -->
+        <div class="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-jet-card to-transparent z-10 pointer-events-none"></div>
+        <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-jet-card to-transparent z-10 pointer-events-none"></div>
+        
+        <!-- Carrusel Scroll Snap -->
+        <div class="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide flex flex-col relative z-0" style="scrollbar-width: none;">
+          
+          <!-- Reel 1 -->
+          <div class="w-full h-full flex-shrink-0 snap-start relative flex justify-center items-center bg-black">
+            <video src="{% static 'images/videoarea30.mp4' %}" autoplay muted loop playsinline class="w-full h-full object-cover opacity-90"></video>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-8 left-6 z-20">
+              <h3 class="text-gold font-serif text-xl font-bold mb-1">The CEO Cut</h3>
+              <p class="text-smoke text-xs font-light tracking-wide">Por: Camilo M.</p>
+            </div>
+            <div class="absolute bottom-8 right-4 flex flex-col gap-4 z-20">
+               <button class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:text-gold transition">♡</button>
+               <a href="booking.html" class="w-10 h-10 rounded-full bg-gold flex items-center justify-center text-jet font-bold hover:scale-110 transition">➔</a>
+            </div>
+          </div>
+          
+          <!-- Reel 2 -->
+          <div class="w-full h-full flex-shrink-0 snap-start relative flex justify-center items-center bg-jet-lighter">
+            <div class="absolute inset-0 bg-gradient-to-br from-jet to-jet-lighter flex items-center justify-center">
+               <span class="text-gold/20 text-5xl font-serif">ÁREA 30</span>
+            </div>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-8 left-6 z-20">
+              <h3 class="text-gold font-serif text-xl font-bold mb-1">Perfilación Barba</h3>
+              <p class="text-smoke text-xs font-light tracking-wide">Precisión Absoluta</p>
+            </div>
+             <div class="absolute bottom-8 right-4 flex flex-col gap-4 z-20">
+               <button class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:text-gold transition">♡</button>
+               <a href="booking.html" class="w-10 h-10 rounded-full bg-gold flex items-center justify-center text-jet font-bold hover:scale-110 transition">➔</a>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Mapa Panorámico Dinámico -->
   <section class="bg-jet py-32 px-4 overflow-hidden border-t border-gold/5 relative">
@@ -262,6 +311,7 @@
         </div>
 
         <div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-12">
+          <!-- Ubicación -->
           <div>
             <h4 class="text-white font-serif tracking-widest mb-10 uppercase text-xs">Ubicación</h4>
             <p class="text-smoke/60 text-lg font-serif mb-4">C.C. Sunrise, Restrepo - Meta</p>
@@ -278,6 +328,19 @@
                 <span class="text-gold">09:00 - 14:00</span>
               </div>
             </div>
+          </div>
+
+          <!-- Buzón de Sugerencias -->
+          <div>
+            <h4 class="text-white font-serif tracking-widest mb-10 uppercase text-xs">Buzón de Sugerencias</h4>
+            <form id="suggestion-form" class="space-y-4" onsubmit="submitSuggestion(event)">
+               <input type="text" id="sugg-name" placeholder="Tu Nombre (Opcional)" class="w-full bg-transparent border-b border-white/20 pb-2 text-sm text-smoke focus:outline-none focus:border-gold transition-colors font-light">
+               <textarea id="sugg-message" placeholder="¿Cómo podemos mejorar tu experiencia?" required rows="3" class="w-full bg-transparent border-b border-white/20 pb-2 text-sm text-smoke focus:outline-none focus:border-gold transition-colors font-light resize-none mt-4"></textarea>
+               <button type="submit" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-2 mt-4">
+                  Enviar Mensaje <span>→</span>
+               </button>
+               <div id="sugg-status" class="text-xs mt-2 hidden"></div>
+            </form>
           </div>
         </div>
       </div>
@@ -376,6 +439,45 @@
           `;
         }).join('');
       });
+
+    // JS for Suggestion Box
+    function submitSuggestion(e) {
+      e.preventDefault();
+      const form = e.target;
+      const name = document.getElementById('sugg-name').value;
+      const message = document.getElementById('sugg-message').value;
+      const statusDiv = document.getElementById('sugg-status');
+      
+      const btn = form.querySelector('button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = 'Enviando...';
+      
+      fetch('/api/suggestions/', {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify({name: name, email: '', message: message})
+      })
+      .then(r => r.json())
+      .then(data => {
+         statusDiv.classList.remove('hidden');
+         if (data.ok) {
+            statusDiv.className = 'text-xs mt-2 text-green-400';
+            statusDiv.innerText = data.message;
+            form.reset();
+         } else {
+            statusDiv.className = 'text-xs mt-2 text-red-400';
+            statusDiv.innerText = data.error || 'Error enviando';
+         }
+         btn.innerHTML = originalText;
+         setTimeout(() => statusDiv.classList.add('hidden'), 5000);
+      })
+      .catch(() => {
+         statusDiv.classList.remove('hidden');
+         statusDiv.className = 'text-xs mt-2 text-red-400';
+         statusDiv.innerText = 'Error de conexión';
+         btn.innerHTML = originalText;
+      });
+    }
   </script>
 </body>
 </html>

@@ -108,3 +108,20 @@ class BlockedDate(models.Model):
 
     def __str__(self):
         return f'{self.date} — {self.description or "Bloqueado"}'
+
+
+class Suggestion(models.Model):
+    """Buzón de Sugerencias anónimo / público."""
+    name = models.CharField(max_length=100, blank=True, help_text='Opcional')
+    email = models.EmailField(blank=True, help_text='Opcional')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Sugerencia'
+        verbose_name_plural = 'Buzón de Sugerencias'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Sugerencia de {self.name or "Anónimo"} - {self.created_at.strftime("%Y-%m-%d")}'

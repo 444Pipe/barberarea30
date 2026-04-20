@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Califica tu Experiencia - Área 30 Barber Club</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+                  jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' }, smoke: '#F5F5F5' },
+        fontFamily: { sans: ['Montserrat','sans-serif'], serif: ['Playfair Display','serif'] }
+      }}
+    }
+  </script>
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <style>
+    .star-btn { color: rgba(245,245,245,0.2); transition: color 0.2s, transform 0.2s; cursor: pointer; }
+    .star-btn.active { color: #D4AF37; }
+    .star-btn:hover { transform: scale(1.1); }
+  </style>
+</head>
+<body class="bg-jet text-smoke font-sans antialiased min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-4">
+  
+  <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold/5 via-transparent to-transparent pointer-events-none"></div>
+
+  <div class="max-w-md w-full bg-jet-card border border-white/5 rounded-2xl shadow-2xl p-8 relative z-10 text-center">
+    <div class="text-3xl font-serif font-bold tracking-widest text-gold mb-2">ÁREA 30</div>
+    <div class="flex items-center justify-center gap-2 mb-8">
+      <div class="h-[1px] w-6 bg-gold/50"></div>
+      <span class="text-[0.65rem] tracking-[0.3em] font-light text-smoke/80 uppercase">Tu Experiencia</span>
+      <div class="h-[1px] w-6 bg-gold/50"></div>
+    </div>
+
+    <form id="rating-form" onsubmit="submitReview(event)" class="space-y-8">
+      <!-- Barber Rating -->
+      <div>
+        <label class="block text-xs tracking-widest uppercase font-bold text-smoke/70 mb-3">¿Cómo te fue con tu barbero?</label>
+        <div class="flex justify-center gap-2" id="barber-stars">
+          <button type="button" class="star-btn active text-3xl" data-val="1">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="2">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="3">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="4">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="5">★</button>
+        </div>
+        <input type="hidden" id="barber_rating" value="5">
+      </div>
+
+      <!-- Shop Rating -->
+      <div>
+        <label class="block text-xs tracking-widest uppercase font-bold text-smoke/70 mb-3">¿Qué tal las instalaciones y el club?</label>
+        <div class="flex justify-center gap-2" id="shop-stars">
+          <button type="button" class="star-btn active text-3xl" data-val="1">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="2">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="3">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="4">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="5">★</button>
+        </div>
+        <input type="hidden" id="shop_rating" value="5">
+      </div>
+
+      <!-- Comments -->
+      <div>
+        <label class="block text-xs tracking-widest uppercase font-bold text-smoke/70 mb-2 text-left">Comentarios adicionales (opcional)</label>
+        <textarea id="comment" rows="3" class="w-full bg-jet-lighter border border-white/10 p-3 text-sm text-smoke rounded-sm focus:border-gold transition-colors font-light resize-none" placeholder="¡Nos encanta leerte!"></textarea>
+      </div>
+
+      <button type="submit" class="w-full px-8 py-4 gold-btn text-xs tracking-widest uppercase font-bold rounded-sm shadow-lg flex items-center justify-center gap-2">
+        Enviar Calificación
+      </button>
+
+      <div id="status-msg" class="text-xs hidden mt-4"></div>
+    </form>
+
+    <div id="success-view" class="hidden py-8">
+      <div class="text-5xl mb-4">🏆</div>
+      <h2 class="text-xl font-serif text-white mb-2">¡Gracias por tu apoyo!</h2>
+      <p class="text-smoke/60 text-sm font-light">Tu retroalimentación nos ayuda a mantener la excelencia que mereces.</p>
+      <a href="/" class="mt-8 inline-block text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-colors">← Volver al inicio</a>
+    </div>
+  </div>
+
+  <script>
+    // Star Rating Logic
+    function setupStars(containerId, inputId) {
+      const container = document.getElementById(containerId);
+      const input = document.getElementById(inputId);
+      const stars = container.querySelectorAll('button');
+
+      stars.forEach(star => {
+        star.addEventListener('click', () => {
+          const val = parseInt(star.dataset.val);
+          input.value = val;
+          stars.forEach(s => {
+            if (parseInt(s.dataset.val) <= val) s.classList.add('active');
+            else s.classList.remove('active');
+          });
+        });
+      });
+    }
+
+    setupStars('barber-stars', 'barber_rating');
+    setupStars('shop-stars', 'shop_rating');
+
+    // Submit Logic
+    function submitReview(e) {
+      e.preventDefault();
+      
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      const bookingId = parts[parts.length - 1]; // /rate/123/ -> 123
+      
+      const barberRating = document.getElementById('barber_rating').value;
+      const shopRating = document.getElementById('shop_rating').value;
+      const comment = document.getElementById('comment').value;
+      
+      const btn = e.target.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = 'Enviando...';
+      
+      fetch(`/api/bookings/${bookingId}/review/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barber_rating: parseInt(barberRating),
+          shop_rating: parseInt(shopRating),
+          comment: comment
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if(data.ok) {
+          document.getElementById('rating-form').classList.add('hidden');
+          document.getElementById('success-view').classList.remove('hidden');
+        } else {
+          const status = document.getElementById('status-msg');
+          status.classList.remove('hidden');
+          status.className = 'text-xs text-red-400 mt-4';
+          status.innerText = data.error || 'Error enviando calificación';
+          btn.innerHTML = originalText;
+        }
+      })
+      .catch(err => {
+        const status = document.getElementById('status-msg');
+        status.classList.remove('hidden');
+        status.className = 'text-xs text-red-400 mt-4';
+        status.innerText = 'Error de red';
+        btn.innerHTML = originalText;
+      });
+    }
+  </script>
+</body>
+</html>

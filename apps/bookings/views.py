@@ -183,6 +183,23 @@ def add_review_view(request, booking_id):
 
     return Response({'ok': True, 'message': 'Calificación guardada exitosamente.'})
 
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def add_suggestion_view(request):
+    """POST /api/suggestions/ - Guarda una sugerencia pública."""
+    from .models import Suggestion
+    
+    name = request.data.get('name', '')
+    email = request.data.get('email', '')
+    message = request.data.get('message', '').strip()
+    
+    if not message:
+        return Response({'error': 'El mensaje no puede estar vacío.'}, status=400)
+        
+    Suggestion.objects.create(name=name, email=email, message=message)
+    return Response({'ok': True, 'message': 'Sugerencia enviada correctamente.'})
+
 # ─── Admin ───────────────────────────────────────────────
 
 @api_view(['GET'])
