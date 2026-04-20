@@ -1,0 +1,237 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Reportes Financieros - Área 30{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in" id="report-root">
+
+    <!-- Header -->
+    <div class="flex flex-wrap justify-between items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-serif text-white">Reportes Financieros</h1>
+            <p class="text-smoke/60 text-sm mt-1">Resumen ejecutivo mensual del Club — acceso exclusivo gerencia.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <select id="sel-month" class="px-3 py-2 bg-jet-lighter border border-white/10 text-smoke text-xs rounded-sm focus:border-gold transition-all appearance-none">
+                <option value="1">Enero</option><option value="2">Febrero</option>
+                <option value="3">Marzo</option><option value="4">Abril</option>
+                <option value="5">Mayo</option><option value="6">Junio</option>
+                <option value="7">Julio</option><option value="8">Agosto</option>
+                <option value="9">Septiembre</option><option value="10">Octubre</option>
+                <option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <select id="sel-year" class="px-3 py-2 bg-jet-lighter border border-white/10 text-smoke text-xs rounded-sm focus:border-gold transition-all appearance-none">
+                {% for y in "2024 2025 2026 2027"|split:" " %}
+                <option value="{{ y }}" {% if y == current_year|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button onclick="loadReport()" class="px-4 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-xs tracking-widest uppercase transition-colors">
+                Generar
+            </button>
+            <button onclick="window.print()" class="px-4 py-2 border border-white/10 hover:border-gold text-smoke hover:text-gold rounded-sm text-xs tracking-widest uppercase transition-colors flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Imprimir
+            </button>
+        </div>
+    </div>
+
+    <!-- Period Title -->
+    <div id="report-period" class="text-center py-2 text-gold tracking-widest uppercase text-xs font-bold hidden">
+        Cargando...
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4" id="kpi-grid">
+        <div class="col-span-2 lg:col-span-3 text-center py-12 text-smoke/30 text-sm border border-dashed border-white/10 rounded-sm">
+            Selecciona un mes y presiona "Generar" para ver el reporte.
+        </div>
+    </div>
+
+    <!-- Charts + Ranking (hidden until load) -->
+    <div id="report-content" class="hidden space-y-6">
+
+        <!-- Net Income Chart -->
+        <div class="bg-jet-card border border-white/5 rounded-sm p-6">
+            <h2 class="text-xs tracking-widest uppercase text-smoke/50 mb-4 font-semibold">Flujo de Caja por Cierre Diario</h2>
+            <div class="h-56"><canvas id="closesChart"></canvas></div>
+        </div>
+
+        <!-- Barber Ranking -->
+        <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-white/5 bg-jet flex items-center justify-between">
+                <h2 class="text-sm tracking-widest uppercase text-white font-semibold">🏆 Ranking de Barberos</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-jet-lighter">
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50">#</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50">Barbero</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-center">Cortes</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-right">Generó para el Club</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-right">Ganó en Comisiones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="barber-ranking-body" class="divide-y divide-white/5"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Daily Closes History -->
+        <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-white/5 bg-jet">
+                <h2 class="text-sm tracking-widest uppercase text-white font-semibold">📋 Historial de Cierres Diarios</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-jet-lighter">
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50">Fecha</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-right">Ventas</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-right">Comisiones</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-right">Egresos</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-right">Neto</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50">Cerrado por</th>
+                            <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 text-center">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="closes-body" class="divide-y divide-white/5"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+@media print {
+    nav, aside, header, button, select { display: none !important; }
+    .fade-in { animation: none !important; }
+    body { background: white !important; color: black !important; }
+    .bg-jet-card, .bg-jet { background: white !important; border-color: #ddd !important; }
+    .text-white, .text-smoke { color: #111 !important; }
+    .text-gold { color: #9a7a10 !important; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let closesChart = null;
+const fmt = n => '$' + Number(n).toLocaleString('es-CO');
+
+document.addEventListener('DOMContentLoaded', () => {
+    const m = document.getElementById('sel-month');
+    m.value = '{{ current_month }}';
+    loadReport();
+});
+
+function loadReport() {
+    const year = document.getElementById('sel-year').value;
+    const month = document.getElementById('sel-month').value;
+
+    fetch(`/api/admin/reports/monthly/?year=${year}&month=${month}`, {
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        renderKPIs(data.kpis, data.period);
+        renderRanking(data.barber_ranking);
+        renderCloses(data.daily_closes);
+        renderClosesChart(data.daily_closes);
+        document.getElementById('report-period').textContent = data.period.toUpperCase();
+        document.getElementById('report-period').classList.remove('hidden');
+        document.getElementById('report-content').classList.remove('hidden');
+    })
+    .catch(e => console.error(e));
+}
+
+function renderKPIs(k, period) {
+    const kpis = [
+        { label: 'Ingresos Brutos', value: fmt(k.total_sales), sub: `${k.total_transactions} transacciones`, color: 'text-white', border: 'border-white/5' },
+        { label: 'Propinas', value: fmt(k.total_tips), sub: 'para los barberos', color: 'text-white', border: 'border-white/5' },
+        { label: 'Comisiones Pagadas', value: fmt(k.total_commissions), sub: 'al equipo de barberos', color: 'text-red-400', border: 'border-white/5' },
+        { label: 'Egresos del Mes', value: fmt(k.total_expenses), sub: 'gastos operativos', color: 'text-orange-400', border: 'border-white/5' },
+        { label: 'Descuentos Aplicados', value: fmt(k.total_discounts), sub: 'del mes', color: 'text-blue-400', border: 'border-white/5' },
+        { label: 'GANANCIA NETA', value: fmt(k.net_income), sub: `${period}`, color: 'text-gold text-3xl', border: 'border-gold/30 shadow-[0_0_15px_rgba(212,175,55,0.15)]' },
+    ];
+
+    document.getElementById('kpi-grid').innerHTML = kpis.map(kpi => `
+        <div class="bg-jet-card border ${kpi.border} p-5 rounded-sm relative overflow-hidden">
+            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">${kpi.label}</div>
+            <div class="font-serif font-bold ${kpi.color}">${kpi.value}</div>
+            <div class="text-xs text-smoke/40 mt-1">${kpi.sub}</div>
+        </div>
+    `).join('');
+}
+
+function renderRanking(ranking) {
+    const medals = ['🥇','🥈','🥉'];
+    document.getElementById('barber-ranking-body').innerHTML = ranking.length ? ranking.map((b, i) => `
+        <tr class="hover:bg-white/[0.02] transition-colors">
+            <td class="px-5 py-4 text-lg">${medals[i] || (i+1)}</td>
+            <td class="px-5 py-4">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background: ${b.color || '#D4AF37'}"></span>
+                    <span class="text-white font-medium text-sm">${b.name}</span>
+                </div>
+            </td>
+            <td class="px-5 py-4 text-center text-smoke/70 text-sm">${b.cuts} cortes</td>
+            <td class="px-5 py-4 text-right text-emerald-400 font-serif font-bold">${fmt(b.generated)}</td>
+            <td class="px-5 py-4 text-right text-gold font-serif font-bold">${fmt(b.earned)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="5" class="px-5 py-8 text-center text-smoke/40 text-sm">No hay ventas registradas en este período.</td></tr>';
+}
+
+function renderCloses(closes) {
+    document.getElementById('closes-body').innerHTML = closes.length ? closes.map(c => `
+        <tr class="hover:bg-white/[0.02] transition-colors">
+            <td class="px-5 py-3 text-sm text-white">${c.date}</td>
+            <td class="px-5 py-3 text-sm text-right text-white">${fmt(c.total_sales)}</td>
+            <td class="px-5 py-3 text-sm text-right text-red-400">-${fmt(c.total_commissions)}</td>
+            <td class="px-5 py-3 text-sm text-right text-orange-400">-${fmt(c.total_expenses)}</td>
+            <td class="px-5 py-3 text-sm text-right font-serif font-bold text-gold">${fmt(c.net_income)}</td>
+            <td class="px-5 py-3 text-xs text-smoke/60">${c.closed_by}</td>
+            <td class="px-5 py-3 text-center">
+                ${c.is_verified
+                    ? '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] uppercase tracking-widest rounded-sm border border-emerald-500/20">✅ Verificado</span>'
+                    : '<span class="px-2 py-0.5 bg-smoke/10 text-smoke/50 text-[10px] uppercase tracking-widest rounded-sm border border-white/10">Pendiente</span>'}
+            </td>
+        </tr>
+    `).join('') : '<tr><td colspan="7" class="px-5 py-8 text-center text-smoke/40 text-sm">No hay cierres de caja registrados en este período.</td></tr>';
+}
+
+function renderClosesChart(closes) {
+    const ctx = document.getElementById('closesChart');
+    if (closesChart) closesChart.destroy();
+    closesChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: closes.map(c => c.date),
+            datasets: [{
+                label: 'Neto del día',
+                data: closes.map(c => c.net_income),
+                backgroundColor: closes.map(c => c.net_income >= 0 ? 'rgba(212, 175, 55, 0.35)' : 'rgba(239, 68, 68, 0.35)'),
+                borderColor: closes.map(c => c.net_income >= 0 ? '#D4AF37' : '#ef4444'),
+                borderWidth: 1,
+                borderRadius: 3,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false },
+                tooltip: { callbacks: { label: c => ' $' + c.parsed.y.toLocaleString('es-CO') } }
+            },
+            scales: {
+                x: { ticks: { color: '#555', maxRotation: 45 }, grid: { display: false } },
+                y: { ticks: { color: '#555', callback: v => '$' + v.toLocaleString('es-CO') }, grid: { color: '#1a1a1a' } }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

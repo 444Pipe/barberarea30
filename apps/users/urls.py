@@ -25,4 +25,5 @@ urlpatterns = [
     path('cashflow/', views.admin_cashflow_view, name='admin_cashflow'),
     path('expenses/', views.admin_expenses_view, name='admin_expenses'),
     path('inventory/', views.admin_inventory_view, name='admin_inventory'),
+    path('reports/', views.admin_reports_view, name='admin_reports'),
 ]

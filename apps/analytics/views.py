@@ -225,3 +225,100 @@ def notifications_view(request):
         })
 
     return Response(result)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminOrAbove])
+def monthly_report_view(request):
+    """
+    GET /api/admin/reports/monthly/?year=2026&month=4
+    Reporte financiero mensual consolidado — solo superadmins.
+    """
+    from apps.users.permissions import IsSuperAdmin
+    from apps.cashflow.models import Sale, Commission, Expense, DailyClose
+    from apps.barbers.models import Barber
+    from django.db.models import Sum, Count
+    from django.utils import timezone
+    import datetime
+
+    profile = getattr(request.user, 'profile', None)
+    if not profile or not profile.is_superadmin:
+        return Response({'error': 'Acceso restringido a SuperAdmins.'}, status=403)
+
+    now = timezone.localtime(timezone.now())
+    year = int(request.query_params.get('year', now.year))
+    month = int(request.query_params.get('month', now.month))
+
+    # Date range
+    first_day = datetime.date(year, month, 1)
+    if month == 12:
+        last_day = datetime.date(year + 1, 1, 1) - datetime.timedelta(days=1)
+    else:
+        last_day = datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)
+
+    # Sales in range
+    sales = Sale.objects.filter(created_at__date__gte=first_day, created_at__date__lte=last_day)
+    totals = sales.aggregate(
+        total_sales=Sum('final_price'),
+        total_tips=Sum('tip_amount'),
+        total_discounts=Sum('discount_amount'),
+    )
+
+    # Commissions
+    commissions = Commission.objects.filter(sale__in=sales)
+    total_commissions = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
+
+    # Expenses in range
+    expenses = Expense.objects.filter(date__gte=first_day, date__lte=last_day)
+    total_expenses = expenses.aggregate(t=Sum('amount'))['t'] or 0
+
+    # Net income
+    total_income = float(totals['total_sales'] or 0)
+    net_income = total_income - float(total_commissions) - float(total_expenses)
+
+    # Daily closes for the month
+    daily_closes = DailyClose.objects.filter(date__gte=first_day, date__lte=last_day).order_by('date')
+    closes_data = [{
+        'date': dc.date.strftime('%d/%m/%Y'),
+        'net_income': float(dc.net_income),
+        'total_sales': float(dc.total_sales),
+        'total_commissions': float(dc.total_commissions),
+        'total_expenses': float(dc.total_expenses),
+        'is_verified': dc.is_verified,
+        'closed_by': dc.closed_by.get_full_name() or dc.closed_by.username if dc.closed_by else 'N/A',
+    } for dc in daily_closes]
+
+    # Barber ranking for the month
+    barber_ranking = []
+    for barber in Barber.objects.all():
+        barber_sales = sales.filter(barber=barber)
+        barber_commissions = commissions.filter(barber=barber)
+        b_income = float(barber_sales.aggregate(t=Sum('final_price'))['t'] or 0)
+        b_commission = float(barber_commissions.aggregate(t=Sum('total_earnings'))['t'] or 0)
+        b_cuts = barber_sales.count()
+        if b_cuts > 0:
+            barber_ranking.append({
+                'name': barber.display_name,
+                'color': barber.color_tag,
+                'cuts': b_cuts,
+                'generated': b_income,
+                'earned': b_commission,
+            })
+    barber_ranking.sort(key=lambda x: x['generated'], reverse=True)
+
+    return Response({
+        'period': f"{first_day.strftime('%B %Y')}",
+        'year': year,
+        'month': month,
+        'kpis': {
+            'total_sales': total_income,
+            'total_tips': float(totals['total_tips'] or 0),
+            'total_discounts': float(totals['total_discounts'] or 0),
+            'total_commissions': float(total_commissions),
+            'total_expenses': float(total_expenses),
+            'net_income': net_income,
+            'total_transactions': sales.count(),
+        },
+        'daily_closes': closes_data,
+        'barber_ranking': barber_ranking,
+    })

@@ -38,12 +38,48 @@ def admin_logout_view(request):
 
 @staff_required
 def admin_dashboard_view(request):
-    """Dashboard principal — redirige barberos a su agenda."""
+    """Dashboard principal — inyecta KPIs reales del día."""
+    from apps.bookings.models import Booking
+    from apps.cashflow.models import Sale
+    from django.db.models import Sum, Count
+    from django.utils import timezone
+
     profile = getattr(request.user, 'profile', None)
+    today = timezone.localtime(timezone.now()).date()
+
+    base = Booking.objects.all()
+    if profile and profile.is_barber and not profile.is_admin:
+        barber = getattr(request.user, 'barber_profile', None)
+        base = base.filter(barber=barber) if barber else base.none()
+
+    today_bookings = base.filter(date=today)
+    today_completed = today_bookings.filter(status='completed').count()
+    today_pending = today_bookings.filter(status__in=['pending', 'confirmed']).count()
+
+    # Revenue today from Sales model (more accurate)
+    today_sales = Sale.objects.filter(created_at__date=today)
+    today_revenue = float(today_sales.aggregate(t=Sum('final_price'))['t'] or 0)
+    today_tips = float(today_sales.aggregate(t=Sum('tip_amount'))['t'] or 0)
+
+    # Top barber today
+    top_today = (
+        today_bookings.filter(status='completed')
+        .values('barber__display_name')
+        .annotate(cuts=Count('id'))
+        .order_by('-cuts')
+        .first()
+    )
+
     context = {
         'user_role': profile.role if profile else 'unknown',
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'dashboard',
+        'today': today,
+        'today_completed': today_completed,
+        'today_pending': today_pending,
+        'today_revenue': today_revenue,
+        'today_tips': today_tips,
+        'top_barber_today': top_today['barber__display_name'] if top_today else '—',
     }
     return render(request, 'admin/dashboard.html', context)
 
@@ -201,3 +237,19 @@ def admin_inventory_view(request):
         'low_stock_count': low_stock_count,
     }
     return render(request, 'admin/inventory.html', context)
+
+
+from .decorators import superadmin_required
+
+@superadmin_required
+def admin_reports_view(request):
+    from django.utils import timezone
+    now = timezone.localtime(timezone.now())
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'reports',
+        'current_year': now.year,
+        'current_month': now.month,
+    }
+    return render(request, 'admin/reports.html', context)
