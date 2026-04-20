@@ -87,3 +87,18 @@ except Exception as check_err:
     except Exception as e:
         print("⚠ Fallo forzando la tabla (probablemente ya existe o hay otro error):", e)
 
+# Crear superusuarios automáticamente para Railway
+usernames_to_promote = ['camilo', 'juan david', 'juandavid', 'juan.david']
+for uname in usernames_to_promote:
+    try:
+        user, created = User.objects.get_or_create(username=uname, defaults={'email': f'{uname.replace(" ", "")}@area30.com'})
+        if created:
+            user.set_password('area30')
+        user.is_staff = True
+        user.is_superuser = True
+        user.save()
+        UserProfile.objects.get_or_create(user=user, defaults={'role': 'superadmin'})
+    except Exception as e:
+        print(f"No se pudo promover al usuario {uname}: {e}")
+
+print("Superusuarios actualizados correctamente.")
