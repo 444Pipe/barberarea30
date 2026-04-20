@@ -169,6 +169,19 @@ def admin_gallery_view(request):
     return render(request, 'admin/gallery.html', context)
 
 
+@admin_required
+def admin_reels_view(request):
+    from apps.barbers.models import Barber
+    barbers = Barber.objects.filter(is_available=True)
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'reels',
+        'barbers': barbers,
+    }
+    return render(request, 'admin/reels.html', context)
+
+
 from .decorators import operational_admin_required
 from apps.cashflow.models import Sale, Expense, Commission
 from django.db.models import Sum

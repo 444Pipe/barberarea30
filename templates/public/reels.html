@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reels — Área 30 Barber Club</title>
+  <meta name="description" content="Mira los mejores trabajos de Área 30 Barber Club en video. Cortes, fades y estilos únicos en Restrepo, Meta.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+
+  <style>
+    html, body { height: 100%; overflow: hidden; background: #0A0A0A; }
+    
+    #reels-container {
+      height: 100dvh;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .reel-slide {
+      height: 100dvh;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+    
+    .reel-video {
+      height: 100%;
+      width: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+    
+    /* Phone frame on desktop */
+    @media (min-width: 768px) {
+      #reels-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #0A0A0A;
+      }
+      .reel-slide {
+        width: 390px;
+        height: 100dvh;
+        border-radius: 0;
+        flex-shrink: 0;
+      }
+    }
+
+    .reel-gradient {
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0) 70%, rgba(0,0,0,0.3) 100%);
+    }
+
+    .like-btn.liked svg { fill: #ef4444; stroke: #ef4444; }
+    .like-btn { transition: transform 0.1s; }
+    .like-btn:active { transform: scale(0.85); }
+
+    /* Progress indicator */
+    .progress-dot { transition: all 0.3s; }
+    .progress-dot.active { background: #D4AF37; transform: scale(1.4); }
+  </style>
+</head>
+<body class="bg-jet font-sans">
+
+  <!-- Navbar flotante -->
+  <nav class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+    <a href="/" class="pointer-events-auto text-gold font-serif font-bold text-xl tracking-widest">ÁREA 30</a>
+    <div class="flex items-center gap-3 pointer-events-auto">
+      <a href="/gallery/" class="text-smoke/70 text-xs tracking-widest uppercase hover:text-gold transition-colors">Galería</a>
+      <a href="/booking/" class="px-4 py-1.5 bg-gold text-jet text-xs tracking-widest uppercase font-bold rounded-sm hover:bg-white transition-colors">Reservar</a>
+    </div>
+  </nav>
+
+  <!-- Contenedor de reels -->
+  <div id="reels-container">
+    <!-- Se carga dinámicamente -->
+  </div>
+
+  <!-- Barra de navegación reels (dots) -->
+  <div id="progress-dots" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex gap-2 items-center"></div>
+
+  <!-- Estado vacío -->
+  <div id="empty-state" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8">
+    <svg class="w-16 h-16 text-smoke/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+    </svg>
+    <p class="text-smoke/40 text-sm tracking-widest uppercase">Pronto habrá reels aquí</p>
+    <a href="/gallery/" class="mt-6 px-6 py-2.5 bg-gold text-jet text-xs tracking-widest uppercase font-bold rounded-sm">Ver Galería</a>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-screen" class="fixed inset-0 flex items-center justify-center bg-jet">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-10 h-10 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></div>
+      <p class="text-smoke/30 text-xs tracking-widest uppercase">Cargando reels...</p>
+    </div>
+  </div>
+
+  <script>
+    let reels = [];
+    let currentIndex = 0;
+    const likes = JSON.parse(localStorage.getItem('reel_likes') || '{}');
+
+    async function loadReels() {
+      try {
+        const resp = await fetch('/api/reels/');
+        if (!resp.ok) throw new Error();
+        reels = await resp.json();
+        document.getElementById('loading-screen').classList.add('hidden');
+        if (!reels.length) {
+          document.getElementById('empty-state').classList.remove('hidden');
+          return;
+        }
+        renderReels();
+        setupScrollObserver();
+        renderDots();
+      } catch(e) {
+        document.getElementById('loading-screen').innerHTML = '<p class="text-smoke/30 text-sm">Error al cargar. <a href="/" class="text-gold">Volver</a></p>';
+      }
+    }
+
+    function renderReels() {
+      const container = document.getElementById('reels-container');
+      container.innerHTML = reels.map((r, i) => `
+        <div class="reel-slide" data-index="${i}" id="slide-${i}">
+          <!-- Video -->
+          ${r.thumbnail
+            ? `<img src="${r.thumbnail}" class="reel-video" alt="${r.title || 'Reel'}">
+               <video class="reel-video absolute inset-0" src="${r.video}" loop playsinline muted preload="none" id="vid-${i}"></video>`
+            : `<video class="reel-video" src="${r.video}" loop playsinline muted preload="metadata" id="vid-${i}"></video>`
+          }
+
+          <!-- Overlay gradiente -->
+          <div class="reel-gradient absolute inset-0"></div>
+
+          <!-- Info inferior izquierda -->
+          <div class="absolute bottom-16 left-4 right-20 z-10">
+            ${r.title ? `<h2 class="text-white font-serif font-bold text-lg leading-tight mb-1">${r.title}</h2>` : ''}
+            ${r.barber_name ? `<p class="text-smoke/70 text-xs tracking-wider">Por: <span class="text-gold">${r.barber_name}</span></p>` : ''}
+            ${r.description ? `<p class="text-smoke/50 text-xs mt-2 leading-relaxed line-clamp-2">${r.description}</p>` : ''}
+          </div>
+
+          <!-- Acciones derecha -->
+          <div class="absolute bottom-16 right-4 flex flex-col items-center gap-5 z-10">
+            <!-- Like -->
+            <button class="like-btn flex flex-col items-center gap-1 ${likes[r.id] ? 'liked' : ''}" onclick="toggleLike(${r.id}, this)">
+              <div class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="${likes[r.id] ? '#ef4444' : 'none'}" stroke="${likes[r.id] ? '#ef4444' : 'currentColor'}" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                </svg>
+              </div>
+              <span class="text-white text-[0.65rem]" id="likes-${r.id}">${r.likes_count || ''}</span>
+            </button>
+
+            <!-- Compartir / Reservar -->
+            <a href="/booking/" class="flex flex-col items-center gap-1">
+              <div class="w-10 h-10 rounded-full bg-gold/90 backdrop-blur-sm flex items-center justify-center hover:bg-gold transition-colors">
+                <svg class="w-4 h-4 text-jet" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <span class="text-white text-[0.65rem]">Reservar</span>
+            </a>
+
+            <!-- Mute -->
+            <button onclick="toggleMute(${i})" id="mute-btn-${i}" class="flex flex-col items-center gap-1">
+              <div class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <svg id="mute-icon-${i}" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M5 12H3"/>
+                </svg>
+              </div>
+            </button>
+          </div>
+
+          <!-- Tap para play/pause -->
+          <div class="absolute inset-0 z-0 cursor-pointer" onclick="togglePlay(${i})"></div>
+
+          <!-- Play icon overlay -->
+          <div id="play-icon-${i}" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200">
+            <div class="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setupScrollObserver() {
+      const slides = document.querySelectorAll('.reel-slide');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const idx = parseInt(entry.target.dataset.index);
+          const vid = document.getElementById(`vid-${idx}`);
+          if (entry.isIntersecting) {
+            currentIndex = idx;
+            updateDots();
+            if (vid) {
+              vid.play().catch(() => {});
+            }
+          } else {
+            if (vid) {
+              vid.pause();
+              vid.currentTime = 0;
+            }
+          }
+        });
+      }, { threshold: 0.6 });
+
+      slides.forEach(slide => observer.observe(slide));
+    }
+
+    function togglePlay(i) {
+      const vid = document.getElementById(`vid-${i}`);
+      const icon = document.getElementById(`play-icon-${i}`);
+      if (!vid) return;
+      if (vid.paused) {
+        vid.play();
+        icon.style.opacity = '0';
+      } else {
+        vid.pause();
+        icon.style.opacity = '1';
+        setTimeout(() => { icon.style.opacity = '0'; }, 800);
+      }
+    }
+
+    let globalMuted = true;
+    function toggleMute(i) {
+      globalMuted = !globalMuted;
+      document.querySelectorAll('video').forEach(v => { v.muted = globalMuted; });
+      // Update all mute icons
+      document.querySelectorAll('[id^="mute-icon-"]').forEach(icon => {
+        icon.innerHTML = globalMuted
+          ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>`
+          : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M5 12H3"/>`;
+      });
+    }
+
+    function toggleLike(id, btn) {
+      btn.classList.toggle('liked');
+      if (likes[id]) {
+        delete likes[id];
+        btn.querySelector('svg').setAttribute('fill', 'none');
+        btn.querySelector('svg').setAttribute('stroke', 'currentColor');
+      } else {
+        likes[id] = true;
+        btn.querySelector('svg').setAttribute('fill', '#ef4444');
+        btn.querySelector('svg').setAttribute('stroke', '#ef4444');
+      }
+      localStorage.setItem('reel_likes', JSON.stringify(likes));
+      // Pulse animation
+      btn.style.transform = 'scale(1.3)';
+      setTimeout(() => { btn.style.transform = ''; }, 200);
+    }
+
+    function renderDots() {
+      const dots = document.getElementById('progress-dots');
+      if (reels.length <= 1) { dots.classList.add('hidden'); return; }
+      dots.innerHTML = reels.map((_, i) =>
+        `<div class="progress-dot w-1.5 h-1.5 rounded-full bg-white/30 ${i === 0 ? 'active' : ''}" data-i="${i}"></div>`
+      ).join('');
+    }
+
+    function updateDots() {
+      document.querySelectorAll('.progress-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === currentIndex);
+      });
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', e => {
+      const container = document.getElementById('reels-container');
+      const slides = document.querySelectorAll('.reel-slide');
+      if (e.key === 'ArrowDown' && currentIndex < reels.length - 1) {
+        slides[currentIndex + 1].scrollIntoView({ behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp' && currentIndex > 0) {
+        slides[currentIndex - 1].scrollIntoView({ behavior: 'smooth' });
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMute(currentIndex);
+      }
+    });
+
+    loadReels();
+  </script>
+</body>
+</html>

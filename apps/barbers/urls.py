@@ -7,4 +7,5 @@ urlpatterns = [
          views.barber_availability_view, name='barber_availability'),
     path('barberos-nativos/', views.obtener_barberos_nativos, name='barberos_nativos'),
     path('gallery/', views.GalleryPublicListView.as_view(), name='gallery_list'),
+    path('reels/', views.ReelPublicListView.as_view(), name='reel_list'),
 ]

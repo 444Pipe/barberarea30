@@ -14,8 +14,8 @@ from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove
 from apps.bookings.models import Booking
-from .models import Barber, GalleryImage
-from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer
+from .models import Barber, GalleryImage, Reel
+from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
 
 
 # ─── Public ──────────────────────────────────────────────
@@ -238,6 +238,33 @@ class GalleryAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/admin/gallery/{id}/"""
     queryset = GalleryImage.objects.all()
     serializer_class = GalleryImageSerializer
+    permission_classes = [IsAdminOrAbove]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+
+# ─── Reels ──────────────────────────────────────────────
+
+class ReelPublicListView(generics.ListAPIView):
+    """GET /api/reels/ — lista pública de reels activos."""
+    queryset = Reel.objects.filter(is_active=True).select_related('barber')
+    serializer_class = ReelSerializer
+    permission_classes = [AllowAny]
+    pagination_class = None
+
+
+class ReelAdminListCreateView(generics.ListCreateAPIView):
+    """GET/POST /api/admin/reels/ — lista completa y subir reel."""
+    queryset = Reel.objects.all().select_related('barber')
+    serializer_class = ReelSerializer
+    permission_classes = [IsAdminOrAbove]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+
+
+class ReelAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PUT/DELETE /api/admin/reels/{id}/"""
+    queryset = Reel.objects.all()
+    serializer_class = ReelSerializer
     permission_classes = [IsAdminOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 

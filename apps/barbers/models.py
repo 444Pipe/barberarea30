@@ -73,3 +73,27 @@ class GalleryImage(models.Model):
 
     def __str__(self):
         return self.title or f'Imagen #{self.pk}'
+
+
+class Reel(models.Model):
+    """Video estilo reel — trabajos en video para la página pública."""
+    video = models.FileField(upload_to='reels/', help_text='Video MP4 vertical (9:16 recomendado)')
+    thumbnail = models.ImageField(upload_to='reels/thumbs/', null=True, blank=True,
+        help_text='Miniatura opcional. Si no se sube se usa el primer frame del video.')
+    title = models.CharField(max_length=150, blank=True)
+    description = models.TextField(blank=True)
+    barber = models.ForeignKey(
+        Barber, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reels'
+    )
+    display_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Reel'
+        verbose_name_plural = 'Reels'
+        ordering = ['display_order', '-created_at']
+
+    def __str__(self):
+        return self.title or f'Reel #{self.pk}'

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Barber, GalleryImage
+from .models import Barber, GalleryImage, Reel
 from apps.services.serializers import ServiceSerializer
 
 
@@ -125,3 +125,15 @@ class AvailabilitySlotSerializer(serializers.Serializer):
     """Representación de un slot de tiempo disponible."""
     time = serializers.TimeField()
     available = serializers.BooleanField()
+
+
+class ReelSerializer(serializers.ModelSerializer):
+    """Serializer para Reels — público y admin."""
+    barber_name = serializers.CharField(source='barber.display_name', read_only=True, default=None)
+
+    class Meta:
+        model = Reel
+        fields = [
+            'id', 'video', 'thumbnail', 'title', 'description',
+            'barber', 'barber_name', 'display_order', 'is_active', 'created_at'
+        ]
