@@ -106,4 +106,15 @@ for uname in usernames_to_promote:
     except Exception as e:
         print(f"No se pudo promover al usuario {uname}: {e}")
 
+# Crear a Frank (Administrador Operativo)
+try:
+    frank, created_f = User.objects.get_or_create(username='frank', defaults={'email': 'frank@area30.com'})
+    if created_f:
+        frank.set_password('area30')
+    frank.is_staff = True
+    frank.save()
+    UserProfile.objects.get_or_create(user=frank, defaults={'role': 'operational_admin'})
+except Exception as e:
+    print("Error creando a Frank:", e)
+
 print("Superusuarios actualizados correctamente.")
