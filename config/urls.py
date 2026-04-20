@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/admin/', include('apps.barbers.urls_admin')),
     path('api/admin/', include('apps.clients.urls')),
     path('api/admin/', include('apps.analytics.urls')),
+    path('api/admin/', include('apps.cashflow.urls')),
 ]
 
 # Serve media files (uploaded barber photos, etc.)

@@ -55,7 +55,77 @@
         <tbody id="bookings-table" class="divide-y divide-white/5"></tbody>
       </table>
     </div>
+    </div>
     <div id="empty-state" class="hidden text-center py-12 text-smoke/30 text-sm">No se encontraron reservas</div>
+  </div>
+</div>
+
+<!-- Checkout Modal -->
+<div id="checkout-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+  <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div class="p-4 border-b border-white/5 flex justify-between items-center">
+      <h3 class="text-lg font-bold text-gold">Checkout del Servicio</h3>
+      <button onclick="closeCheckout()" class="text-smoke/40 hover:text-white">✕</button>
+    </div>
+    <form id="checkout-form" class="p-6 space-y-4" onsubmit="submitCheckout(event)">
+      <input type="hidden" id="checkout-booking-id">
+      
+      <div>
+        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Cliente</label>
+        <p id="checkout-client-name" class="text-white font-medium"></p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Total a cobrar</label>
+          <p id="checkout-base-price" class="text-xl text-emerald-400 font-bold"></p>
+        </div>
+        <div>
+          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Método de pago</label>
+          <select id="checkout-payment-method" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+            <option value="">Seleccione...</option>
+            {% for method in payment_methods %}
+              <option value="{{ method.id }}">{{ method.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Referencia (Opcional)</label>
+        <input type="text" id="checkout-reference" placeholder="Ej: Nequi 1234" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Propina</label>
+          <input type="number" id="checkout-tip" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        </div>
+        <div>
+          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Descuento</label>
+          <input type="number" id="checkout-discount" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">¿Quién asume el descuento?</label>
+        <select id="checkout-assumed-by" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <option value="none">No aplica</option>
+          <option value="company">Empresa (Afecta caja general)</option>
+          <option value="barber">Barbero (Afecta su comisión)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Observaciones</label>
+        <textarea id="checkout-notes" rows="2" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none"></textarea>
+      </div>
+
+      <div class="pt-4 border-t border-white/5 flex gap-3 justify-end">
+        <button type="button" onclick="closeCheckout()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
+        <button type="submit" class="px-6 py-2 bg-gold text-jet font-bold text-sm rounded hover:bg-white transition-colors">Confirmar Pago</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -139,7 +209,12 @@ function renderTable(bookings) {
       <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price||0).toLocaleString('es-CO')}</td>
       <td class="px-4 py-3">${statusBadge[b.status] || statusBadge.pending}</td>
       <td class="px-4 py-3">
-        <div class="flex gap-1">
+        <div class="flex flex-col gap-1">
+          ${b.status !== 'completed' && b.status !== 'cancelled' ? `
+            <button onclick="openCheckout(${b.id}, '${b.client_name.replace(/'/g, "\\'")}', ${b.price})" class="w-full px-2 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded text-[0.6rem] hover:bg-emerald-600/40 transition-colors mb-1 font-bold">
+              💰 COBRAR
+            </button>
+          ` : ''}
           <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem]">
             <option value="">Cambiar...</option>
             <option value="pending">Pendiente</option>
@@ -173,6 +248,48 @@ function exportCSV() {
   if (dateFrom) params.set('date_from', dateFrom);
   if (dateTo) params.set('date_to', dateTo);
   window.open('/api/admin/bookings/export/?' + params.toString());
+}
+
+function openCheckout(id, clientName, price) {
+  document.getElementById('checkout-booking-id').value = id;
+  document.getElementById('checkout-client-name').textContent = clientName;
+  document.getElementById('checkout-base-price').textContent = '$' + price.toLocaleString('es-CO');
+  document.getElementById('checkout-modal').classList.remove('hidden');
+}
+
+function closeCheckout() {
+  document.getElementById('checkout-modal').classList.add('hidden');
+  document.getElementById('checkout-form').reset();
+}
+
+function submitCheckout(e) {
+  e.preventDefault();
+  const id = document.getElementById('checkout-booking-id').value;
+  
+  const payload = {
+    payment_method_id: document.getElementById('checkout-payment-method').value,
+    payment_reference: document.getElementById('checkout-reference').value,
+    tip_amount: document.getElementById('checkout-tip').value || 0,
+    discount_amount: document.getElementById('checkout-discount').value || 0,
+    discount_assumed_by: document.getElementById('checkout-assumed-by').value,
+    notes: document.getElementById('checkout-notes').value
+  };
+
+  fetch('/api/admin/checkout/' + id + '/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) {
+      alert('Error: ' + data.error);
+    } else {
+      closeCheckout();
+      loadBookings();
+    }
+  })
+  .catch(err => alert('Error en la conexión.'));
 }
 
 function getCSRF() {

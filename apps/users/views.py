@@ -58,12 +58,16 @@ def admin_calendar_view(request):
     return render(request, 'admin/calendar.html', context)
 
 
+from apps.cashflow.models import PaymentMethod
+
 @staff_required
 def admin_bookings_view(request):
+    payment_methods = PaymentMethod.objects.filter(is_active=True)
     context = {
         'user_role': getattr(request.user, 'profile', None) and request.user.profile.role,
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'bookings',
+        'payment_methods': payment_methods,
     }
     return render(request, 'admin/bookings.html', context)
 

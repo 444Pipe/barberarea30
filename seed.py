@@ -87,6 +87,11 @@ except Exception as check_err:
     except Exception as e:
         print("⚠ Fallo forzando la tabla (probablemente ya existe o hay otro error):", e)
 
+from apps.cashflow.models import PaymentMethod
+
+pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 'Efectivo', 'is_active': True, 'requires_reference': False})
+pm2, _ = PaymentMethod.objects.get_or_create(slug='transferencia', defaults={'name': 'Transferencia (Nequi/Bancolombia)', 'is_active': True, 'requires_reference': True})
+
 # Crear superusuarios automáticamente para Railway
 usernames_to_promote = ['camilo', 'juan david', 'juandavid', 'juan.david']
 for uname in usernames_to_promote:
