@@ -1,2 +1,5 @@
+[variables]
+DJANGO_SETTINGS_MODULE = "config.settings.production"
+
 [deploy]
-startCommand = "python manage.py collectstatic --noinput && python manage.py migrate --noinput && python seed.py && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers 2"
+startCommand = "python manage.py migrate --noinput && python seed.py && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120"

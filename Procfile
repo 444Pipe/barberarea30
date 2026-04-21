@@ -1,2 +1,1 @@
-web: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python seed.py && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
-release: DJANGO_SETTINGS_MODULE=config.settings.production python manage.py migrate --noinput && DJANGO_SETTINGS_MODULE=config.settings.production python manage.py collectstatic --noinput && DJANGO_SETTINGS_MODULE=config.settings.production python seed.py
+web: DJANGO_SETTINGS_MODULE=config.settings.production python manage.py migrate --noinput && DJANGO_SETTINGS_MODULE=config.settings.production python seed.py && DJANGO_SETTINGS_MODULE=config.settings.production gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
