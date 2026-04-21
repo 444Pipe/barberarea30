@@ -197,27 +197,31 @@ def adjust_inventory_view(request, item_id):
         item.quantity = qty_before - quantity_change
         movement_type = 'waste' if 'merma' in notes.lower() or 'desperdicio' in notes.lower() else 'adjustment'
 
-    item.save()
+    try:
+        item.save()
 
-    InventoryMovement.objects.create(
-        item=item,
-        movement_type=movement_type,
-        quantity=quantity_change,
-        quantity_before=qty_before,
-        quantity_after=item.quantity,
-        performed_by=request.user,
-        notes=notes
-    )
+        InventoryMovement.objects.create(
+            item=item,
+            movement_type=movement_type,
+            quantity=quantity_change,
+            quantity_before=qty_before,
+            quantity_after=item.quantity,
+            performed_by=request.user,
+            notes=notes
+        )
 
-    action_word = "Añadió" if adjustment_type == 'add' else "Restó"
-    log_audit(
-        user=request.user,
-        action='inventory',
-        obj=item,
-        changes={'qty_before': str(qty_before), 'qty_after': str(item.quantity)},
-        request=request,
-        extra_data={'msg': f"{action_word} {quantity_change} {item.unit} a {item.name}. Razón: {notes}"}
-    )
+        action_word = "Añadió" if adjustment_type == 'add' else "Restó"
+        log_audit(
+            user=request.user,
+            action='inventory',
+            obj=item,
+            changes={'qty_before': str(qty_before), 'qty_after': str(item.quantity)},
+            request=request,
+            extra_data={'msg': f"{action_word} {quantity_change} {item.unit} a {item.name}. Razón: {notes}"}
+        )
+    except Exception as e:
+        msg = str(e)
+        return Response({'error': f'Error interno guardando ajuste o logs: {msg}'}, status=500)
 
     return Response({
         'ok': True,
