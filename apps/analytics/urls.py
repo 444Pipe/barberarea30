@@ -9,4 +9,6 @@ urlpatterns = [
     path('stats/heatmap/', views.heatmap_view, name='admin_heatmap'),
     path('notifications/', views.notifications_view, name='admin_notifications'),
     path('reports/monthly/', views.monthly_report_view, name='admin_monthly_report'),
+    path('audit/logs/', views.audit_log_api_view, name='admin_audit_log_api'),
 ]
+

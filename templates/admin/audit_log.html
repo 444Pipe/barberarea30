@@ -1,0 +1,284 @@
+{% extends "admin/base_admin.html" %}
+{% load static %}
+
+{% block title %}Log de Auditoría{% endblock %}
+
+{% block extra_head %}
+<style>
+  .action-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .action-payment   { background: rgba(212,175,55,.15); color: #D4AF37; }
+  .action-daily_close { background: rgba(99,102,241,.15); color: #818cf8; }
+  .action-create    { background: rgba(34,197,94,.12);  color: #4ade80; }
+  .action-update    { background: rgba(251,146,60,.12); color: #fb923c; }
+  .action-delete    { background: rgba(239,68,68,.12);  color: #f87171; }
+  .action-login     { background: rgba(56,189,248,.12); color: #38bdf8; }
+  .action-logout    { background: rgba(148,163,184,.12);color: #94a3b8; }
+  .action-inventory { background: rgba(167,139,250,.12);color: #a78bfa; }
+  .action-commission{ background: rgba(52,211,153,.12); color: #34d399; }
+  .action-price_change{ background: rgba(239,68,68,.15);color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+  .action-default   { background: rgba(255,255,255,.05);color: #94a3b8; }
+
+  .log-row { transition: background .15s ease; }
+  .log-row:hover { background: rgba(212,175,55,.04); }
+
+  .changes-toggle { cursor: pointer; font-size: 0.65rem; color: #D4AF37; }
+  .changes-panel  { display: none; }
+  .changes-panel.open { display: block; }
+
+  .filter-chip {
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255,255,255,.08);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .filter-chip:hover, .filter-chip.active {
+    border-color: #D4AF37;
+    color: #D4AF37;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wide">
+        Log de Auditoría
+        <span class="text-xs font-sans text-gold/60 font-normal ml-2 tracking-widest uppercase">Solo Lectura</span>
+      </h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider">Registro inmutable de todas las acciones críticas del sistema.</p>
+    </div>
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-2" id="filter-bar">
+      <button class="filter-chip active" data-action="all">Todos</button>
+      <button class="filter-chip" data-action="payment">Pagos</button>
+      <button class="filter-chip" data-action="daily_close">Cierres</button>
+      <button class="filter-chip" data-action="price_change">Precios</button>
+      <button class="filter-chip" data-action="delete">Eliminaciones</button>
+      <button class="filter-chip" data-action="login">Accesos</button>
+    </div>
+  </div>
+
+  <!-- Search + count -->
+  <div class="flex items-center gap-4 mb-4">
+    <div class="relative flex-1 max-w-xs">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-smoke/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input id="log-search" type="text" placeholder="Buscar por usuario o acción…"
+        class="w-full bg-jet-lighter border border-white/8 rounded-lg pl-9 pr-4 py-2 text-xs text-smoke placeholder-smoke/30 focus:border-gold/40 focus:outline-none transition-colors">
+    </div>
+    <span id="log-count" class="text-xs text-smoke/30 tracking-wider"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-jet-card border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+
+    <!-- Loading skeleton -->
+    <div id="log-loading" class="p-8 text-center">
+      <div class="inline-block w-6 h-6 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></div>
+      <p class="text-xs text-smoke/30 mt-3 tracking-wider">Cargando registros…</p>
+    </div>
+
+    <div id="log-container" class="hidden">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="border-b border-white/5 text-smoke/40 bg-jet-lighter">
+            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Fecha / Hora</th>
+            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Usuario</th>
+            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Acción</th>
+            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem] hidden md:table-cell">Objeto</th>
+            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem] hidden lg:table-cell">IP</th>
+            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Detalle</th>
+          </tr>
+        </thead>
+        <tbody id="log-tbody" class="divide-y divide-white/[0.04]">
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <div class="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-jet-lighter">
+        <button id="btn-prev" onclick="changePage(-1)"
+          class="text-xs text-smoke/40 hover:text-gold transition-colors disabled:opacity-20 tracking-wider uppercase">
+          ← Anterior
+        </button>
+        <span id="page-info" class="text-xs text-smoke/40 tracking-wider"></span>
+        <button id="btn-next" onclick="changePage(1)"
+          class="text-xs text-smoke/40 hover:text-gold transition-colors disabled:opacity-20 tracking-wider uppercase">
+          Siguiente →
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="log-empty" class="hidden p-12 text-center">
+      <svg class="w-10 h-10 text-smoke/10 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <p class="text-xs text-smoke/30 tracking-wider">No se encontraron registros.</p>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const PAGE_SIZE = 50;
+let allLogs = [];
+let filtered = [];
+let currentPage = 1;
+let activeFilter = 'all';
+let searchQuery = '';
+
+const ACTION_LABELS = {
+  payment:     'Pago',
+  daily_close: 'Cierre de Caja',
+  create:      'Creación',
+  update:      'Modificación',
+  delete:      'Eliminación',
+  login:       'Login',
+  logout:      'Logout',
+  price_change:'Cambio de Precio',
+  promotion:   'Promoción',
+  inventory:   'Inventario',
+  commission:  'Comisión',
+  refund:      'Reembolso',
+};
+
+function getActionClass(action) {
+  return `action-${action}` in document.styleSheets[0] ? `action-${action}` : 'action-default';
+}
+
+async function fetchLogs() {
+  try {
+    const resp = await fetch('/api/admin/audit/logs/');
+    if (!resp.ok) throw new Error(resp.status);
+    allLogs = await resp.json();
+    applyFilters();
+  } catch(e) {
+    document.getElementById('log-loading').innerHTML =
+      `<p class="text-xs text-red-400 p-8 text-center tracking-wider">Error al cargar los registros. Refresca la página.</p>`;
+  }
+}
+
+function applyFilters() {
+  filtered = allLogs.filter(log => {
+    const matchAction = activeFilter === 'all' || log.action === activeFilter;
+    const q = searchQuery.toLowerCase();
+    const matchSearch = !q ||
+      (log.user || '').toLowerCase().includes(q) ||
+      (log.action || '').toLowerCase().includes(q) ||
+      (log.object_repr || '').toLowerCase().includes(q) ||
+      (log.msg || '').toLowerCase().includes(q);
+    return matchAction && matchSearch;
+  });
+  currentPage = 1;
+  renderPage();
+}
+
+function renderPage() {
+  const tbody = document.getElementById('log-tbody');
+  const loading = document.getElementById('log-loading');
+  const container = document.getElementById('log-container');
+  const empty = document.getElementById('log-empty');
+  const count = document.getElementById('log-count');
+
+  loading.classList.add('hidden');
+
+  if (filtered.length === 0) {
+    container.classList.add('hidden');
+    empty.classList.remove('hidden');
+    count.textContent = '';
+    return;
+  }
+
+  empty.classList.add('hidden');
+  container.classList.remove('hidden');
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+
+  count.textContent = `${filtered.length} registro${filtered.length !== 1 ? 's' : ''}`;
+  document.getElementById('page-info').textContent = `Página ${currentPage} / ${totalPages}`;
+  document.getElementById('btn-prev').disabled = currentPage === 1;
+  document.getElementById('btn-next').disabled = currentPage === totalPages;
+
+  tbody.innerHTML = page.map((log, idx) => {
+    const actionKey = log.action || 'default';
+    const label = ACTION_LABELS[actionKey] || actionKey;
+    const hasChanges = log.changes && Object.keys(log.changes).length > 0;
+    const rowId = `row-${start + idx}`;
+    const changesJson = hasChanges
+      ? JSON.stringify(log.changes, null, 2)
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      : '';
+
+    return `
+      <tr class="log-row" data-action="${actionKey}">
+        <td class="px-4 py-3 text-smoke/50 whitespace-nowrap font-mono text-[0.62rem]">${log.datetime || '—'}</td>
+        <td class="px-4 py-3 text-smoke/80 font-medium">${log.user || '<span class="text-smoke/30 italic">Sistema</span>'}</td>
+        <td class="px-4 py-3">
+          <span class="action-badge action-${actionKey}">${label}</span>
+        </td>
+        <td class="px-4 py-3 text-smoke/50 hidden md:table-cell max-w-[160px] truncate" title="${log.object_repr || ''}">${log.object_repr || '—'}</td>
+        <td class="px-4 py-3 text-smoke/30 font-mono text-[0.6rem] hidden lg:table-cell">${log.ip || '—'}</td>
+        <td class="px-4 py-3">
+          <div class="text-smoke/60 text-[0.65rem] leading-relaxed">${log.msg || '—'}</div>
+          ${hasChanges ? `
+            <button class="changes-toggle mt-1 hover:underline" onclick="toggleChanges('${rowId}')">
+              Ver cambios ▾
+            </button>
+            <pre id="${rowId}" class="changes-panel mt-2 p-2 bg-jet-lighter rounded text-[0.6rem] text-smoke/50 overflow-auto max-h-40 font-mono">${changesJson}</pre>
+          ` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function toggleChanges(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+function changePage(dir) {
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(totalPages, currentPage + dir));
+  renderPage();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Filter chips
+document.getElementById('filter-bar').addEventListener('click', e => {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  activeFilter = chip.dataset.action;
+  applyFilters();
+});
+
+// Search
+document.getElementById('log-search').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  applyFilters();
+});
+
+fetchLogs();
+</script>
+{% endblock %}

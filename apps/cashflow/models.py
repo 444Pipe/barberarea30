@@ -105,6 +105,12 @@ class Commission(models.Model):
     tip_amount = models.DecimalField(max_digits=10, decimal_places=0, default=0,
         help_text='100% de propinas va para el barbero')
     total_earnings = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    
+    # Banderas para aislar flujo de pago
+    is_paid = models.BooleanField(default=False, help_text='¿Ya fue pagada esta comisión al barbero?')
+    paid_at = models.DateTimeField(null=True, blank=True)
+    is_paid_in_daily_close = models.BooleanField(default=False, help_text='Usado para liquidaciones diarias automatizadas (ej. Frank)')
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

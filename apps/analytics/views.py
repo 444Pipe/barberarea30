@@ -229,6 +229,44 @@ def notifications_view(request):
 
 @api_view(['GET'])
 @permission_classes([IsAdminOrAbove])
+def audit_log_api_view(request):
+    """
+    GET /api/admin/audit/logs/
+    Devuelve el log completo de auditoría en JSON.
+    Restringido a superadmin y admin (batman). Frank (operational_admin) y barberos no tienen acceso.
+    """
+    profile = getattr(request.user, 'profile', None)
+    # Solo superadmin y admin (no operational_admin, no barber)
+    if not profile or profile.role not in ('superadmin', 'admin'):
+        return Response({'error': 'Acceso restringido. Solo administradores principales.'}, status=403)
+
+    logs = AuditLog.objects.select_related('user').order_by('-created_at')[:500]
+
+    result = []
+    for log in logs:
+        user_name = (
+            log.user.get_full_name() or log.user.username
+            if log.user else 'Sistema'
+        )
+        msg = log.extra_data.get('msg', f'Realizó: {log.get_action_display()}')
+        result.append({
+            'id':          log.id,
+            'datetime':    log.created_at.strftime('%d/%m/%Y  %H:%M:%S'),
+            'user':        user_name,
+            'action':      log.action,
+            'model_name':  log.model_name,
+            'object_id':   log.object_id,
+            'object_repr': log.object_repr,
+            'changes':     log.changes,
+            'ip':          log.ip_address,
+            'msg':         msg,
+        })
+
+    return Response(result)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminOrAbove])
 def monthly_report_view(request):
     """
     GET /api/admin/reports/monthly/?year=2026&month=4

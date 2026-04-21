@@ -266,3 +266,15 @@ def admin_reports_view(request):
         'current_month': now.month,
     }
     return render(request, 'admin/reports.html', context)
+
+
+@role_required('superadmin', 'admin')
+def admin_audit_log_view(request):
+    """Vista del Log de Auditoría. Solo accesible para superadmin y admin (batman).
+    Frank (operational_admin) y barberos no tienen acceso."""
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'audit_log',
+    }
+    return render(request, 'admin/audit_log.html', context)
