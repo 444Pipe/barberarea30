@@ -58,16 +58,24 @@ def inventory_create_view(request):
     except (TypeError, ValueError):
         return Response({'error': 'Valores numéricos inválidos.'}, status=400)
 
-    item = InventoryItem.objects.create(
-        name=name,
-        category=category,
-        description=description,
-        unit=unit,
-        minimum_stock=minimum_stock,
-        cost_per_unit=cost_per_unit,
-        sale_price=sale_price,
-        image=image,
-    )
+    try:
+        item = InventoryItem.objects.create(
+            name=name,
+            category=category,
+            description=description,
+            unit=unit,
+            minimum_stock=minimum_stock,
+            cost_per_unit=cost_per_unit,
+            sale_price=sale_price,
+            image=image,
+        )
+    except Exception as e:
+        msg = str(e)
+        if "api_key" in msg.lower() or "cloudinary" in msg.lower() or "must supply" in msg.lower():
+            return Response({'error': 'Configuración de Cloudinary incompleta. Faltan variables de entorno en Railway.'}, status=500)
+        elif "column" in msg.lower() or "relation" in msg.lower():
+            return Response({'error': 'Falta ejecutar las migraciones en tu entorno de producción (Railway).'}, status=500)
+        return Response({'error': f'Error interno: {msg}'}, status=500)
 
     log_audit(
         user=request.user,
@@ -102,7 +110,15 @@ def inventory_update_view(request, item_id):
     if 'image' in request.FILES:
         item.image = request.FILES['image']
 
-    item.save()
+    try:
+        item.save()
+    except Exception as e:
+        msg = str(e)
+        if "api_key" in msg.lower() or "cloudinary" in msg.lower() or "must supply" in msg.lower():
+            return Response({'error': 'Configuración de Cloudinary incompleta. Faltan variables de entorno en Railway.'}, status=500)
+        elif "column" in msg.lower() or "relation" in msg.lower():
+            return Response({'error': 'Falta ejecutar las migraciones en tu entorno de producción (Railway).'}, status=500)
+        return Response({'error': f'Error interno: {msg}'}, status=500)
 
     log_audit(
         user=request.user,
