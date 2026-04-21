@@ -14,12 +14,19 @@ class InventoryItem(models.Model):
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
     description = models.TextField(blank=True)
+    image = models.ImageField(
+        upload_to='inventory/', null=True, blank=True,
+        help_text='Foto del producto (mostrada en el selector del checkout)'
+    )
     unit = models.CharField(max_length=50, default='unidad',
         help_text='Ej: unidad, botella, litro, gramo')
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     minimum_stock = models.DecimalField(max_digits=10, decimal_places=2, default=5,
         help_text='Nivel mínimo; se genera alerta si quantity <= minimum_stock')
-    cost_per_unit = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    cost_per_unit = models.DecimalField(max_digits=10, decimal_places=0, default=0,
+        help_text='Costo interno de compra por unidad')
+    sale_price = models.DecimalField(max_digits=10, decimal_places=0, default=0,
+        help_text='Precio de venta al consumidor (ej. cerveza $5,000)')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

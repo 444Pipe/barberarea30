@@ -121,6 +121,18 @@
         <textarea id="checkout-notes" rows="2" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none"></textarea>
       </div>
 
+      <!-- CONSUMIBLES -->
+      <div>
+        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-2">🍺 Consumibles del Cliente <span class="text-smoke/30 normal-case font-normal">(opcional)</span></label>
+        <div id="consumables-loading" class="text-xs text-smoke/30 italic py-2">Cargando productos…</div>
+        <div id="consumables-grid" class="hidden space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+        <div id="consumables-empty" class="hidden text-xs text-smoke/30 italic py-2">No hay consumibles disponibles en inventario.</div>
+        <div id="consumables-total" class="hidden mt-2 pt-2 border-t border-white/10 flex justify-between items-center">
+          <span class="text-xs text-smoke/50 uppercase tracking-widest">Total consumibles:</span>
+          <span id="consumables-total-amount" class="text-sm text-gold font-bold">$0</span>
+        </div>
+      </div>
+
       <div class="pt-4 border-t border-white/5 flex gap-3 justify-end">
         <button type="button" onclick="closeCheckout()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
         <button type="submit" class="px-6 py-2 bg-gold text-jet font-bold text-sm rounded hover:bg-white transition-colors">Confirmar Pago</button>
@@ -255,11 +267,97 @@ function openCheckout(id, clientName, price) {
   document.getElementById('checkout-client-name').textContent = clientName;
   document.getElementById('checkout-base-price').textContent = '$' + price.toLocaleString('es-CO');
   document.getElementById('checkout-modal').classList.remove('hidden');
+  loadConsumables();
 }
 
 function closeCheckout() {
   document.getElementById('checkout-modal').classList.add('hidden');
   document.getElementById('checkout-form').reset();
+  document.getElementById('consumables-grid').innerHTML = '';
+  document.getElementById('consumables-total').classList.add('hidden');
+}
+
+// ─── CONSUMABLES ──────────────────────────────────────────────────
+function loadConsumables() {
+  const grid    = document.getElementById('consumables-grid');
+  const loading = document.getElementById('consumables-loading');
+  const empty   = document.getElementById('consumables-empty');
+  const total   = document.getElementById('consumables-total');
+
+  loading.classList.remove('hidden');
+  grid.classList.add('hidden');
+  empty.classList.add('hidden');
+  total.classList.add('hidden');
+
+  fetch('/api/admin/inventory/consumables/')
+    .then(r => r.json())
+    .then(items => {
+      loading.classList.add('hidden');
+      if (!items.length) { empty.classList.remove('hidden'); return; }
+
+      grid.innerHTML = items.map(item => {
+        const imgHtml = item.image
+          ? `<img src="${item.image}" class="w-8 h-8 rounded object-cover flex-shrink-0">`
+          : `<div class="w-8 h-8 rounded bg-white/5 flex items-center justify-center text-smoke/20 flex-shrink-0">📦</div>`;
+        return `
+          <div class="flex items-center justify-between p-2.5 bg-jet rounded-lg border border-white/5 group hover:border-gold/20 transition-all">
+            <div class="flex items-center gap-2.5">
+              ${imgHtml}
+              <div>
+                <div class="text-xs font-medium text-white">${item.name}</div>
+                <div class="text-[0.6rem] text-smoke/40">${item.category_display} · Stock: ${item.quantity_available} ${item.unit}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              ${item.sale_price > 0 ? `<span class="text-[0.65rem] text-gold font-bold">$${item.sale_price.toLocaleString('es-CO')}</span>` : ''}
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="changeQty(${item.id}, -1)" class="w-5 h-5 rounded bg-white/5 hover:bg-red-500/20 text-smoke/70 hover:text-red-400 text-xs flex items-center justify-center transition-colors">−</button>
+                <span id="qty-${item.id}" class="w-6 text-center text-xs text-white font-mono">0</span>
+                <button type="button" onclick="changeQty(${item.id}, 1)" class="w-5 h-5 rounded bg-white/5 hover:bg-emerald-500/20 text-smoke/70 hover:text-emerald-400 text-xs flex items-center justify-center transition-colors">+</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      grid.classList.remove('hidden');
+
+      // Store prices for total calculation
+      window._consumablePrices = {};
+      items.forEach(i => window._consumablePrices[i.id] = i.sale_price);
+    })
+    .catch(() => { loading.textContent = 'Error al cargar consumibles.'; });
+}
+
+function changeQty(itemId, delta) {
+  const el = document.getElementById('qty-' + itemId);
+  const current = parseInt(el.textContent) || 0;
+  const next = Math.max(0, current + delta);
+  el.textContent = next;
+  updateConsumableTotal();
+}
+
+function updateConsumableTotal() {
+  let total = 0;
+  const prices = window._consumablePrices || {};
+  for (const [id, price] of Object.entries(prices)) {
+    const qty = parseInt(document.getElementById('qty-' + id)?.textContent || '0');
+    total += qty * price;
+  }
+  const totalDiv = document.getElementById('consumables-total');
+  const totalAmt = document.getElementById('consumables-total-amount');
+  totalAmt.textContent = '$' + total.toLocaleString('es-CO');
+  if (total > 0) totalDiv.classList.remove('hidden');
+  else totalDiv.classList.add('hidden');
+}
+
+function getSelectedConsumables() {
+  const prices = window._consumablePrices || {};
+  const result = [];
+  for (const id of Object.keys(prices)) {
+    const qty = parseInt(document.getElementById('qty-' + id)?.textContent || '0');
+    if (qty > 0) result.push({ id: parseInt(id), qty });
+  }
+  return result;
 }
 
 function submitCheckout(e) {
@@ -289,9 +387,24 @@ function submitCheckout(e) {
     if (!ok) {
       const msg = data.error || data.detail || `Error ${status}`;
       alert('Error: ' + msg);
+      btn.disabled = false;
+      btn.textContent = 'Confirmar Pago';
     } else {
-      closeCheckout();
-      loadBookings();
+      // Registrar consumibles seleccionados si hay alguno
+      const consumables = getSelectedConsumables();
+      if (consumables.length > 0) {
+        return fetch('/api/admin/inventory/consumables/' + id + '/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+          body: JSON.stringify({ items: consumables })
+        }).then(() => {
+          closeCheckout();
+          loadBookings();
+        });
+      } else {
+        closeCheckout();
+        loadBookings();
+      }
     }
   })
   .catch(err => alert('Error en la conexión: ' + err))
