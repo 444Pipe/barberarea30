@@ -291,7 +291,7 @@ def register_consumables_view(request, booking_id):
                 notes=f'Consumo en corte — {booking.client_name}'
             )
 
-            total_consumable_value += item.sale_price * qty
+            total_consumable_value += float(item.sale_price) * qty
 
         log_audit(
             user=request.user,
