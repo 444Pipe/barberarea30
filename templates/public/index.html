@@ -408,11 +408,14 @@
           const priceK = Number(s.price) >= 1000 ? `$${Math.round(Number(s.price)/1000)}k` : `$${Number(s.price).toLocaleString('es-CO')}`;
           return `
             <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60 visible" style="transition-delay: ${i*100}ms;">
-              <div class="flex justify-between items-start mb-8">
+              <div class="flex justify-between items-start mb-6">
                 <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">${s.name}</h3>
                 <span class="text-gold font-medium tracking-widest">${priceK}</span>
               </div>
-              <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed">${s.duration_minutes} minutos</p>
+              <div class="mb-8">
+                <p class="text-smoke/60 font-light text-[0.8rem] mb-2 leading-relaxed tracking-wider uppercase">${s.duration_minutes} minutos</p>
+                ${s.description ? `<p class="text-smoke/50 text-[0.75rem] leading-relaxed italic">${s.description.replace(/\n/g, '<br>')}</p>` : ''}
+              </div>
               <a href="/booking" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reservar <span class="text-xl">→</span></a>
             </div>
           `;

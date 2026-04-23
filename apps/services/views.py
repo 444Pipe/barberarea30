@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 class ServiceListView(generics.ListCreateAPIView):
     """GET /api/services/ — lista pública, POST crea nuevo servicio."""
-    queryset = Service.objects.filter(is_active=True)
+    queryset = Service.objects.filter(is_active=True).order_by('price')
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = None
@@ -38,7 +38,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 def obtener_servicios_nativos(request):
     """Endpoint nativo de servicios para JS Vanilla"""
     try:
-        servicios = list(Service.objects.filter(is_active=True).values('id', 'name', 'price', 'duration_minutes'))
+        servicios = list(Service.objects.filter(is_active=True).order_by('price').values('id', 'name', 'price', 'duration_minutes', 'description'))
         return JsonResponse({'servicios': servicios}, safe=False, encoder=DjangoJSONEncoder)
     except Exception as e:
         import traceback
