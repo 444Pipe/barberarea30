@@ -410,6 +410,29 @@
         }
         grid.innerHTML = servicios.map((s, i) => {
           const priceK = Number(s.price) >= 1000 ? `$${Math.round(Number(s.price)/1000)}k` : `$${Number(s.price).toLocaleString('es-CO')}`;
+          
+          let descHtml = '';
+          if (s.description) {
+            const features = s.description
+              .split(/[\n,]+|\s+y\s+/i)
+              .map(item => item.trim())
+              .filter(item => item.length > 1)
+              .map(f => f.charAt(0).toUpperCase() + f.slice(1));
+
+            descHtml = `
+              <ul class="text-smoke/60 text-[0.75rem] font-light space-y-3 mt-5 pt-5 border-t border-white/5">
+                ${features.map(f => `
+                  <li class="flex items-start gap-2.5">
+                    <svg class="w-3.5 h-3.5 text-gold shrink-0 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span class="leading-relaxed text-smoke/80">${f}</span>
+                  </li>
+                `).join('')}
+              </ul>
+            `;
+          }
+
           return `
             <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60 visible" style="transition-delay: ${i*100}ms;">
               <div class="flex justify-between items-start mb-6">
@@ -418,9 +441,9 @@
               </div>
               <div class="mb-8">
                 <p class="text-smoke/60 font-light text-[0.8rem] mb-2 leading-relaxed tracking-wider uppercase">${s.duration_minutes} minutos</p>
-                ${s.description ? `<p class="text-smoke/50 text-[0.75rem] leading-relaxed italic">${s.description.replace(/\n/g, '<br>')}</p>` : ''}
+                ${descHtml}
               </div>
-              <a href="/booking" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reservar <span class="text-xl">→</span></a>
+              <a href="/booking" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3 mt-auto">Reservar <span class="text-xl">→</span></a>
             </div>
           `;
         }).join('');
