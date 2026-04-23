@@ -28,4 +28,5 @@ urlpatterns = [
     path('inventory/', views.admin_inventory_view, name='admin_inventory'),
     path('reports/', views.admin_reports_view, name='admin_reports'),
     path('audit-log/', views.admin_audit_log_view, name='admin_audit_log'),
+    path('reviews/', views.admin_reviews_view, name='admin_reviews'),
 ]

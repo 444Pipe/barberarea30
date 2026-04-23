@@ -278,3 +278,27 @@ def admin_audit_log_view(request):
         'active_section': 'audit_log',
     }
     return render(request, 'admin/audit_log.html', context)
+
+
+@superadmin_required
+def admin_reviews_view(request):
+    """Vista del panel de encuestas y calificaciones de clientes."""
+    from apps.bookings.models import Review
+    from apps.barbers.models import Barber
+    from django.db.models import Avg, Count
+    
+    barbers = Barber.objects.filter(is_available=True).annotate(
+        review_count=Count('bookings__review'),
+        avg_rating=Avg('bookings__review__barber_rating')
+    ).order_by('-avg_rating')
+    
+    reviews = Review.objects.select_related('booking__barber', 'booking__service').order_by('-created_at')[:50]
+    
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'reviews',
+        'barbers': barbers,
+        'reviews': reviews,
+    }
+    return render(request, 'admin/reviews.html', context)
