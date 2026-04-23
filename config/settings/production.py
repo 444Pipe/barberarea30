@@ -20,7 +20,7 @@ DEBUG = os.environ.get('DEBUG', 'True' if IS_LOCAL else 'False').lower() == 'tru
 
 ALLOWED_HOSTS = _split_env(os.environ.get(
     'ALLOWED_HOSTS',
-    'barberarea30-production.up.railway.app,localhost,127.0.0.1'
+    'www.area30barberclub.com,area30barberclub.com,barberarea30-production.up.railway.app,localhost,127.0.0.1'
 ))
 
 # ── Database (PostgreSQL via DATABASE_URL) ───────────────────────
@@ -44,7 +44,7 @@ CSRF_COOKIE_SECURE = not (IS_LOCAL or DEBUG)
 
 CSRF_TRUSTED_ORIGINS = _split_env(os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://barberarea30-production.up.railway.app,http://127.0.0.1:8000,http://localhost:8000'
+    'https://www.area30barberclub.com,https://area30barberclub.com,https://barberarea30-production.up.railway.app,http://127.0.0.1:8000,http://localhost:8000'
 ))
 
 # ── Static files (WhiteNoise) ───────────────────────────────────

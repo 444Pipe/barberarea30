@@ -135,12 +135,13 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 LOGIN_URL = '/admin-panel/login/'
 LOGIN_REDIRECT_URL = '/admin-panel/'
 
-# Email (optional, for notifications)
+# Email (SMTP — variables configuradas en Railway)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('SMTP_PORT', '587'))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('SMTP_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('SMTP_FROM', 'Reservas Área 30 <noreply@area30.com>')
-SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.hostinger.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('EMAIL_FROM', 'Área 30 Barber Club <area30barberclub@area30barberclub.com>')
+EMAIL_ADMIN = os.environ.get('EMAIL_ADMIN', '')
+SITE_URL = os.environ.get('SITE_URL', 'https://www.area30barberclub.com')
