@@ -10,37 +10,7 @@
     "rating": 5.0,
     "reviews_count": 10
   },
-  "services": [
-    {
-      "id": 1,
-      "name": "Corte Básico",
-      "price": 30000,
-      "duration": 25,
-      "features": ["Incluye cejas", "Styling con productos premium"]
-    },
-    {
-      "id": 2,
-      "name": "Corte + Freestyle",
-      "price": 35000,
-      "duration": 35,
-      "features": ["Corte completo", "Diseño freestyle personalizado", "Cejas y styling"],
-      "popular": true
-    },
-    {
-      "id": 3,
-      "name": "Corte con Barba",
-      "price": 40000,
-      "duration": 35,
-      "features": ["Corte de cabello", "Perfilado de barba", "Cejas y styling"]
-    },
-    {
-      "id": 4,
-      "name": "Corte para Dama",
-      "price": 35000,
-      "duration": 40,
-      "features": ["Corte personalizado", "Limpieza de cejas con cuchilla"]
-    }
-  ],
+  "services": [],
   "testimonials": [
     {
       "author": "Johan Felipe Serrano",

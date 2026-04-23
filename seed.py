@@ -21,21 +21,14 @@ shop, _ = Barbershop.objects.get_or_create(
 
 from django.utils.text import slugify
 
-for s in data.get('services', []):
-    Service.objects.get_or_create(
-        id=s['id'],
-        defaults={
-            'name': s['name'],
-            'slug': slugify(s['name']),
-            'price': s['price'],
-            'duration_minutes': s.get('duration', 30),
-            'is_active': True
-        }
-    )
+# Ya no se crean servicios desde data.json, solo se usarán los ingresados por el usuario.
 
 # Limpiar barberos de prueba si existen
 Barber.objects.filter(display_name__in=['Barbero Prueba', 'Juan Pérez', 'Carlos Estilista']).delete()
 User.objects.filter(username__in=['barberoprueba', 'juan', 'carlos']).delete()
+
+# Limpiar servicios ficticios
+Service.objects.filter(name__in=['Corte Básico', 'Corte + Freestyle', 'Corte con Barba', 'Corte para Dama']).delete()
 
 print("Datos cargados correctamente")
 # Asegurarnos de que la tabla bookings_blockeddate exista en producción si la migración falló misteriosamente
