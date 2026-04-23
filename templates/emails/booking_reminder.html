@@ -1,66 +1,112 @@
-{% load static %}
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="es">
 <head>
-  <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
-  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/favicon30.png' %}">
-  <link rel="apple-touch-icon" href="{% static 'images/favicon30.png' %}">
-
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recordatorio de Reserva</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recordatorio de Cita — Área 30</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #1a1a1a; font-family: Arial, sans-serif; color: #ffffff;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; padding: 40px 0;">
-        <tr>
-            <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #242424; border: 1px solid #333333; border-top: 4px solid #D4AF37; border-radius: 4px; overflow: hidden;">
-                    <!-- Header -->
-                    <tr>
-                        <td align="center" style="padding: 30px 20px; background-color: #1f1f1f; border-bottom: 1px solid #333333;">
-                            <h1 style="margin: 0; color: #D4AF37; font-size: 28px; letter-spacing: 2px; text-transform: uppercase;">Área 30</h1>
-                            <p style="margin: 5px 0 0 0; color: #888888; font-size: 12px; letter-spacing: 4px; text-transform: uppercase;">Barber Club</p>
-                        </td>
-                    </tr>
-                    
-                    <!-- Body -->
-                    <tr>
-                        <td style="padding: 40px 30px;">
-                            <h2 style="margin: 0 0 20px 0; color: #ffffff; font-size: 20px;">¡Tu cita es en poco tiempo, {{ booking.client_name }}!</h2>
-                            <p style="margin: 0 0 30px 0; color: #cccccc; font-size: 16px; line-height: 1.6;">
-                                Este es un recordatorio de que tu reserva está programada para dentro de aproximadamente 2 horas.
-                            </p>
-                            
-                            <!-- Booking Details Card -->
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border: 1px solid #333333; border-radius: 4px; margin-bottom: 30px;">
-                                <tr>
-                                    <td style="padding: 20px;">
-                                        <p style="margin: 0 0 10px 0; font-size: 14px;"><strong style="color: #D4AF37;">Fecha:</strong> <span style="color: #ffffff;">{{ booking.date|date:"l, d \d\e F Y" }}</span></p>
-                                        <p style="margin: 0 0 10px 0; font-size: 14px;"><strong style="color: #D4AF37;">Hora:</strong> <span style="color: #ffffff;">{{ booking.time|time:"h:i A" }}</span></p>
-                                        <p style="margin: 0 0 10px 0; font-size: 14px;"><strong style="color: #D4AF37;">Servicio:</strong> <span style="color: #ffffff;">{{ booking.service.name|default:"N/A" }}</span></p>
-                                        <p style="margin: 0; font-size: 14px;"><strong style="color: #D4AF37;">Barbero:</strong> <span style="color: #ffffff;">{{ booking.barber.display_name|default:"Cualquiera disponible" }}</span></p>
-                                    </td>
-                                </tr>
-                            </table>
+<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;">
 
-                            <p style="margin: 0 0 30px 0; color: #888888; font-size: 14px; line-height: 1.6;">
-                                📍 Nuestro barbero te estará esperando. Por favor intenta ser puntual para no afectar las reservas posteriores.
-                            </p>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:48px 16px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
 
-                        </td>
-                    </tr>
-                    
-                    <!-- Footer -->
-                    <tr>
-                        <td align="center" style="padding: 20px; background-color: #1f1f1f; border-top: 1px solid #333333;">
-                            <p style="margin: 0; color: #666666; font-size: 12px;">
-                                © {% now "Y" %} Área 30 Barber Club. Todos los derechos reservados.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
+          <!-- TOP ACCENT -->
+          <tr>
+            <td style="background:linear-gradient(90deg,transparent,#D4AF37,transparent);height:1px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- HEADER -->
+          <tr>
+            <td align="center" style="background-color:#111111;padding:36px 32px 28px;border-left:1px solid #1e1e1e;border-right:1px solid #1e1e1e;">
+              <div style="display:inline-block;width:42px;height:42px;border:1px solid #D4AF37;border-radius:50%;line-height:42px;text-align:center;margin-bottom:14px;">
+                <span style="color:#D4AF37;font-size:18px;">⏰</span>
+              </div>
+              <h1 style="margin:0;color:#D4AF37;font-size:26px;letter-spacing:6px;text-transform:uppercase;font-weight:300;">ÁREA 30</h1>
+              <p style="margin:6px 0 0;color:#555555;font-size:9px;letter-spacing:5px;text-transform:uppercase;">BARBER CLUB · RESTREPO</p>
             </td>
-        </tr>
-    </table>
+          </tr>
+
+          <!-- HERO -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#0e0d1a 0%,#111111 60%,#0a0a0f 100%);padding:40px 32px 36px;border-left:1px solid #1e1e1e;border-right:1px solid #1e1e1e;text-align:center;">
+              <p style="margin:0 0 10px;color:#a389f0;font-size:10px;letter-spacing:4px;text-transform:uppercase;">⏳ Tu cita es hoy</p>
+              <h2 style="margin:0 0 12px;color:#ffffff;font-size:26px;font-weight:300;line-height:1.3;">¡No te lo pierdas,<br><strong style="font-weight:600;">{{ booking.client_name }}</strong>!</h2>
+              <p style="margin:0;color:#888888;font-size:14px;line-height:1.7;max-width:380px;display:inline-block;">
+                Tu reserva está confirmada para dentro de aproximadamente <strong style="color:#ffffff;">2 horas</strong>. Tu barbero ya se prepara para ti.
+              </p>
+            </td>
+          </tr>
+
+          <!-- TIME HIGHLIGHT -->
+          <tr>
+            <td style="background-color:#111111;padding:0 32px 24px;border-left:1px solid #1e1e1e;border-right:1px solid #1e1e1e;text-align:center;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#1a1506,#111111);border:1px solid #2a2208;border-radius:4px;">
+                <tr>
+                  <td align="center" style="padding:24px;">
+                    <p style="margin:0 0 4px;font-size:9px;color:#D4AF37;letter-spacing:4px;text-transform:uppercase;">Tu cita hoy a las</p>
+                    <p style="margin:0;color:#D4AF37;font-size:42px;font-weight:700;letter-spacing:2px;">{{ booking.time|time:"h:i A" }}</p>
+                    <p style="margin:6px 0 0;color:#666666;font-size:12px;">{{ booking.date|date:"l, d \d\e F Y" }}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- DETAILS -->
+          <tr>
+            <td style="background-color:#111111;padding:0 32px 24px;border-left:1px solid #1e1e1e;border-right:1px solid #1e1e1e;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0d0d0d;border:1px solid #2a2a2a;border-radius:4px;">
+                <tr>
+                  <td style="padding:14px 20px;border-bottom:1px solid #1e1e1e;">
+                    <p style="margin:0;font-size:10px;color:#555555;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">Servicio</p>
+                    <p style="margin:0;color:#D4AF37;font-size:14px;font-weight:500;">{{ booking.service.name|default:"N/A" }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 20px;">
+                    <p style="margin:0;font-size:10px;color:#555555;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">Barbero</p>
+                    <p style="margin:0;color:#ffffff;font-size:14px;font-weight:500;">{{ booking.barber.display_name|default:"Asignado al llegar" }}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- LOCATION NOTE -->
+          <tr>
+            <td style="background-color:#111111;padding:0 32px 40px;border-left:1px solid #1e1e1e;border-right:1px solid #1e1e1e;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#13110a;border-left:3px solid #D4AF37;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0;color:#b39129;font-size:13px;line-height:1.6;">
+                      📍 <strong>C.C. Sunrise, Local 149 · Piso 1</strong><br>
+                      <span style="color:#666666;">Por favor llega puntual. Tu barbero te está esperando.</span>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- BOTTOM ACCENT -->
+          <tr>
+            <td style="background:linear-gradient(90deg,transparent,#D4AF37,transparent);height:1px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td align="center" style="padding:24px 16px;">
+              <p style="margin:0 0 6px;color:#333333;font-size:10px;letter-spacing:3px;text-transform:uppercase;">ÁREA 30 BARBER CLUB</p>
+              <p style="margin:0;color:#2e2e2e;font-size:10px;">© {% now "Y" %} Todos los derechos reservados · Restrepo, Meta</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
 </body>
 </html>
