@@ -7,6 +7,14 @@ from apps.bookings.models import Booking
 from apps.cashflow.models import PaymentMethod
 from apps.cashflow import services as cashflow_services
 
+from decimal import Decimal, InvalidOperation
+
+def _safe_decimal(val, default=0):
+    try:
+        return Decimal(str(val)) if val else Decimal(default)
+    except (ValueError, TypeError, InvalidOperation):
+        return Decimal(default)
+
 @api_view(['POST'])
 @permission_classes([IsBarberOrAbove])
 def checkout_booking_view(request, booking_id):
@@ -26,10 +34,10 @@ def checkout_booking_view(request, booking_id):
             confirmed_by=request.user,
             payment_method_id=data.get('payment_method_id'),
             payment_reference=data.get('payment_reference', ''),
-            tip_amount=float(data.get('tip_amount', 0)),
-            discount_amount=float(data.get('discount_amount', 0)),
+            tip_amount=_safe_decimal(data.get('tip_amount'), 0),
+            discount_amount=_safe_decimal(data.get('discount_amount'), 0),
             discount_assumed_by=data.get('discount_assumed_by', 'none'),
-            commission_percentage=float(data.get('commission_percentage', 50)),
+            commission_percentage=_safe_decimal(data.get('commission_percentage'), 50),
             notes=data.get('notes', ''),
             request=request,
         )
