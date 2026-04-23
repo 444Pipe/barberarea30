@@ -82,13 +82,13 @@ def barber_availability_view(request, barber_id):
         bk_end = bk_start + timedelta(minutes=bk_duration or 60)
         booked_ranges.append((bk_start, bk_end))
 
-    # Generate 30-minute slots
+    # Generate 60-minute slots
     slots = []
     current = datetime.combine(target_date, start_time)
     end = datetime.combine(target_date, end_time)
 
     while current < end:
-        slot_end = current + timedelta(minutes=30)
+        slot_end = current + timedelta(minutes=60)
         is_available = True
         for br_start, br_end in booked_ranges:
             if current < br_end and slot_end > br_start:

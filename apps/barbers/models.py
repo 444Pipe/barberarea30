@@ -47,15 +47,15 @@ class Barber(models.Model):
         return self.display_name
 
     def get_default_schedule(self):
-        """Devuelve horario por defecto (Lun-Sáb 09–20, Dom 09–14)."""
+        """Devuelve horario por defecto (L-V 10–20, Sáb 09–21, Dom 10–15)."""
         return {
-            'monday': {'start': '09:00', 'end': '20:00'},
-            'tuesday': {'start': '09:00', 'end': '20:00'},
-            'wednesday': {'start': '09:00', 'end': '20:00'},
-            'thursday': {'start': '09:00', 'end': '20:00'},
-            'friday': {'start': '09:00', 'end': '20:00'},
-            'saturday': {'start': '09:00', 'end': '20:00'},
-            'sunday': {'start': '09:00', 'end': '14:00'},
+            'monday': {'start': '10:00', 'end': '20:00'},
+            'tuesday': {'start': '10:00', 'end': '20:00'},
+            'wednesday': {'start': '10:00', 'end': '20:00'},
+            'thursday': {'start': '10:00', 'end': '20:00'},
+            'friday': {'start': '10:00', 'end': '20:00'},
+            'saturday': {'start': '09:00', 'end': '21:00'},
+            'sunday': {'start': '10:00', 'end': '15:00'},
         }
 
     def save(self, *args, **kwargs):
