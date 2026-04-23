@@ -33,43 +33,9 @@ for s in data.get('services', []):
         }
     )
 
-u1, _ = User.objects.get_or_create(username='juan', defaults={'email': 'juan@test.com'})
-u1.set_password('area30')
-u1.save()
-UserProfile.objects.get_or_create(user=u1, defaults={'role': 'barber', 'barbershop': shop})
-b1, _ = Barber.objects.get_or_create(
-    id=1,
-    defaults={
-        'user': u1,
-        'barbershop': shop,
-        'display_name': 'Juan Pérez',
-        'is_available': True,
-        'color_tag': '#D4AF37'
-    }
-)
-if not b1.specialties.exists():
-    b1.specialties.add(Service.objects.first())
-
-u2, _ = User.objects.get_or_create(username='carlos', defaults={'email': 'carlos@test.com'})
-u2.set_password('area30')
-u2.save()
-UserProfile.objects.get_or_create(user=u2, defaults={'role': 'barber', 'barbershop': shop})
-b2, _ = Barber.objects.get_or_create(
-    id=2,
-    defaults={
-        'user': u2,
-        'barbershop': shop,
-        'display_name': 'Carlos Estilista',
-        'is_available': True,
-        'color_tag': '#1A1A1A'
-    }
-)
-if not b2.specialties.exists():
-    b2.specialties.add(Service.objects.last())
-
-# Limpiar barbero de prueba si existe
-Barber.objects.filter(display_name='Barbero Prueba').delete()
-User.objects.filter(username='barberoprueba').delete()
+# Limpiar barberos de prueba si existen
+Barber.objects.filter(display_name__in=['Barbero Prueba', 'Juan Pérez', 'Carlos Estilista']).delete()
+User.objects.filter(username__in=['barberoprueba', 'juan', 'carlos']).delete()
 
 print("Datos cargados correctamente")
 # Asegurarnos de que la tabla bookings_blockeddate exista en producción si la migración falló misteriosamente
