@@ -411,6 +411,34 @@
         grid.innerHTML = servicios.map((s, i) => {
           const priceK = Number(s.price) >= 1000 ? `$${Math.round(Number(s.price)/1000)}k` : `$${Number(s.price).toLocaleString('es-CO')}`;
           
+          const lowerName = s.name.toLowerCase();
+          
+          let theme = {
+            borderHover: 'hover:border-gold/60',
+            textHover: 'group-hover:text-gold',
+            text: 'text-gold',
+            shadowHover: 'hover:shadow-[0_0_30px_-5px_rgba(212,175,55,0.15)]',
+            icon: 'text-gold'
+          };
+
+          if (lowerName.includes('silver') || lowerName.includes('plata')) {
+            theme = {
+              borderHover: 'hover:border-slate-300/60',
+              textHover: 'group-hover:text-slate-200',
+              text: 'text-slate-300',
+              shadowHover: 'hover:shadow-[0_0_30px_-5px_rgba(203,213,225,0.15)]',
+              icon: 'text-slate-300'
+            };
+          } else if (lowerName.includes('diamond') || lowerName.includes('diamot') || lowerName.includes('diamante') || lowerName.includes('vip')) {
+            theme = {
+              borderHover: 'hover:border-purple-500/60',
+              textHover: 'group-hover:text-purple-400',
+              text: 'text-purple-400',
+              shadowHover: 'hover:shadow-[0_0_30px_-5px_rgba(168,85,247,0.15)]',
+              icon: 'text-purple-500'
+            };
+          }
+          
           let descHtml = '';
           if (s.description) {
             const features = s.description
@@ -423,7 +451,7 @@
               <ul class="text-smoke/60 text-[0.75rem] font-light space-y-3 mt-5 pt-5 border-t border-white/5">
                 ${features.map(f => `
                   <li class="flex items-start gap-2.5">
-                    <svg class="w-3.5 h-3.5 text-gold shrink-0 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-3.5 h-3.5 ${theme.icon} shrink-0 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
                     <span class="leading-relaxed text-smoke/80">${f}</span>
@@ -434,16 +462,16 @@
           }
 
           return `
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up hover:border-gold/60 visible" style="transition-delay: ${i*100}ms;">
+            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up ${theme.borderHover} ${theme.shadowHover} visible transition-all duration-500" style="transition-delay: ${i*100}ms;">
               <div class="flex justify-between items-start mb-6">
-                <h3 class="text-2xl font-serif text-white group-hover:text-gold transition-colors">${s.name}</h3>
-                <span class="text-gold font-medium tracking-widest">${priceK}</span>
+                <h3 class="text-2xl font-serif text-white ${theme.textHover} transition-colors duration-300">${s.name}</h3>
+                <span class="${theme.text} font-medium tracking-widest">${priceK}</span>
               </div>
               <div class="mb-8">
                 <p class="text-smoke/60 font-light text-[0.8rem] mb-2 leading-relaxed tracking-wider uppercase">${s.duration_minutes} minutos</p>
                 ${descHtml}
               </div>
-              <a href="/booking" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3 mt-auto">Reservar <span class="text-xl">→</span></a>
+              <a href="/booking" class="${theme.text} text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3 mt-auto group-hover:gap-4">Reservar <span class="text-xl">→</span></a>
             </div>
           `;
         }).join('');
