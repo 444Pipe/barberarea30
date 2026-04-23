@@ -200,6 +200,35 @@ def add_suggestion_view(request):
     Suggestion.objects.create(name=name, email=email, message=message)
     return Response({'ok': True, 'message': 'Sugerencia enviada correctamente.'})
 
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def public_reviews_view(request):
+    """GET /api/reviews/ — Retorna las reseñas públicas (barber_rating >= 4) para el index."""
+    from .models import Review
+    reviews = Review.objects.select_related(
+        'booking__barber', 'booking__service'
+    ).filter(
+        is_public=True, barber_rating__gte=4
+    ).order_by('-created_at')[:12]
+
+    data = []
+    for r in reviews:
+        barber_name = None
+        if r.booking.barber:
+            barber_name = r.booking.barber.display_name
+        data.append({
+            'client_name': r.booking.client_name,
+            'barber_name': barber_name,
+            'service_name': r.booking.service.name if r.booking.service else None,
+            'barber_rating': r.barber_rating,
+            'shop_rating': r.shop_rating,
+            'comment': r.comment,
+            'date': r.created_at.strftime('%d %b %Y'),
+        })
+    return Response({'reviews': data})
+
 # ─── Admin ───────────────────────────────────────────────
 
 @api_view(['GET'])

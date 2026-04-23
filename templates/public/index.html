@@ -235,6 +235,41 @@
     </div>
   </section>
 
+  <!-- ══ RESEÑAS DE CLIENTES ══ -->
+  <section id="reviews-section" class="bg-jet-card py-32 px-4 border-t border-white/5 relative overflow-hidden">
+    <!-- Atmospheric glow -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-1 bg-gradient-to-r from-transparent via-gold/30 to-transparent pointer-events-none"></div>
+    <div class="absolute top-1/3 right-0 w-96 h-96 bg-gold/3 blur-[150px] pointer-events-none rounded-full"></div>
+
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="text-center mb-20">
+        <div class="flex items-center justify-center gap-6 mb-6">
+          <div class="h-[1px] w-12 bg-gold/40"></div>
+          <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold">Opiniones Reales</span>
+          <div class="h-[1px] w-12 bg-gold/40"></div>
+        </div>
+        <h2 class="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight mb-4">
+          Lo que dicen <span class="italic text-gold font-light">nuestros clientes.</span>
+        </h2>
+        <p class="text-smoke/40 font-light text-sm max-w-md mx-auto">Experiencias auténticas de quienes ya viven el estilo Área 30.</p>
+      </div>
+
+      <!-- Reviews Carousel -->
+      <div class="relative">
+        <div id="reviews-track" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style="display:none">
+          <!-- filled by JS -->
+        </div>
+        <div id="reviews-empty" class="text-center text-smoke/30 text-sm py-8 hidden">
+          Las primeras reseñas aparecerán aquí pronto.
+        </div>
+        <div id="reviews-loader" class="flex justify-center py-12">
+          <div class="w-6 h-6 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Mapa Panorámico Dinámico -->
   <section class="bg-jet py-32 px-4 overflow-hidden border-t border-gold/5 relative">
     <!-- Luz de fondo sutil que reacciona indirectamente -->
@@ -513,8 +548,54 @@
          statusDiv.className = 'text-xs mt-2 text-red-400';
          statusDiv.innerText = 'Error de conexión';
          btn.innerHTML = originalText;
+       });
+     }
+
+    // ─── Load Public Reviews ──────────────────────────────
+    fetch('/api/reviews/')
+      .then(r => r.json())
+      .then(data => {
+        const track = document.getElementById('reviews-track');
+        const loader = document.getElementById('reviews-loader');
+        const empty = document.getElementById('reviews-empty');
+        loader.style.display = 'none';
+
+        const reviews = data.reviews;
+        if (!reviews || !reviews.length) {
+          empty.classList.remove('hidden');
+          return;
+        }
+
+        track.style.display = 'grid';
+        track.innerHTML = reviews.map((r, i) => {
+          const stars = Array.from({length: 5}, (_, idx) =>
+            `<svg class="w-4 h-4 ${idx < r.barber_rating ? 'text-gold' : 'text-white/10'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`
+          ).join('');
+
+          const initial = r.client_name ? r.client_name.charAt(0).toUpperCase() : '?';
+          const commentHtml = r.comment
+            ? `<p class="text-smoke/60 text-sm font-light leading-relaxed italic flex-1">"${r.comment}"</p>`
+            : `<p class="text-smoke/25 text-xs italic flex-1">Sin comentario adicional.</p>`;
+
+          return `
+            <div class="group bg-jet border border-white/5 hover:border-gold/20 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-500 hover:shadow-[0_8px_40px_-10px_rgba(212,175,55,0.12)]" style="animation-delay:${i*80}ms">
+              <div class="flex items-center gap-1">${stars}</div>
+              ${commentHtml}
+              <div class="h-[1px] bg-white/5"></div>
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">${initial}</div>
+                <div class="min-w-0">
+                  <p class="text-white text-sm font-semibold truncate">${r.client_name}</p>
+                  <p class="text-smoke/30 text-[0.65rem] truncate">${r.service_name || ''}${r.barber_name ? ' &bull; <span class=\'text-gold/50\'>' + r.barber_name + '</span>' : ''}</p>
+                </div>
+                <span class="ml-auto text-smoke/20 text-[0.6rem] flex-shrink-0">${r.date}</span>
+              </div>
+            </div>`;
+        }).join('');
+      })
+      .catch(() => {
+        document.getElementById('reviews-loader').style.display = 'none';
       });
-    }
   </script>
 </body>
 </html>
