@@ -374,6 +374,23 @@ def admin_bookings_export_csv(request):
     return response
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAdminOrAbove])
+def admin_delete_all_bookings_view(request):
+    """DELETE /api/admin/bookings/bulk-delete/ — Eliminar todas las reservas."""
+    Booking.objects.all().delete()
+    from apps.analytics.models import log_audit
+    log_audit(
+        user=request.user,
+        action='delete',
+        obj=None,
+        changes={},
+        request=request,
+        extra_data={'msg': "Eliminó TODAS las reservas del sistema"}
+    )
+    return Response({'ok': True, 'message': 'Todas las reservas eliminadas'}, status=204)
+
+
 # ─── Admin Blocked Dates ─────────────────────────────────
 
 @api_view(['GET', 'POST'])
