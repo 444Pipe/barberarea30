@@ -71,7 +71,7 @@
     <div class="max-w-4xl mx-auto text-center relative z-10">
       <div class="flex justify-center gap-2 mb-4 text-gold text-sm">★★★★★</div>
       <h1 class="text-4xl md:text-5xl font-serif font-bold mb-4 text-white">Reserva <span class="text-gold italic font-light">VIP</span></h1>
-      <p class="text-smoke/70 font-light max-w-md mx-auto">Selecciona tu servicio, barbero preferido y horario ideal.</p>
+      <p class="text-smoke/70 font-light max-w-md mx-auto">Selecciona tu servicio, fecha, hora y barbero disponible.</p>
     </div>
   </section>
 
@@ -97,29 +97,33 @@
       </div>
     </div>
 
-    <!-- STEP 2: Date + Barber Selection -->
+    <!-- STEP 2: Date Only -->
     <div class="wizard-step" id="step-2">
-      <h2 class="text-xl font-serif text-white mb-6">Elige <span class="text-gold italic">Fecha y Barbero</span></h2>
+      <h2 class="text-xl font-serif text-white mb-6">Elige tu <span class="text-gold italic">Fecha</span></h2>
       <div class="mb-8">
         <label class="block text-xs uppercase tracking-widest font-semibold mb-4 text-smoke/70">Fecha Deseada</label>
-        <div id="calendar-carousel" class="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-          <!-- Se llena dinámicamente -->
-        </div>
+        <div id="calendar-carousel" class="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory"></div>
         <input type="hidden" id="booking-date">
-      </div>
-      <div id="barbers-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <p class="text-smoke/40 text-sm col-span-full text-center py-8">Selecciona una fecha para ver barberos disponibles</p>
       </div>
       <div class="flex gap-3">
         <button onclick="goStep(1)" class="px-6 py-3 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-gold transition-colors">← Atrás</button>
       </div>
     </div>
 
-    <!-- STEP 3: Time Slot Selection -->
+    <!-- STEP 3: Time then Barber -->
     <div class="wizard-step" id="step-3">
       <h2 class="text-xl font-serif text-white mb-6">Elige tu <span class="text-gold italic">Hora</span></h2>
-      <div id="selected-barber-info" class="mb-6 text-sm text-smoke/60"></div>
+      <p id="step3-date-label" class="text-smoke/50 text-xs mb-5 tracking-widest uppercase"></p>
+      <div id="time-slots-loading" class="text-smoke/40 text-sm text-center py-6">Consultando horarios disponibles...</div>
       <div id="time-slots" class="grid grid-cols-4 md:grid-cols-6 gap-2 mb-8"></div>
+
+      <!-- Barbers appear after time selected -->
+      <div id="barbers-section" class="hidden">
+        <h2 class="text-xl font-serif text-white mb-4 mt-6">Barberos <span class="text-gold italic">Disponibles</span></h2>
+        <p id="barbers-subtitle" class="text-smoke/50 text-xs mb-5 tracking-widest uppercase"></p>
+        <div id="barbers-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6"></div>
+      </div>
+
       <div class="flex gap-3">
         <button onclick="goStep(2)" class="px-6 py-3 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-gold transition-colors">← Atrás</button>
       </div>
@@ -150,8 +154,8 @@
           </div>
         </div>
         <div>
-          <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Email (opcional)</label>
-          <input type="email" name="email" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="tu@email.com">
+          <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Email <span class="text-gold">*</span></label>
+          <input type="email" name="email" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="tu@email.com">
         </div>
         <div>
           <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Notas (opcional)</label>
@@ -207,38 +211,32 @@
 <script>
 // ═══ Booking Wizard State ═══
 const state = {
-  service: null, barber: null, date: null, time: null, slots: [],
-  barbersAvailability: {}
+  service: null, barber: null, date: null, time: null,
+  slotBarberMap: {}, // { "09:00": [barberObj, ...], ... }
+  allBarberData: []
 };
-
-let debounceTimer = null;
 
 // ─── Step Navigation ─────────────────────────
 function goStep(n) {
   document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
   document.getElementById(`step-${n}`).classList.add('active');
-
   for (let i = 1; i <= 4; i++) {
     const dot = document.getElementById(`step-dot-${i}`);
     dot.classList.remove('active', 'completed');
     if (i < n) dot.classList.add('completed');
     else if (i === n) dot.classList.add('active');
-
-    if (i < 4) {
-      const line = document.getElementById(`step-line-${i}`);
-      line.classList.toggle('completed', i < n);
-    }
+    if (i < 4) document.getElementById(`step-line-${i}`).classList.toggle('completed', i < n);
   }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ─── Step 1: Load Services ─────────────────────────
+// ─── Init ─────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   fetch('/api/servicios-nativos/')
     .then(r => r.json())
     .then(data => {
-      const grid = document.getElementById('services-grid');
-      grid.innerHTML = data.servicios.map((s, idx) => `
-        <div class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group hover:border-gold/60 border border-white/5 bg-jet transition-all duration-300 shadow-2xl" 
+      document.getElementById('services-grid').innerHTML = data.servicios.map((s, idx) => `
+        <div class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group hover:border-gold/60 border border-white/5 bg-jet transition-all duration-300 shadow-2xl"
              style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${idx*100}ms; opacity: 0;"
              data-service='${JSON.stringify(s)}' onclick="selectService(this)">
           <div class="flex justify-between items-start mb-4">
@@ -253,19 +251,8 @@ document.addEventListener('DOMContentLoaded', function() {
       `).join('');
     });
 
-  // Date change handler (ahora disparado por el calendario custom)
-  document.getElementById('booking-date').addEventListener('change', function() {
-    state.date = this.value;
-    if (state.date) loadBarberAvailability();
-  });
-
   renderCustomCalendar();
 
-  // Set min date to today
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('booking-date').setAttribute('min', today);
-
-  // FAB
   document.getElementById('fab-main').addEventListener('click', () => {
     document.getElementById('fab-list').classList.toggle('active');
   });
@@ -274,14 +261,14 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// ─── Step 1 ─────────────────────────
 function selectService(el) {
   state.service = JSON.parse(el.dataset.service);
-  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('border-gold', 'bg-jet'));
-  el.classList.add('border-gold', 'bg-jet');
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('border-gold'));
+  el.classList.add('border-gold');
   setTimeout(() => goStep(2), 300);
 }
 
-// ─── Step 2: Load Barber Availability ─────────────────────────
 function loadBarberAvailability() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
