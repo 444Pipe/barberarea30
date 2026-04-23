@@ -269,90 +269,102 @@ function selectService(el) {
   setTimeout(() => goStep(2), 300);
 }
 
-function loadBarberAvailability() {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    fetch('/api/barberos-nativos/')
-      .then(r => r.json())
-      .then(data => {
-        const grid = document.getElementById('barbers-grid');
-        grid.innerHTML = '<p class="text-smoke/40 text-sm col-span-full text-center py-4">Consultando disponibilidad...</p>';
-        const barbers = data.barberos;
 
-        const promises = barbers.map(b =>
-          fetch(`/api/barbers/${b.id}/availability/?date=${state.date}`)
-            .then(r => r.json())
-            .then(avail => ({ ...b, avail }))
-        );
-
-        Promise.all(promises).then(results => {
-          grid.innerHTML = results.map((b, idx) => {
-            const avail = b.avail;
-            let badgeClass = 'avail-available', badgeText = '🟢 Disponible';
-            if (avail.day_off || avail.availability_status === 'unavailable') {
-              badgeClass = 'avail-unavailable'; badgeText = '🔴 No disponible';
-            } else if (avail.availability_status === 'partial') {
-              badgeClass = 'avail-partial'; badgeText = '🟡 Parcial';
-            }
-
-            return `
-              <div class="barber-card p-6 rounded-sm relative overflow-hidden group border border-white/5 bg-jet transition-all duration-300 hover:border-gold/60 flex flex-col items-center ${avail.day_off || avail.availability_status === 'unavailable' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
-                   style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${idx*100}ms; opacity: 0;"
-                   data-barber='${JSON.stringify({id: b.id, display_name: b.nombre})}' 
-                   data-available='${!avail.day_off && avail.availability_status !== "unavailable"}'
-                   onclick="selectBarber(this)">
-                
-                <div class="w-16 h-16 rounded-full border border-gold/40 flex items-center justify-center text-gold mb-4 group-hover:scale-110 transition-transform duration-500 overflow-hidden">
-                     ${b.avatar
-                       ? `<img src="${b.avatar}" alt="${b.nombre}" class="w-full h-full object-cover">`
-                       : `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                          </svg>`}
-                </div>
-                <div class="availability-badge ${badgeClass} mb-3">${badgeText}</div>
-                <h3 class="text-white font-serif text-lg group-hover:text-gold transition-colors mb-2">${b.nombre}</h3>
-                <div class="h-[1px] w-8 bg-gold/50 mx-auto my-2"></div>
-                <p class="text-smoke/60 font-light text-[0.6rem] uppercase tracking-widest italic">${b.especialidad || 'Barbero'}</p>
-              </div>
-            `;
-          }).join('');
-        });
-      });
-  }, 300);
+// ─── Step 2: Render Calendar ─────────────────────────
+function renderCustomCalendar() {
+  const carousel = document.getElementById('calendar-carousel');
+  fetch('/api/blocked-dates/')
+    .then(r => r.ok ? r.json() : [])
+    .then(blockedData => {
+      if (!Array.isArray(blockedData)) blockedData = [];
+      const blockedDates = blockedData.map(b => b.date);
+      const today = new Date();
+      let html = '';
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayStr = d.toLocaleDateString('es-CO', { weekday: 'short', timeZone: 'America/Bogota' }).toUpperCase();
+        const isBlocked = blockedDates.includes(dateStr);
+        html += `
+          <div onclick="${isBlocked ? '' : `selectDate('${dateStr}', this)`}"
+               class="calendar-day shrink-0 w-16 h-20 rounded-xl border border-white/5 bg-jet flex flex-col items-center justify-center transition-all ${isBlocked ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:border-gold/50'}">
+            <span class="text-smoke/60 text-[10px] uppercase font-semibold tracking-widest">${dayStr.substring(0,3)}</span>
+            <span class="text-white font-serif text-2xl mt-1">${d.getDate()}</span>
+            ${isBlocked ? '<span class="text-[8px] text-gold/40 mt-1 uppercase font-bold">Bloqueado</span>' : ''}
+          </div>`;
+      }
+      carousel.innerHTML = html;
+    })
+    .catch(() => { carousel.innerHTML = '<p class="text-red-500 text-xs">Error cargando fechas</p>'; });
 }
 
-function selectBarber(el) {
-  if (el.dataset.available === 'false') return;
-  state.barber = JSON.parse(el.dataset.barber);
-  document.querySelectorAll('.barber-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
+function selectDate(dateStr, element) {
+  document.querySelectorAll('.calendar-day').forEach(el => {
+    el.classList.remove('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
+    el.classList.add('border-white/5');
+  });
+  element.classList.remove('border-white/5');
+  element.classList.add('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
+  state.date = dateStr;
+  document.getElementById('booking-date').value = dateStr;
+  goStep(3);
+  loadAllBarberSlots();
+}
 
-  // Load time slots
-  fetch(`/api/barbers/${state.barber.id}/availability/?date=${state.date}`)
+// ─── Step 3: Aggregate all barbers' slots ─────────────────────────
+function loadAllBarberSlots() {
+  const slotsEl = document.getElementById('time-slots');
+  const loadingEl = document.getElementById('time-slots-loading');
+  const barbersSection = document.getElementById('barbers-section');
+  slotsEl.innerHTML = '';
+  loadingEl.classList.remove('hidden');
+  barbersSection.classList.add('hidden');
+  state.slotBarberMap = {};
+  state.time = null;
+  state.barber = null;
+  document.getElementById('step3-date-label').textContent = `Fecha: ${state.date}`;
+
+  fetch('/api/barberos-nativos/')
     .then(r => r.json())
     .then(data => {
-      state.slots = data.slots || [];
-      document.getElementById('selected-barber-info').textContent = `Horarios disponibles con ${state.barber.display_name} el ${state.date}`;
-      renderTimeSlots();
-      setTimeout(() => goStep(3), 300);
+      const promises = data.barberos.map(b =>
+        fetch(`/api/barbers/${b.id}/availability/?date=${state.date}`)
+          .then(r => r.json())
+          .then(avail => ({ ...b, avail }))
+      );
+      Promise.all(promises).then(results => {
+        results.forEach(b => {
+          if (b.avail.day_off || b.avail.availability_status === 'unavailable') return;
+          (b.avail.slots || []).filter(s => s.available).forEach(slot => {
+            if (!state.slotBarberMap[slot.time]) state.slotBarberMap[slot.time] = [];
+            state.slotBarberMap[slot.time].push(b);
+          });
+        });
+        loadingEl.classList.add('hidden');
+        renderAggregatedSlots();
+      });
+    })
+    .catch(() => {
+      loadingEl.classList.add('hidden');
+      document.getElementById('time-slots').innerHTML = '<p class="text-red-500 text-sm col-span-full text-center py-4">Error cargando horarios</p>';
     });
 }
 
-// ─── Step 3: Time Slots ─────────────────────────
-function renderTimeSlots() {
+function renderAggregatedSlots() {
   const container = document.getElementById('time-slots');
-  if (!state.slots.length) {
-    container.innerHTML = '<p class="text-smoke/40 text-sm col-span-full text-center py-4">No hay slots disponibles</p>';
+  const times = Object.keys(state.slotBarberMap).sort();
+  if (!times.length) {
+    container.innerHTML = '<p class="text-smoke/40 text-sm col-span-full text-center py-4">No hay horarios disponibles para esta fecha</p>';
     return;
   }
-  container.innerHTML = state.slots.map(s => {
-    const h = parseInt(s.time.split(':')[0]);
-    const m = s.time.split(':')[1];
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    const label = `${h12}:${m} ${ampm}`;
-
-    return `<div class="time-slot ${s.available ? 'available' : 'unavailable'}" data-time="${s.time}" onclick="${s.available ? `selectTime(this, '${s.time}')` : ''}">${label}</div>`;
+  container.innerHTML = times.map(t => {
+    const h = parseInt(t.split(':')[0]), m = t.split(':')[1];
+    const label = `${h%12||12}:${m} ${h>=12?'PM':'AM'}`;
+    const count = state.slotBarberMap[t].length;
+    return `<div class="time-slot available" data-time="${t}" onclick="selectTime(this,'${t}')">
+      ${label}<span style="display:block;font-size:0.55rem;opacity:0.7">${count} barbero${count>1?'s':''}</span>
+    </div>`;
   }).join('');
 }
 
@@ -360,15 +372,42 @@ function selectTime(el, time) {
   state.time = time;
   document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected'));
   el.classList.add('selected');
+  showBarbersForTime(time);
+}
 
-  // Update summary
+function showBarbersForTime(time) {
+  const section = document.getElementById('barbers-section');
+  const grid = document.getElementById('barbers-grid');
+  const barbers = state.slotBarberMap[time] || [];
+  const h = parseInt(time.split(':')[0]), m = time.split(':')[1];
+  document.getElementById('barbers-subtitle').textContent = `Barberos disponibles a las ${h%12||12}:${m} ${h>=12?'PM':'AM'}`;
+  section.classList.remove('hidden');
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  grid.innerHTML = barbers.map((b, idx) => `
+    <div class="barber-card p-6 rounded-sm cursor-pointer border border-white/5 bg-jet transition-all duration-300 hover:border-gold/60 flex flex-col items-center"
+         style="animation: fadeInUp 0.5s ease-out forwards; animation-delay: ${idx*80}ms; opacity: 0;"
+         data-barber='${JSON.stringify({id: b.id, display_name: b.nombre})}'
+         onclick="selectBarber(this)">
+      <div class="w-16 h-16 rounded-full border border-gold/40 flex items-center justify-center text-gold mb-4 overflow-hidden">
+        ${b.avatar ? `<img src="${b.avatar}" alt="${b.nombre}" class="w-full h-full object-cover">` : `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>`}
+      </div>
+      <h3 class="text-white font-serif text-lg hover:text-gold transition-colors mb-1">${b.nombre}</h3>
+      <div class="h-[1px] w-8 bg-gold/50 mx-auto my-2"></div>
+      <p class="text-smoke/60 font-light text-[0.6rem] uppercase tracking-widest italic">${b.especialidad || 'Barbero'}</p>
+    </div>
+  `).join('');
+}
+
+function selectBarber(el) {
+  state.barber = JSON.parse(el.dataset.barber);
+  document.querySelectorAll('.barber-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const h = parseInt(state.time.split(':')[0]), m = state.time.split(':')[1];
   document.getElementById('summary-service').textContent = state.service.name;
   document.getElementById('summary-barber').textContent = state.barber.display_name;
   document.getElementById('summary-date').textContent = state.date;
-  const h = parseInt(time.split(':')[0]), m = time.split(':')[1];
   document.getElementById('summary-time').textContent = `${h%12||12}:${m} ${h>=12?'PM':'AM'}`;
   document.getElementById('summary-price').textContent = `$${Number(state.service.price).toLocaleString('es-CO')} COP`;
-
   setTimeout(() => goStep(4), 300);
 }
 
@@ -376,19 +415,12 @@ function selectTime(el, time) {
 document.getElementById('booking-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData(this);
-
-  // Intentar obtener CSRF en caso de que el usuario tenga sesión activa de admin
   const csrfCookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
   const csrfToken = csrfCookie ? csrfCookie.split('=')[1] : '';
-
   const headers = { 'Content-Type': 'application/json' };
-  if (csrfToken) {
-    headers['X-CSRFToken'] = csrfToken;
-  }
-
+  if (csrfToken) headers['X-CSRFToken'] = csrfToken;
   fetch('/api/bookings/', {
-    method: 'POST',
-    headers: headers,
+    method: 'POST', headers,
     body: JSON.stringify({
       client_name: formData.get('name'),
       client_phone: formData.get('phone'),
@@ -404,95 +436,14 @@ document.getElementById('booking-form').addEventListener('submit', function(e) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok || data.id) { // por si solo llega id sin ok
+    if (data.ok || data.id) {
       document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
       document.getElementById('step-success').classList.add('active');
     } else {
-      const errorMsg = data.error || data.detail || (data.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
-      alert('Error al reservar: ' + errorMsg);
+      alert('Error al reservar: ' + (data.error || data.detail || JSON.stringify(data)));
     }
   })
-  .catch((err) => {
-    console.error(err);
-    alert('Error de conexión. Intenta de nuevo.');
-  });
 });
-
-function renderCustomCalendar() {
-  const carousel = document.getElementById('calendar-carousel');
-  const daysToRender = 14; // Limitado a 2 semanas
-  const today = new Date();
-  
-  // Obtener fechas bloqueadas antes de renderizar
-  fetch('/api/blocked-dates/')
-    .then(r => {
-      if (!r.ok) {
-        return r.text().then(text => {
-          alert('Error de servidor (' + r.status + '): ' + text.substring(0, 150));
-          throw new Error('Servidor falló');
-        });
-      }
-      return r.text().then(text => {
-        try {
-          return JSON.parse(text);
-        } catch(e) {
-          alert('Error serializando JSON: ' + text.substring(0, 150));
-          throw e;
-        }
-      });
-    })
-    .then(blockedData => {
-      if(!Array.isArray(blockedData)) {
-        alert('Respuesta no es array: ' + JSON.stringify(blockedData).substring(0, 100));
-        blockedData = [];
-      }
-      const blockedDates = blockedData.map(b => b.date);
-      
-      let html = '';
-      for (let i = 0; i < daysToRender; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() + i);
-        const yyyy_mm_dd = d.toISOString().split('T')[0];
-        const dayStr = d.toLocaleDateString('es-CO', { weekday: 'short', timeZone: 'America/Bogota' }).toUpperCase();
-        const dateNum = d.getDate();
-        
-        const isBlocked = blockedDates.includes(yyyy_mm_dd);
-        
-        html += `
-          <div onclick="${isBlocked ? '' : `selectDate('${yyyy_mm_dd}', this)`}"
-               class="calendar-day shrink-0 w-16 h-20 rounded-xl border border-white/5 bg-jet flex flex-col items-center justify-center cursor-pointer transition-all ${isBlocked ? 'opacity-30 cursor-not-allowed' : 'hover:border-gold/50'}">
-            <span class="text-smoke/60 text-[10px] uppercase font-semibold tracking-widest">${dayStr.substring(0,3)}</span>
-            <span class="text-white font-serif text-2xl mt-1">${dateNum}</span>
-            ${isBlocked ? '<span class="text-[8px] text-gold/40 mt-1 uppercase font-bold">Bloqueado</span>' : ''}
-          </div>
-        `;
-      }
-      carousel.innerHTML = html;
-    })
-    .catch(err => {
-      console.error("Error al cargar fechas bloqueadas:", err);
-      // Fallback simple si falla la API
-      carousel.innerHTML = '<p class="text-smoke/30 text-xs text-red-500">Error: ' + err.message + '</p>';
-    });
-}
-
-function selectDate(dateStr, element) {
-  // Remover activas anteriores
-  document.querySelectorAll('.calendar-day').forEach(el => {
-    el.classList.remove('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
-    el.classList.add('border-white/5');
-  });
-  
-  // Activar actual
-  element.classList.remove('border-white/5');
-  element.classList.add('border-gold', 'shadow-[0_0_15px_rgba(212,175,55,0.1)]');
-  
-  const input = document.getElementById('booking-date');
-  input.value = dateStr;
-  
-  // Disparar evento para actualizar barberos
-  input.dispatchEvent(new Event('change', { bubbles: true }));
-}
 </script>
 </body>
 </html>
