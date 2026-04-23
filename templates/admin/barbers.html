@@ -230,6 +230,9 @@ function editBarber(id) {
     .then(b => {
       document.getElementById('barber-modal-title').textContent = 'Editar Barbero';
       const form = document.getElementById('barber-form');
+      
+      // Limpiar el input de archivo para evitar que se suba la foto anterior por accidente
+      document.getElementById('avatar-input').value = '';
       form.display_name.value = b.display_name;
       form.color_tag.value = b.color_tag;
       form.phone.value = b.phone || '';
