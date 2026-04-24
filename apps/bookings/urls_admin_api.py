@@ -8,4 +8,5 @@ urlpatterns = [
     path('bookings/export/', views.admin_bookings_export_csv, name='admin_bookings_export'),
     path('blocked-dates/', views.admin_blocked_dates_view, name='admin_blocked_dates_api'),
     path('blocked-dates/<int:pk>/', views.admin_blocked_date_detail_view, name='admin_blocked_date_detail_api'),
+    path('reviews/<int:pk>/', views.admin_delete_review_view, name='admin_delete_review'),
 ]

@@ -84,7 +84,7 @@
       {% if reviews %}
       <div id="reviews-list" class="divide-y divide-white/5">
         {% for review in reviews %}
-        <div class="review-item p-6 hover:bg-white/[0.02] transition-colors" data-barber-rating="{{ review.barber_rating }}" data-shop-rating="{{ review.shop_rating }}">
+        <div class="review-item p-6 hover:bg-white/[0.02] transition-colors" id="review-{{ review.id }}" data-barber-rating="{{ review.barber_rating }}" data-shop-rating="{{ review.shop_rating }}">
           <div class="flex flex-col sm:flex-row sm:items-start gap-4">
 
             <!-- Stars & Meta -->
@@ -144,6 +144,11 @@
               {% else %}
                 <span class="inline-block mt-2 px-2 py-0.5 bg-red-500/10 text-red-400 text-[0.55rem] uppercase tracking-widest rounded-full font-bold border border-red-500/20">Negativa</span>
               {% endif %}
+              <button onclick="deleteReview({{ review.id }})" title="Eliminar reseña"
+                class="mt-3 flex items-center gap-1 text-[0.6rem] text-red-400/60 hover:text-red-400 tracking-widest uppercase transition-colors ml-auto">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Borrar
+              </button>
             </div>
 
           </div>
@@ -174,6 +179,30 @@ function filterReviews() {
       item.style.display = 'none';
     }
   });
+}
+
+function deleteReview(id) {
+  if (!confirm('¿Seguro que deseas eliminar esta reseña? Esta acción no se puede deshacer.')) return;
+
+  const csrfToken = document.cookie.split(';').map(c => c.trim())
+    .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+
+  fetch(`/api/admin/reviews/${id}/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': csrfToken }
+  }).then(res => {
+    if (res.ok || res.status === 204) {
+      const el = document.getElementById(`review-${id}`);
+      if (el) {
+        el.style.transition = 'opacity 0.4s, transform 0.4s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+        setTimeout(() => el.remove(), 400);
+      }
+    } else {
+      alert('Error al eliminar la reseña.');
+    }
+  }).catch(() => alert('Error de conexión.'));
 }
 </script>
 {% endblock %}

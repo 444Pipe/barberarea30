@@ -449,3 +449,24 @@ def admin_blocked_date_detail_view(request, pk):
         return Response({'ok': True}, status=204)
     except BlockedDate.DoesNotExist:
         return Response({'error': 'No encontrado'}, status=404)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAdminOrAbove])
+def admin_delete_review_view(request, pk):
+    """DELETE /api/admin/reviews/{id}/ — Elimina una reseña individual."""
+    from .models import Review
+    from django.db.models import Avg
+    try:
+        review = Review.objects.select_related('booking__barber').get(pk=pk)
+        barber = review.booking.barber if review.booking else None
+        review.delete()
+        # Recalculate barber's average after deletion
+        if barber:
+            reviews_remaining = Review.objects.filter(booking__barber=barber)
+            avg = reviews_remaining.aggregate(Avg('barber_rating'))['barber_rating__avg']
+            barber.rating = round(avg, 1) if avg else 0
+            barber.save()
+        return Response({'ok': True}, status=204)
+    except Review.DoesNotExist:
+        return Response({'error': 'Reseña no encontrada'}, status=404)
