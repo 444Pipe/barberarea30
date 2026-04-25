@@ -206,7 +206,35 @@ function renderTable(bookings) {
     cancelled: '<span class="inline-flex px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[0.6rem]">Cancelado</span>',
   };
 
-  tbody.innerHTML = bookings.map(b => `
+  const pad = (n) => n.toString().padStart(2, '0');
+  const today = new Date();
+  const strToday = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const strTomorrow = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`;
+  
+  const dayAfter = new Date(today);
+  dayAfter.setDate(dayAfter.getDate() + 2);
+  const strDayAfter = `${dayAfter.getFullYear()}-${pad(dayAfter.getMonth() + 1)}-${pad(dayAfter.getDate())}`;
+
+  const groups = {
+    'Hoy': [],
+    'Mañana': [],
+    'Pasado mañana': [],
+    'Más adelantadas': [],
+    'Anteriores': []
+  };
+
+  bookings.forEach(b => {
+    if (b.date === strToday) groups['Hoy'].push(b);
+    else if (b.date === strTomorrow) groups['Mañana'].push(b);
+    else if (b.date === strDayAfter) groups['Pasado mañana'].push(b);
+    else if (b.date < strToday) groups['Anteriores'].push(b);
+    else groups['Más adelantadas'].push(b);
+  });
+
+  const renderRow = (b) => `
     <tr class="hover:bg-white/[0.02] transition-colors">
       <td class="px-4 py-3">
         <div class="text-white font-medium">${b.client_name}</div>
@@ -242,7 +270,26 @@ function renderTable(bookings) {
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+
+  let html = '';
+  const order = ['Hoy', 'Mañana', 'Pasado mañana', 'Más adelantadas', 'Anteriores'];
+  
+  order.forEach(groupName => {
+    const groupBookings = groups[groupName];
+    if (groupBookings.length > 0) {
+      html += `
+        <tr class="bg-jet border-y border-white/5">
+          <td colspan="9" class="px-4 py-3 text-xs font-serif font-bold text-gold tracking-widest">
+            ${groupName.toUpperCase()} <span class="text-smoke/50 text-[0.65rem] ml-2 normal-case font-sans">(${groupBookings.length} reservas)</span>
+          </td>
+        </tr>
+      `;
+      html += groupBookings.map(renderRow).join('');
+    }
+  });
+
+  tbody.innerHTML = html;
 }
 
 function quickStatus(id, newStatus) {
