@@ -127,7 +127,15 @@ def daily_close_view(request):
     return Response({
         'message': 'Cierre de caja exitoso',
         'close_id': daily_close.id,
-        'net_income': daily_close.net_income
+        'net_income': daily_close.net_income,
+        'debug': {
+            'total_final_prices': float(total_final_prices),
+            'total_commissions': float(total_commissions),
+            'total_expenses': float(total_expenses),
+            'total_tips': float(total_tips),
+            'ventas_ids': list(pending_sales.values_list('id', flat=True)),
+            'egresos_ids': list(pending_expenses.values_list('id', flat=True)),
+        }
     })
 
 
@@ -137,12 +145,13 @@ def add_expense_view(request):
     """POST /api/admin/cashflow/expenses/ - Registrar un egreso."""
     from apps.cashflow.models import Expense
     data = request.data
-    
     description = data.get('description', '').strip()
     amount = data.get('amount')
     expense_type = data.get('expense_type', 'variable')
     notes = data.get('notes', '')
+    image = request.FILES.get('image') if hasattr(request, 'FILES') else None
 
+    # Validaciones
     if not description or not amount:
         return Response({'error': 'Descripción y monto son obligatorios.'}, status=400)
 
@@ -150,30 +159,30 @@ def add_expense_view(request):
         amount = float(amount)
         if amount <= 0:
             raise ValueError
-    except ValueError:
-        return Response({'error': 'Monto inválido.'}, status=400)
+    except Exception as e:
+        return Response({'error': f'Monto inválido: {str(e)}'}, status=400)
 
-    # Solo superadmin puede registrar fijos/inventario si queremos ser estrictos,
-    # pero por ahora lo dejamos a nivel de IsOperationalAdminOrAbove y validamos rol:
     profile = getattr(request.user, 'profile', None)
     if profile and profile.role == 'operational_admin' and expense_type != 'variable':
         return Response({'error': 'Solo los administradores principales pueden registrar egresos fijos o de inventario.'}, status=403)
 
-    expense = Expense.objects.create(
-        description=description,
-        amount=amount,
-        expense_type=expense_type,
-        notes=notes,
-        registered_by=request.user
-    )
-
-    log_audit(
-        user=request.user,
-        action='payment',
-        obj=expense,
-        changes={'amount': str(amount), 'type': expense_type},
-        request=request,
-        extra_data={'msg': f"Registró un egreso de ${amount:,.0f}: {description}"}
-    )
-
-    return Response({'ok': True, 'expense_id': expense.id, 'message': 'Egreso registrado correctamente.'})
+    try:
+        expense = Expense.objects.create(
+            description=description,
+            amount=amount,
+            expense_type=expense_type,
+            notes=notes,
+            registered_by=request.user,
+            image=image
+        )
+        log_audit(
+            user=request.user,
+            action='payment',
+            obj=expense,
+            changes={'amount': str(amount), 'type': expense_type},
+            request=request,
+            extra_data={'msg': f"Registró un egreso de ${amount:,.0f}: {description}"}
+        )
+        return Response({'ok': True, 'expense_id': expense.id, 'message': 'Egreso registrado correctamente.'})
+    except Exception as e:
+        return Response({'error': f'Error inesperado al guardar: {str(e)}'}, status=500)

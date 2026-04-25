@@ -150,6 +150,8 @@ class Expense(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True
     )
     notes = models.TextField(blank=True)
+    # Permitir adjuntar una imagen (foto o galería)
+    image = models.ImageField(upload_to='expenses/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     included_in_daily_close = models.ForeignKey(
         'DailyClose', null=True, blank=True, on_delete=models.SET_NULL,
