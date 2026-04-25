@@ -28,7 +28,8 @@ _db_url = os.environ.get('DATABASE_URL', f"sqlite:///{BASE_DIR / 'bookings.db'}"
 DATABASES = {
     'default': dj_database_url.config(
         default=_db_url,
-        conn_max_age=600,
+        conn_max_age=0,
+        conn_health_checks=True,
         ssl_require=True if 'postgresql' in _db_url or 'postgres' in _db_url else False,
     )
 }
