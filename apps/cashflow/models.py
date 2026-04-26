@@ -71,6 +71,28 @@ class Sale(models.Model):
         related_name='sales'
     )
 
+    # --- NUEVO: Estado de aprobación ---
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    APPROVAL_STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pendiente'),
+        (STATUS_APPROVED, 'Aprobada'),
+        (STATUS_REJECTED, 'Rechazada'),
+    ]
+    approval_status = models.CharField(max_length=10, choices=APPROVAL_STATUS_CHOICES, default=STATUS_PENDING)
+    approved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='approved_sales'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='rejected_sales'
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+
     class Meta:
         verbose_name = 'Venta / Checkout'
         verbose_name_plural = 'Ventas'

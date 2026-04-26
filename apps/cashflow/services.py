@@ -62,6 +62,13 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
             payment_method = PaymentMethod.objects.filter(id=payment_method_id).first()
 
         # ── 2. Crear Venta ──────────────────────────────────────────────
+        # Determinar estado de aprobación
+        user_profile = getattr(confirmed_by, 'profile', None)
+        if user_profile and user_profile.role in ('operational_admin', 'superadmin', 'admin'):
+            approval_status = Sale.STATUS_APPROVED
+        else:
+            approval_status = Sale.STATUS_PENDING
+
         sale = Sale.objects.create(
             booking=booking,
             barber=booking.barber,
@@ -74,6 +81,7 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
             payment_reference=payment_reference,
             confirmed_by=confirmed_by,
             notes=notes,
+            approval_status=approval_status,
         )
         # Sale.save() calcula final_price y total_paid automáticamente
 
