@@ -6,6 +6,7 @@ from apps.users.permissions import IsOperationalAdminOrAbove, IsBarberOrAbove
 from apps.bookings.models import Booking
 from apps.cashflow.models import PaymentMethod
 from apps.cashflow import services as cashflow_services
+from apps.analytics.models import log_audit
 
 from decimal import Decimal, InvalidOperation
 
