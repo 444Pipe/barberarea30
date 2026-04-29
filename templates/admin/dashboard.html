@@ -8,12 +8,40 @@
 {% block content %}
 <div class="space-y-6">
   <!-- Header -->
-  <div class="flex items-center justify-between">
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Dashboard</h1>
-      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Resumen del día — <span id="today-date"></span></p>
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Dashboard Diario</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Resumen del día — <span id="today-date-header"></span></p>
     </div>
-    <a href="/" target="_blank" class="text-xs text-smoke/40 hover:text-gold transition-colors tracking-wider uppercase flex items-center gap-1">
+    
+    <!-- Date Navigation Component -->
+    <div class="flex items-center gap-2 bg-jet-lighter border border-white/10 rounded-lg p-1.5 shadow-lg w-fit">
+      <a href="?date={{ prev_date }}" class="p-2 text-smoke/50 hover:text-gold hover:bg-white/5 rounded-md transition-colors" title="Día Anterior">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      
+      <form id="date-form" class="relative m-0 p-0 flex items-center">
+        <input type="date" id="date-picker" name="date" value="{{ today_str }}" 
+               class="bg-transparent text-sm font-medium text-white px-2 py-1 focus:outline-none focus:ring-0 w-[130px] cursor-pointer appearance-none text-center [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+               style="color-scheme: dark;">
+        <div class="absolute right-2 pointer-events-none text-gold">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </div>
+      </form>
+
+      <a href="?date={{ next_date }}" class="p-2 text-smoke/50 hover:text-gold hover:bg-white/5 rounded-md transition-colors" title="Día Siguiente">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </a>
+
+      {% if not is_today %}
+      <div class="w-[1px] h-6 bg-white/10 mx-1"></div>
+      <a href="?" class="px-3 py-1.5 text-xs font-semibold bg-gold/10 text-gold rounded-md hover:bg-gold hover:text-jet transition-colors tracking-wider uppercase">
+        Hoy
+      </a>
+      {% endif %}
+    </div>
+
+    <a href="/" target="_blank" class="hidden md:flex text-xs text-smoke/40 hover:text-gold transition-colors tracking-wider uppercase items-center gap-1">
       Ver sitio →
     </a>
   </div>
@@ -59,15 +87,29 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const today = new Date();
+  // Configurar la fecha en el título superior y Kanban
+  const selectedDateStr = '{{ today_str }}';
+  const todayObj = new Date(selectedDateStr + 'T00:00:00'); // Evitar desajustes de zona horaria
   const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  const dateStr = today.toLocaleDateString('es-CO', opts);
-  document.getElementById('today-date').textContent = dateStr;
-  document.getElementById('kanban-date').textContent = dateStr;
+  const formattedDate = todayObj.toLocaleDateString('es-CO', opts);
+  document.getElementById('today-date-header').textContent = formattedDate;
+  document.getElementById('kanban-date').textContent = formattedDate;
+
+  // Auto-enviar formulario al cambiar la fecha
+  const datePicker = document.getElementById('date-picker');
+  datePicker.addEventListener('change', function() {
+    document.getElementById('date-form').submit();
+  });
 
   let dashData = null;
+  const urlParams = new URLSearchParams(window.location.search);
+  const dateParam = urlParams.get('date');
+  let apiUrl = '/api/admin/stats/dashboard/';
+  if (dateParam) {
+    apiUrl += `?date=${dateParam}`;
+  }
 
-  fetch('/api/admin/stats/dashboard/')
+  fetch(apiUrl)
     .then(r => r.json())
     .then(data => {
       dashData = data;

@@ -128,11 +128,19 @@ def heatmap_view(request):
 @permission_classes([IsBarberOrAbove])
 def dashboard_stats_view(request):
     """GET /api/admin/stats/dashboard/ — KPIs para el dashboard."""
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime
     from django.utils import timezone
 
     profile = getattr(request.user, 'profile', None)
-    today = date.today()
+    
+    date_str = request.query_params.get('date')
+    if date_str:
+        try:
+            today = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            today = date.today()
+    else:
+        today = date.today()
     week_start = today - timedelta(days=today.weekday())
     month_start = today.replace(day=1)
 

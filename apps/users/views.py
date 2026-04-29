@@ -38,14 +38,28 @@ def admin_logout_view(request):
 
 @staff_required
 def admin_dashboard_view(request):
-    """Dashboard principal — inyecta KPIs reales del día."""
+    """Dashboard principal — inyecta KPIs reales del día o la fecha seleccionada."""
     from apps.bookings.models import Booking
     from apps.cashflow.models import Sale
     from django.db.models import Sum, Count
     from django.utils import timezone
+    import datetime
 
     profile = getattr(request.user, 'profile', None)
-    today = timezone.localtime(timezone.now()).date()
+    
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            today = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            today = timezone.localtime(timezone.now()).date()
+    else:
+        today = timezone.localtime(timezone.now()).date()
+
+    # Calculate dates for navigation
+    prev_date = today - datetime.timedelta(days=1)
+    next_date = today + datetime.timedelta(days=1)
+    is_today = (today == timezone.localtime(timezone.now()).date())
 
     base = Booking.objects.all()
     if profile and profile.is_barber and not profile.is_admin:
@@ -75,6 +89,10 @@ def admin_dashboard_view(request):
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'dashboard',
         'today': today,
+        'today_str': today.strftime('%Y-%m-%d'),
+        'prev_date': prev_date.strftime('%Y-%m-%d'),
+        'next_date': next_date.strftime('%Y-%m-%d'),
+        'is_today': is_today,
         'today_completed': today_completed,
         'today_pending': today_pending,
         'today_revenue': today_revenue,
