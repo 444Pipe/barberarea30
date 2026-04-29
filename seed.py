@@ -80,18 +80,36 @@ for uname in usernames_to_promote:
         user.is_superuser = True
         user.save()
         UserProfile.objects.get_or_create(user=user, defaults={'role': 'superadmin'})
-        
-        # Crear perfil de Socio (ROI) si no existe
-        from apps.roi.models import Partner
-        Partner.objects.get_or_create(
-            user=user,
-            defaults={
-                'display_name': uname.title(),
-                'share_percentage': 50.00
-            }
-        )
     except Exception as e:
-        print(f"No se pudo promover o crear socio {uname}: {e}")
+        print(f"No se pudo promover al usuario {uname}: {e}")
+
+# --- Asegurar que solo existan Camilo y Juan David como socios ---
+try:
+    from apps.roi.models import Partner
+    
+    # 1. Obtener usuarios canónicos
+    camilo_user = User.objects.filter(username='camilo').first()
+    jd_user = User.objects.filter(username='juan david').first()
+    
+    # 2. Eliminar socios duplicados o con alias (manteniendo solo los que tengan estos usuarios)
+    valid_users = [u for u in [camilo_user, jd_user] if u]
+    Partner.objects.exclude(user__in=valid_users).delete()
+    
+    # 3. Crear/Asegurar socio Camilo
+    if camilo_user:
+        Partner.objects.get_or_create(
+            user=camilo_user,
+            defaults={'display_name': 'Camilo', 'share_percentage': 50.00}
+        )
+        
+    # 4. Crear/Asegurar socio Juan David
+    if jd_user:
+        Partner.objects.get_or_create(
+            user=jd_user,
+            defaults={'display_name': 'Juan David', 'share_percentage': 50.00}
+        )
+except Exception as e:
+    print(f"Error gestionando los socios únicos: {e}")
 
 # Crear a Frank (Administrador Operativo)
 try:
