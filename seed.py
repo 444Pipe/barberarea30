@@ -80,8 +80,18 @@ for uname in usernames_to_promote:
         user.is_superuser = True
         user.save()
         UserProfile.objects.get_or_create(user=user, defaults={'role': 'superadmin'})
+        
+        # Crear perfil de Socio (ROI) si no existe
+        from apps.roi.models import Partner
+        Partner.objects.get_or_create(
+            user=user,
+            defaults={
+                'display_name': uname.title(),
+                'share_percentage': 50.00
+            }
+        )
     except Exception as e:
-        print(f"No se pudo promover al usuario {uname}: {e}")
+        print(f"No se pudo promover o crear socio {uname}: {e}")
 
 # Crear a Frank (Administrador Operativo)
 try:

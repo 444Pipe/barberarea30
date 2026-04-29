@@ -119,3 +119,37 @@ def roi_api_history(request):
             'commissions': float(s.total_commissions),
         })
     return JsonResponse({'history': data})
+
+
+# ─────────────────────────────────────────────────────────
+# Registrar Inversión (Aporte de Capital)
+# ─────────────────────────────────────────────────────────
+
+@superadmin_required
+def roi_add_investment_view(request):
+    """POST: Registra un nuevo aporte de capital para un socio."""
+    if request.method != 'POST':
+        return redirect('roi_dashboard')
+
+    try:
+        partner_id = request.POST.get('partner_id')
+        amount = request.POST.get('amount')
+        description = request.POST.get('description', 'Aporte de capital')
+
+        if not partner_id or not amount:
+            raise ValueError('Socio y monto son obligatorios.')
+
+        partner = Partner.objects.get(pk=partner_id)
+        
+        PartnerInvestment.objects.create(
+            partner=partner,
+            amount=amount,
+            description=description,
+            registered_by=request.user
+        )
+        
+        messages.success(request, f'✅ Inversión de ${int(float(amount)):,.0f} registrada para {partner.display_name}.')
+    except Exception as e:
+        messages.error(request, f'❌ Error al registrar inversión: {e}')
+
+    return redirect('roi_dashboard')

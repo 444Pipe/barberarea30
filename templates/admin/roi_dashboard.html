@@ -87,6 +87,11 @@
     </div>
     <div class="flex items-center gap-3">
       <span class="text-xs text-smoke/40">{{ current_month_name }} {{ current_year }}</span>
+      <button onclick="document.getElementById('modal-investment').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold tracking-widest uppercase hover:bg-blue-600/30 transition-colors shadow-lg">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        Registrar Inversión
+      </button>
       <button onclick="document.getElementById('modal-snapshot').classList.remove('hidden')"
               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold tracking-widest uppercase hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -379,6 +384,57 @@
         <button type="submit"
                 class="flex-1 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
           Consolidar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══ MODAL: Registrar Inversión ══ -->
+<div id="modal-investment" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-jet-card border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+    <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+      <div>
+        <h3 class="font-serif font-bold text-white tracking-wide">Registrar Aporte de Capital</h3>
+        <p class="text-xs text-smoke/40 mt-0.5">Suma dinero a la inversión total de un socio</p>
+      </div>
+      <button onclick="document.getElementById('modal-investment').classList.add('hidden')"
+              class="text-smoke/40 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'roi_add_investment' %}" class="px-6 py-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="stat-label block mb-1">Seleccionar Socio</label>
+        <select name="partner_id" required class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+          <option value="">— Elegir Socio —</option>
+          {% for pd in partners %}
+            <option value="{{ pd.partner.id }}">{{ pd.partner.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="stat-label block mb-1">Monto de Inversión (COP)</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gold font-bold">$</span>
+          <input type="number" name="amount" required min="1" step="1" placeholder="0"
+                 class="w-full bg-jet-lighter border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+        </div>
+      </div>
+      <div>
+        <label class="stat-label block mb-1">Descripción / Concepto</label>
+        <input type="text" name="description" placeholder="Ej: Aporte inicial, compra de espejos..."
+               class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="document.getElementById('modal-investment').classList.add('hidden')"
+                class="flex-1 px-4 py-2 rounded-lg border border-white/10 text-smoke/60 text-xs uppercase tracking-widest hover:bg-white/5 transition-colors">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="flex-1 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
+          Guardar Aporte
         </button>
       </div>
     </form>
