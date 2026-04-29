@@ -1,0 +1,456 @@
+{% extends 'admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}ROI & Ganancias{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  .roi-card {
+    background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .roi-card:hover {
+    border-color: rgba(212,175,55,0.4);
+    box-shadow: 0 0 24px rgba(212,175,55,0.08);
+  }
+  .roi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #D4AF37, transparent);
+    opacity: 0.6;
+  }
+  .roi-card.partner-card::before {
+    background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+  }
+  .gold-glow { color: #D4AF37; text-shadow: 0 0 20px rgba(212,175,55,0.4); }
+  .progress-bar-bg { background: rgba(212,175,55,0.1); border-radius: 999px; height: 6px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #b8962e, #f3d97f); transition: width 1s ease; }
+  .badge-confidential {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5; font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 0.2rem 0.6rem; border-radius: 999px;
+  }
+  .stat-label {
+    font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase;
+    color: rgba(245,245,245,0.4); font-weight: 600; margin-bottom: 0.4rem;
+  }
+  .stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1; font-family: 'Playfair Display', serif; }
+  .history-row { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.2s; }
+  .history-row:hover { background: rgba(212,175,55,0.04); }
+  .locked-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+    color: #86efac; font-size: 0.6rem; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 999px;
+  }
+  .pending-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3);
+    color: #fde68a; font-size: 0.6rem; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 999px;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-in { animation: fadeInUp 0.5s ease both; }
+  .animate-in:nth-child(2) { animation-delay: 0.08s; }
+  .animate-in:nth-child(3) { animation-delay: 0.16s; }
+  .animate-in:nth-child(4) { animation-delay: 0.24s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-8">
+
+  <!-- ══ HEADER ══ -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-3 mb-1">
+        <h1 class="text-2xl font-serif font-bold text-white tracking-wide">ROI &amp; Ganancias</h1>
+        <span class="badge-confidential">
+          <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+          Confidencial
+        </span>
+      </div>
+      <p class="text-xs text-smoke/40 tracking-wider">Retorno de Inversión — Área 30 Barber Club</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-smoke/40">{{ current_month_name }} {{ current_year }}</span>
+      <button onclick="document.getElementById('modal-snapshot').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold tracking-widest uppercase hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Consolidar Mes
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ MENSAJES DJANGO ══ -->
+  {% if messages %}
+  <div class="space-y-2">
+    {% for message in messages %}
+    <div class="px-4 py-3 rounded-lg text-sm
+      {% if message.tags == 'success' %}bg-emerald-900/40 border border-emerald-500/30 text-emerald-300
+      {% elif message.tags == 'error' %}bg-red-900/40 border border-red-500/30 text-red-300
+      {% else %}bg-amber-900/40 border border-amber-500/30 text-amber-300{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ══ KPIs GLOBALES ══ -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+    <div class="roi-card animate-in">
+      <div class="stat-label">Inversión Total</div>
+      <div class="stat-value gold-glow">${{ total_invested|floatformat:0 }} <span class="text-base text-smoke/40 font-sans">COP</span></div>
+      <p class="text-xs text-smoke/40 mt-2">Capital total aportado por los socios</p>
+    </div>
+    <div class="roi-card animate-in">
+      <div class="stat-label">Recuperado</div>
+      <div class="stat-value text-emerald-400">${{ total_recovered|floatformat:0 }} <span class="text-base text-smoke/40 font-sans">COP</span></div>
+      <p class="text-xs text-smoke/40 mt-2">Amortizado contra ganancias netas</p>
+    </div>
+    <div class="roi-card animate-in">
+      <div class="stat-label">Saldo Pendiente</div>
+      <div class="stat-value text-amber-400">${{ total_pending|floatformat:0 }} <span class="text-base text-smoke/40 font-sans">COP</span></div>
+      <p class="text-xs text-smoke/40 mt-2">Aún por recuperar entre los socios</p>
+    </div>
+  </div>
+
+  <!-- ══ TARJETAS POR SOCIO ══ -->
+  <div>
+    <h2 class="text-xs font-bold tracking-[0.3em] uppercase text-smoke/50 mb-4">Estado por Socio</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {% for pd in partners %}
+      <div class="roi-card partner-card animate-in">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 font-serif font-bold text-lg mb-2">
+              {{ pd.partner.display_name|first|upper }}
+            </div>
+            <div class="text-white font-semibold tracking-wide">{{ pd.partner.display_name }}</div>
+            <div class="text-xs text-smoke/40">{{ pd.partner.share_percentage }}% de participación</div>
+          </div>
+          <div class="text-right">
+            <div class="stat-label">Pendiente</div>
+            <div class="text-xl font-bold text-amber-400">${{ pd.pending_balance|floatformat:0 }}</div>
+          </div>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div class="mb-3">
+          <div class="flex justify-between text-xs text-smoke/40 mb-1">
+            <span>Recuperación</span>
+            <span>{{ pd.recovery_pct }}%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width: {{ pd.recovery_pct }}%"></div>
+          </div>
+        </div>
+
+        <!-- Stats fila -->
+        <div class="grid grid-cols-2 gap-3 pt-3 border-t border-white/5">
+          <div>
+            <div class="stat-label">Invertido</div>
+            <div class="text-sm font-semibold text-white">${{ pd.total_invested|floatformat:0 }}</div>
+          </div>
+          <div>
+            <div class="stat-label">Recuperado</div>
+            <div class="text-sm font-semibold text-emerald-400">${{ pd.total_recovered|floatformat:0 }}</div>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-span-2 roi-card text-center text-smoke/40 py-8">
+        No hay socios registrados aún. Crea socios desde el panel de administración de Django.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ══ MES ANTERIOR ══ -->
+  <div>
+    <h2 class="text-xs font-bold tracking-[0.3em] uppercase text-smoke/50 mb-4">
+      Ganancias — {{ prev_month_name }} {{ prev_year }}
+      {% if last_snapshot and last_snapshot.is_locked %}
+        <span class="locked-badge ml-2">🔒 Cerrado</span>
+      {% else %}
+        <span class="pending-badge ml-2">⏳ Sin consolidar</span>
+      {% endif %}
+    </h2>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+      <div class="roi-card">
+        <div class="stat-label">Ingresos Brutos</div>
+        <div class="text-lg font-bold text-white">${{ prev_gross|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Ventas aprobadas</div>
+      </div>
+      <div class="roi-card">
+        <div class="stat-label">Comisiones</div>
+        <div class="text-lg font-bold text-red-400">- ${{ prev_commissions|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Pago barberos</div>
+      </div>
+      <div class="roi-card">
+        <div class="stat-label">Egresos</div>
+        <div class="text-lg font-bold text-red-400">- ${{ prev_expenses|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Gastos operativos</div>
+      </div>
+      <div class="roi-card" style="border-color: rgba(212,175,55,0.35);">
+        <div class="stat-label">Ganancia Neta</div>
+        <div class="text-lg font-bold gold-glow">${{ prev_net|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Para distribución</div>
+      </div>
+    </div>
+
+    <!-- Distribución del mes anterior -->
+    {% if last_snapshot and last_snapshot.partner_shares.all %}
+    <div class="roi-card">
+      <div class="stat-label mb-4">Distribución {{ prev_month_name }} {{ prev_year }}</div>
+      <div class="divide-y divide-white/5">
+        {% for share in last_snapshot.partner_shares.all %}
+        <div class="py-3 flex flex-wrap items-center gap-x-8 gap-y-1">
+          <div class="w-32">
+            <div class="text-sm font-semibold text-white">{{ share.partner.display_name }}</div>
+            <div class="text-xs text-smoke/40">{{ share.share_percentage }}%</div>
+          </div>
+          <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div>
+              <div class="stat-label">Corresponde</div>
+              <div class="text-gold font-semibold">${{ share.gross_share|floatformat:0 }}</div>
+            </div>
+            <div>
+              <div class="stat-label">Amortización</div>
+              <div class="text-emerald-400 font-semibold">${{ share.amortization_applied|floatformat:0 }}</div>
+            </div>
+            <div>
+              <div class="stat-label">Saldo anterior</div>
+              <div class="text-smoke/60">${{ share.investment_balance_before|floatformat:0 }}</div>
+            </div>
+            <div>
+              <div class="stat-label">Saldo actual</div>
+              <div class="text-amber-400 font-semibold">${{ share.investment_balance_after|floatformat:0 }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="roi-card text-center py-6 text-smoke/40 text-sm">
+      <svg class="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p class="font-semibold mb-1">Sin snapshot consolidado</p>
+      <p class="text-xs">Los datos de arriba son calculados en tiempo real. Presiona <strong class="text-gold">Consolidar Mes</strong> para guardarlos permanentemente.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ══ GRÁFICA DE HISTORIAL ══ -->
+  {% if history %}
+  <div class="roi-card">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <div class="stat-label">Historial de Ganancias Netas</div>
+        <div class="text-sm text-smoke/60">Últimos 12 meses consolidados</div>
+      </div>
+    </div>
+    <div class="h-52">
+      <canvas id="roiChart"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ══ HISTORIAL TABLA ══ -->
+  {% if history %}
+  <div class="roi-card">
+    <div class="stat-label mb-4">Historial de Snapshots</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-smoke/40 font-bold tracking-widest uppercase text-left">
+            <th class="pb-3 pr-4">Período</th>
+            <th class="pb-3 pr-4">Bruto</th>
+            <th class="pb-3 pr-4">Comisiones</th>
+            <th class="pb-3 pr-4">Egresos</th>
+            <th class="pb-3 pr-4">Neto</th>
+            <th class="pb-3 pr-4">Estado</th>
+            <th class="pb-3">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for snap in history %}
+          <tr class="history-row">
+            <td class="py-3 pr-4 text-white font-semibold">{{ snap.month }}/{{ snap.year }}</td>
+            <td class="py-3 pr-4 text-smoke/70">${{ snap.gross_income|floatformat:0 }}</td>
+            <td class="py-3 pr-4 text-red-400">-${{ snap.total_commissions|floatformat:0 }}</td>
+            <td class="py-3 pr-4 text-red-400">-${{ snap.total_expenses|floatformat:0 }}</td>
+            <td class="py-3 pr-4 text-gold font-bold">${{ snap.net_income|floatformat:0 }}</td>
+            <td class="py-3 pr-4">
+              {% if snap.is_locked %}
+                <span class="locked-badge">🔒 Bloqueado</span>
+              {% else %}
+                <span class="pending-badge">⏳ Abierto</span>
+              {% endif %}
+            </td>
+            <td class="py-3">
+              {% if not snap.is_locked %}
+              <form method="post" action="{% url 'roi_lock_snapshot' snap.pk %}"
+                    onsubmit="return confirm('¿Bloquear este snapshot? Esta acción es irreversible.')">
+                {% csrf_token %}
+                <button type="submit"
+                        class="px-3 py-1 rounded-lg bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50 transition-colors text-xs font-semibold">
+                  Bloquear
+                </button>
+              </form>
+              {% else %}
+              <span class="text-smoke/20 text-xs">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div><!-- /max-w-6xl -->
+
+<!-- ══ MODAL: Consolidar Mes ══ -->
+<div id="modal-snapshot" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-jet-card border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+    <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+      <div>
+        <h3 class="font-serif font-bold text-white tracking-wide">Consolidar Snapshot</h3>
+        <p class="text-xs text-smoke/40 mt-0.5">Genera y guarda el cierre ROI de un mes específico</p>
+      </div>
+      <button onclick="document.getElementById('modal-snapshot').classList.add('hidden')"
+              class="text-smoke/40 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'roi_generate_snapshot' %}" class="px-6 py-5 space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="stat-label block mb-1">Año</label>
+          <input type="number" name="year" value="{{ current_year }}" min="2020" max="2100"
+                 class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+        </div>
+        <div>
+          <label class="stat-label block mb-1">Mes</label>
+          <select name="month" class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+            {% for m in "123456789101112"|make_list %}{% endfor %}
+            <option value="1"  {% if prev_month == 1  %}selected{% endif %}>Enero</option>
+            <option value="2"  {% if prev_month == 2  %}selected{% endif %}>Febrero</option>
+            <option value="3"  {% if prev_month == 3  %}selected{% endif %}>Marzo</option>
+            <option value="4"  {% if prev_month == 4  %}selected{% endif %}>Abril</option>
+            <option value="5"  {% if prev_month == 5  %}selected{% endif %}>Mayo</option>
+            <option value="6"  {% if prev_month == 6  %}selected{% endif %}>Junio</option>
+            <option value="7"  {% if prev_month == 7  %}selected{% endif %}>Julio</option>
+            <option value="8"  {% if prev_month == 8  %}selected{% endif %}>Agosto</option>
+            <option value="9"  {% if prev_month == 9  %}selected{% endif %}>Septiembre</option>
+            <option value="10" {% if prev_month == 10 %}selected{% endif %}>Octubre</option>
+            <option value="11" {% if prev_month == 11 %}selected{% endif %}>Noviembre</option>
+            <option value="12" {% if prev_month == 12 %}selected{% endif %}>Diciembre</option>
+          </select>
+        </div>
+      </div>
+      <p class="text-xs text-amber-300/70 bg-amber-900/20 border border-amber-500/20 rounded-lg px-3 py-2">
+        ⚠️ Si ya existe un snapshot abierto para ese mes, será regenerado con los datos actuales. Los snapshots bloqueados no pueden modificarse.
+      </p>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="document.getElementById('modal-snapshot').classList.add('hidden')"
+                class="flex-1 px-4 py-2 rounded-lg border border-white/10 text-smoke/60 text-xs uppercase tracking-widest hover:bg-white/5 transition-colors">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="flex-1 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
+          Consolidar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if history %}
+<script>
+(function() {
+  fetch("{% url 'roi_api_history' %}")
+    .then(r => r.json())
+    .then(data => {
+      const labels  = data.history.map(d => d.label);
+      const nets    = data.history.map(d => d.net_income);
+      const grosses = data.history.map(d => d.gross_income);
+      const ctx = document.getElementById('roiChart');
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Ganancia Neta',
+              data: nets,
+              backgroundColor: 'rgba(212,175,55,0.55)',
+              borderColor: '#D4AF37',
+              borderWidth: 1,
+              borderRadius: 5,
+              order: 1,
+            },
+            {
+              label: 'Ingresos Brutos',
+              data: grosses,
+              type: 'line',
+              borderColor: 'rgba(96,165,250,0.7)',
+              backgroundColor: 'rgba(96,165,250,0.05)',
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: '#60a5fa',
+              fill: false,
+              tension: 0.3,
+              order: 0,
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: 'rgba(245,245,245,0.5)', font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: ctx => ' $' + ctx.parsed.y.toLocaleString('es-CO') + ' COP'
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: 'rgba(245,245,245,0.4)', font: { size: 10 } }, grid: { display: false } },
+            y: {
+              ticks: {
+                color: 'rgba(245,245,245,0.3)', font: { size: 10 },
+                callback: v => '$' + Number(v).toLocaleString('es-CO')
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            }
+          }
+        }
+      });
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

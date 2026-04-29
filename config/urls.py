@@ -10,6 +10,7 @@ urlpatterns = [
 
     # Authentication (login/logout)
     path('admin-panel/', include('apps.users.urls')),
+    path('admin-panel/roi/', include('apps.roi.urls')),
 
     # Public pages
     path('', include('apps.bookings.urls_pages')),

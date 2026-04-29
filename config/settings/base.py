@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'apps.analytics',
     'apps.inventory',
     'apps.cashflow',
+    'apps.roi',
 ]
 
 MIDDLEWARE = [
