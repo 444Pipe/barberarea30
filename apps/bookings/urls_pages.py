@@ -1,9 +1,10 @@
 """Public page URLs."""
 from django.urls import path
 from django.views.generic import TemplateView
+from .views import HomeView
 
 urlpatterns = [
-    path('', TemplateView.as_view(template_name='public/index.html'), name='home'),
+    path('', HomeView.as_view(), name='home'),
     path('services/', TemplateView.as_view(template_name='public/services.html'), name='services'),
     path('gallery/', TemplateView.as_view(template_name='public/gallery.html'), name='gallery'),
     path('booking/', TemplateView.as_view(template_name='public/booking.html'), name='booking'),

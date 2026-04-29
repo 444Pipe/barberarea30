@@ -18,6 +18,17 @@ from .serializers import BookingCreateSerializer, BookingAdminSerializer, Blocke
 
 
 # ─── Public ──────────────────────────────────────────────
+from django.views.generic import TemplateView
+
+class HomeView(TemplateView):
+    """Renderiza la página principal con el listado de profesionales dinámico."""
+    template_name = 'public/index.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Obtenemos los barberos disponibles y los ordenamos
+        context['barbers'] = Barber.objects.filter(is_available=True).order_by('display_order', 'display_name')
+        return context
 
 @api_view(['GET'])
 @authentication_classes([])
