@@ -50,6 +50,7 @@ class Sale(models.Model):
     DISCOUNT_ASSUMED_BY = [
         (COMPANY_ASSUMES, 'Empresa'),
         (BARBER_ASSUMES, 'Barbero'),
+        ('shared', 'Mitad y Mitad (50% / 50%)'),
         ('none', 'No aplica'),
     ]
     discount_assumed_by = models.CharField(max_length=20, choices=DISCOUNT_ASSUMED_BY, default='none')
@@ -141,10 +142,13 @@ class Commission(models.Model):
         ordering = ['-created_at']
 
     def save(self, *args, **kwargs):
-        # Lógica de cálculo:
         if self.sale.discount_assumed_by == Sale.BARBER_ASSUMES:
             # Barbero asume: la comisión se calcula sobre el precio FINAL (ya descontado)
             self.basis_amount = self.sale.final_price
+        elif self.sale.discount_assumed_by == 'shared':
+            # Mitad y mitad: se resta el 50% del descuento al precio base
+            half_discount = self.sale.discount_amount / Decimal('2.0')
+            self.basis_amount = self.sale.base_price - half_discount
         else:
             # Empresa asume (o sin descuento): comisión sobre el precio BASE
             self.basis_amount = self.sale.base_price

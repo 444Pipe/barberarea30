@@ -13,7 +13,7 @@ from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BlockedDate
 from .models import Barber, GalleryImage, Reel
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
 
@@ -58,18 +58,32 @@ def barber_availability_view(request, barber_id):
     day_key = day_names[target_date.weekday()]
     day_schedule = barber.schedule.get(day_key)
 
-    if not day_schedule:
-        return Response({
-            'barber_id': barber.id,
-            'barber_name': barber.display_name,
-            'date': date_str,
-            'day_off': True,
-            'slots': [],
-        })
-
-    # Parse start and end times
-    start_time = datetime.strptime(day_schedule['start'], '%H:%M').time()
-    end_time = datetime.strptime(day_schedule['end'], '%H:%M').time()
+    # Check global BlockedDate for overrides
+    try:
+        blocked = BlockedDate.objects.get(date=target_date)
+        if blocked.start_time and blocked.end_time:
+            start_time = blocked.start_time
+            end_time = blocked.end_time
+        else:
+            return Response({
+                'barber_id': barber.id,
+                'barber_name': barber.display_name,
+                'date': date_str,
+                'day_off': True,
+                'slots': [],
+            })
+    except BlockedDate.DoesNotExist:
+        if not day_schedule:
+            return Response({
+                'barber_id': barber.id,
+                'barber_name': barber.display_name,
+                'date': date_str,
+                'day_off': True,
+                'slots': [],
+            })
+        # Parse start and end times
+        start_time = datetime.strptime(day_schedule['start'], '%H:%M').time()
+        end_time = datetime.strptime(day_schedule['end'], '%H:%M').time()
 
     # Get existing bookings for this barber on this date
     booked = Booking.objects.filter(

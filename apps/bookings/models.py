@@ -99,6 +99,11 @@ class Review(models.Model):
 class BlockedDate(models.Model):
     """Fechas en las que la barbería está cerrada o no disponible."""
     date = models.DateField(unique=True)
+    start_time = models.TimeField(
+        null=True, blank=True,
+        help_text='Opcional. Si se define (junto con end_time), el día no estará completamente bloqueado, sino que se limitará a trabajar solo en este horario (ej: 10:00 a 14:00).'
+    )
+    end_time = models.TimeField(null=True, blank=True)
     description = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
