@@ -46,6 +46,24 @@ except Exception as check_err:
     except Exception as e:
         print("⚠ Fallo forzando la tabla (probablemente ya existe o hay otro error):", e)
 
+# --- NUEVO: Autocuración para cashflow_sale.approval_status ---
+from apps.cashflow.models import Sale
+try:
+    # Intentamos una consulta que use la columna
+    Sale.objects.filter(approval_status='approved').exists()
+except Exception:
+    print("⚠ Columna 'approval_status' no encontrada en cashflow_sale. Intentando crearla...")
+    try:
+        with connection.schema_editor() as schema_editor:
+            from django.db import models
+            # Añadir el campo manualmente vía SchemaEditor
+            field = models.CharField(max_length=10, choices=[('pending', 'Pendiente'), ('approved', 'Aprobada'), ('rejected', 'Rechazada')], default='pending')
+            field.set_attributes_from_name('approval_status')
+            schema_editor.add_field(Sale, field)
+        print("✓ Columna 'approval_status' creada exitosamente.")
+    except Exception as e:
+        print("⚠ No se pudo crear la columna manualmente:", e)
+
 from apps.cashflow.models import PaymentMethod
 
 pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 'Efectivo', 'is_active': True, 'requires_reference': False})
