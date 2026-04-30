@@ -164,6 +164,11 @@
                         <span class="text-gold">Neto:</span>
                         <span class="text-gold">${{ close.net_income|floatformat:0 }}</span>
                     </div>
+                    <div class="mt-4 text-center">
+                        <button onclick="showDailyCloseDetails({{ close.id }})" class="w-full text-xs tracking-widest uppercase font-semibold text-smoke/50 hover:text-gold border border-white/5 hover:border-gold/30 bg-white/[0.02] hover:bg-gold/5 py-2 rounded-sm transition-all duration-300">
+                            + Ver Detalles
+                        </button>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -192,6 +197,32 @@
                 </button>
             </div>
             <div id="close-error" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded-sm"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalles del Cierre -->
+<div id="modal-close-detail" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('modal-close-detail').classList.add('hidden')"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl flex flex-col h-full overflow-hidden">
+            <!-- Header -->
+            <div class="p-6 border-b border-white/5 flex justify-between items-start bg-jet shrink-0">
+                <div>
+                    <h3 class="text-xl font-serif text-white mb-1">Detalle del Cierre</h3>
+                    <p class="text-smoke/50 text-xs tracking-widest uppercase" id="detail-date"></p>
+                </div>
+                <button onclick="document.getElementById('modal-close-detail').classList.add('hidden')" class="text-smoke/40 hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            
+            <!-- Body -->
+            <div class="p-6 overflow-y-auto" id="detail-body">
+                <div class="flex justify-center py-10">
+                    <div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -380,6 +411,99 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if pending_approvals_count and pending_approvals_count > 0 %}
     cfLoadApprovals();
     {% endif %}
+
+    // ── Detalles del Cierre ──────────────────────────────────────────────────
+    window.showDailyCloseDetails = function(closeId) {
+        const modal = document.getElementById('modal-close-detail');
+        const body = document.getElementById('detail-body');
+        const dateEl = document.getElementById('detail-date');
+        
+        modal.classList.remove('hidden');
+        body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
+        
+        fetch(`/api/admin/cashflow/daily-close/${closeId}/detail/`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
+                    return;
+                }
+                
+                dateEl.textContent = `${data.date} (Cerrado a las ${data.closed_at.split(' ')[1]} por ${data.closed_by})`;
+                
+                let html = '';
+                
+                // Barber Breakdown
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Rendimiento por Barbero</h4>';
+                html += '<div class="space-y-3 mb-8">';
+                data.barbers.forEach(b => {
+                    html += `
+                    <div class="bg-jet-lighter border border-white/5 rounded-sm p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-white">${b.name} <span class="text-[0.6rem] text-smoke/40 ml-1">(${b.sales_count} ventas)</span></span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
+                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Ventas</span>
+                                <span class="text-white font-bold">$${Number(b.total_sales).toLocaleString('es-CO')}</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
+                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Comisión (-50%)</span>
+                                <span class="text-red-400 font-bold">-$${Number(b.total_commissions).toLocaleString('es-CO')}</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
+                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Propinas (+100%)</span>
+                                <span class="text-emerald-400 font-bold">$${Number(b.total_tips).toLocaleString('es-CO')}</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-right border-t border-white/5 pt-2">
+                            <span class="text-[0.65rem] text-smoke/60 tracking-widest uppercase mr-2">Ganancia del Barbero:</span>
+                            <span class="text-white font-bold">$${Number(b.total_commissions + b.total_tips).toLocaleString('es-CO')}</span>
+                        </div>
+                    </div>`;
+                });
+                if (data.barbers.length === 0) {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center">No hubo ventas en este cierre.</div>';
+                }
+                html += '</div>';
+                
+                // Expenses Breakdown
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Egresos Registrados</h4>';
+                if (data.expenses.length > 0) {
+                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
+                    data.expenses.forEach(e => {
+                        html += `
+                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
+                            <div>
+                                <span class="text-white block font-medium">${e.description}</span>
+                                <span class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${e.type}</span>
+                            </div>
+                            <span class="text-red-400 font-bold">-$${Number(e.amount).toLocaleString('es-CO')}</span>
+                        </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron egresos.</div>';
+                }
+                
+                // Totals summary
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
+                html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
+                html += `
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Ventas (Ingresos Brutos):</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Propinas (Pasan derecho):</span><span class="text-emerald-400 font-medium">+$${Number(data.total_tips).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Comisiones Barberos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_commissions).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Egresos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_expenses).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center pt-3 mt-3 border-t border-white/10 text-lg font-bold font-serif"><span class="text-gold tracking-widest uppercase">INGRESO NETO BARBERÍA:</span><span class="text-gold">$${Number(data.net_income).toLocaleString('es-CO')}</span></div>
+                `;
+                html += '</div>';
+                
+                body.innerHTML = html;
+            })
+            .catch(() => {
+                body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles.</div>';
+            });
+    };
 
 });
 </script>

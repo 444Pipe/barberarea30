@@ -150,6 +150,68 @@ def daily_close_view(request):
         }
     })
 
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def daily_close_detail_view(request, close_id):
+    """GET /api/admin/cashflow/daily-close/<id>/detail/ - Detalles de un cierre de caja."""
+    from apps.cashflow.models import DailyClose, Sale, Commission, Expense
+    from django.db.models import Sum
+
+    try:
+        daily_close = DailyClose.objects.get(pk=close_id)
+    except DailyClose.DoesNotExist:
+        return Response({'error': 'Cierre no encontrado'}, status=404)
+
+    # Ventas asociadas a este cierre
+    sales = daily_close.sales.all().select_related('barber', 'service', 'commission')
+    expenses = daily_close.expenses.all()
+
+    # Desglose por barbero
+    barbers_data = {}
+    for sale in sales:
+        barber_id = sale.barber.id if sale.barber else 'unassigned'
+        barber_name = sale.barber.display_name if sale.barber else 'Sin Barbero'
+        
+        if barber_id not in barbers_data:
+            barbers_data[barber_id] = {
+                'name': barber_name,
+                'sales_count': 0,
+                'total_sales': 0,
+                'total_tips': 0,
+                'total_commissions': 0,
+            }
+        
+        b_data = barbers_data[barber_id]
+        b_data['sales_count'] += 1
+        b_data['total_sales'] += float(sale.final_price)
+        b_data['total_tips'] += float(sale.tip_amount)
+        
+        if hasattr(sale, 'commission'):
+            b_data['total_commissions'] += float(sale.commission.commission_amount)
+
+    # Detalle de egresos
+    expenses_data = []
+    for exp in expenses:
+        expenses_data.append({
+            'description': exp.description,
+            'amount': float(exp.amount),
+            'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
+        })
+
+    return Response({
+        'id': daily_close.id,
+        'date': daily_close.date.strftime('%Y-%m-%d'),
+        'closed_at': daily_close.closed_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'closed_by': daily_close.closed_by.username,
+        'total_sales': float(daily_close.total_sales),
+        'total_tips': float(daily_close.total_tips),
+        'total_commissions': float(daily_close.total_commissions),
+        'total_expenses': float(daily_close.total_expenses),
+        'net_income': float(daily_close.net_income),
+        'barbers': list(barbers_data.values()),
+        'expenses': expenses_data,
+    })
+
 
 @api_view(['POST'])
 @permission_classes([IsOperationalAdminOrAbove])
