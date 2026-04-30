@@ -1,13 +1,14 @@
 """Public page URLs."""
 from django.urls import path
 from django.views.generic import TemplateView
-from .views import HomeView
+from .views import HomeView, client_booking_detail_view
 
 urlpatterns = [
     path('', HomeView.as_view(), name='home'),
     path('services/', TemplateView.as_view(template_name='public/services.html'), name='services'),
     path('gallery/', TemplateView.as_view(template_name='public/gallery.html'), name='gallery'),
     path('booking/', TemplateView.as_view(template_name='public/booking.html'), name='booking'),
+    path('reserva/<str:signed_id>/', client_booking_detail_view, name='client_booking_detail'),
     # Compatibilidad sin trailing slash
     path('services', TemplateView.as_view(template_name='public/services.html')),
     path('gallery', TemplateView.as_view(template_name='public/gallery.html')),

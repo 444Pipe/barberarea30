@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/favicon30.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'images/favicon30.png' %}">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Reserva - Área 30 Barber Club</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+                  jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' }, smoke: '#F5F5F5' },
+        fontFamily: { sans: ['Montserrat','sans-serif'], serif: ['Playfair Display','serif'] }
+      }}
+    }
+  </script>
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body class="bg-jet text-smoke font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-jet/90 backdrop-blur-md border-b border-gold/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <a href="/" class="text-2xl font-serif font-bold tracking-widest text-gold hover:text-gold-light transition-colors">ÁREA 30</a>
+      <a href="/" class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">← Volver al Club</a>
+    </div>
+  </nav>
+
+  <section class="py-16 px-4 bg-jet-lighter border-b border-gold/10 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold/5 via-transparent to-transparent"></div>
+    <div class="max-w-4xl mx-auto text-center relative z-10">
+      <div class="flex justify-center gap-2 mb-4 text-gold text-sm">★★★★★</div>
+      <h1 class="text-4xl md:text-5xl font-serif font-bold mb-4 text-white">Detalles de tu <span class="text-gold italic font-light">Reserva</span></h1>
+      <p class="text-smoke/70 font-light max-w-md mx-auto">Consulta o cancela tu cita asignada.</p>
+    </div>
+  </section>
+
+  <div class="max-w-2xl mx-auto px-4 py-16">
+    <!-- Messages -->
+    {% if messages %}
+      <div class="mb-8 space-y-2">
+        {% for message in messages %}
+          <div class="px-4 py-3 rounded-sm text-sm border
+            {% if message.tags == 'success' %}bg-emerald-900/40 border-emerald-500/30 text-emerald-300
+            {% elif message.tags == 'error' %}bg-red-900/40 border-red-500/30 text-red-300
+            {% else %}bg-amber-900/40 border-amber-500/30 text-amber-300{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="bg-jet-lighter border border-gold/20 rounded-sm p-8 shadow-2xl relative">
+      <!-- Status Badge -->
+      <div class="absolute top-6 right-6">
+        {% if booking.status == 'pending' %}
+          <span class="bg-amber-900/40 border border-amber-500/30 text-amber-300 text-xs px-3 py-1 uppercase tracking-widest rounded-full">Pendiente</span>
+        {% elif booking.status == 'confirmed' %}
+          <span class="bg-emerald-900/40 border border-emerald-500/30 text-emerald-300 text-xs px-3 py-1 uppercase tracking-widest rounded-full">Confirmada</span>
+        {% elif booking.status == 'completed' %}
+          <span class="bg-blue-900/40 border border-blue-500/30 text-blue-300 text-xs px-3 py-1 uppercase tracking-widest rounded-full">Completada</span>
+        {% elif booking.status == 'cancelled' %}
+          <span class="bg-red-900/40 border border-red-500/30 text-red-300 text-xs px-3 py-1 uppercase tracking-widest rounded-full">Cancelada</span>
+        {% endif %}
+      </div>
+
+      <h2 class="text-2xl font-serif text-white mb-6 border-b border-white/10 pb-4">Cita de <span class="text-gold">{{ booking.client_name }}</span></h2>
+
+      <div class="space-y-6">
+        <div>
+          <p class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Fecha y Hora</p>
+          <p class="text-white text-lg">{{ booking.date|date:"l, d \d\e F Y"|title }} a las {{ booking.time|time:"g:i A" }}</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <p class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Servicio</p>
+            <p class="text-white">{{ booking.service.name }}</p>
+          </div>
+          <div>
+            <p class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Barbero</p>
+            <p class="text-white">{{ booking.barber.display_name|default:"Cualquiera" }}</p>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Valor</p>
+          <p class="text-emerald-400 font-bold tracking-widest">${{ booking.price|floatformat:"0" }} COP</p>
+        </div>
+      </div>
+
+      {% if booking.can_cancel %}
+        <div class="mt-10 border-t border-red-500/20 pt-6">
+          <p class="text-smoke/50 text-xs mb-4">Si necesitas cancelar tu cita, puedes hacerlo presionando el botón abajo. Solo es posible cancelar hasta 2 horas antes de la hora programada.</p>
+          <form method="POST" onsubmit="return confirm('¿Estás seguro que deseas cancelar tu reserva? Esta acción no se puede deshacer y perderás tu turno.');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="cancel">
+            <button type="submit" class="w-full sm:w-auto px-6 py-3 border border-red-500/30 text-red-400 rounded-sm text-xs tracking-widest uppercase hover:bg-red-500 hover:text-white transition-all font-bold">
+              Cancelar Reserva
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="mt-12 text-center">
+      <a href="/" class="text-gold hover:text-gold-light text-xs tracking-widest uppercase font-semibold transition-colors">Volver a Inicio</a>
+    </div>
+  </div>
+
+  <footer class="bg-black pt-12 pb-8 px-4 border-t border-white/5 mt-auto">
+    <div class="max-w-7xl mx-auto text-center">
+      <p class="text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -2,8 +2,11 @@
 import csv
 from datetime import datetime
 
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.utils import timezone
+from django.core.signing import Signer, BadSignature
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
 
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -469,6 +472,61 @@ def admin_blocked_date_detail_view(request, pk):
         return Response({'ok': True}, status=204)
     except BlockedDate.DoesNotExist:
         return Response({'error': 'No encontrado'}, status=404)
+
+
+# ─── Public Client Booking Detail ──────────────────────────────────────────────
+
+def client_booking_detail_view(request, signed_id):
+    """
+    Muestra los detalles de una reserva al cliente y permite cancelarla.
+    Usa URLs firmadas para evitar que se adivinen IDs de otras personas.
+    """
+    from django.core.signing import Signer, BadSignature
+    from django.shortcuts import render, get_object_or_404, redirect
+    from django.http import Http404
+    from django.contrib import messages
+
+    signer = Signer()
+    try:
+        booking_id = signer.unsign(signed_id)
+    except BadSignature:
+        raise Http404("Enlace inválido o caducado.")
+        
+    booking = get_object_or_404(Booking, id=booking_id)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'cancel':
+            if booking.can_cancel:
+                booking.status = 'cancelled'
+                booking.save()
+                
+                # Registrar en auditoría
+                from apps.analytics.models import AuditLog
+                AuditLog.objects.create(
+                    user=None, # Cliente anónimo
+                    action='update',
+                    model_name='Booking',
+                    object_id=booking.id,
+                    object_repr=str(booking),
+                    changes={'status': ['pending/confirmed', 'cancelled']},
+                    extra_data={'msg': 'Reserva cancelada por el cliente desde el enlace público.'}
+                )
+                
+                # Notificar al barbero
+                from apps.bookings.emails import send_barber_cancellation_notification
+                send_barber_cancellation_notification(booking)
+                
+                messages.success(request, "Tu reserva ha sido cancelada correctamente.")
+            else:
+                messages.error(request, "No puedes cancelar esta reserva. El tiempo límite ha pasado o ya estaba cancelada.")
+                
+        return redirect('client_booking_detail', signed_id=signed_id)
+
+    context = {
+        'booking': booking,
+    }
+    return render(request, 'public/booking_detail.html', context)
 
 
 @api_view(['DELETE'])
