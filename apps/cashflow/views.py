@@ -70,8 +70,9 @@ def daily_close_view(request):
     POST /api/admin/cashflow/daily-close/
     Genera el cierre de caja del día actual. Agrupa ventas no cerradas.
     """
-    from apps.cashflow.models import DailyClose, Expense
+    from apps.cashflow.models import DailyClose, Expense, Sale, Commission
     from django.db.models import Sum
+    from django.db import transaction
 
     today = timezone.localtime(timezone.now()).date()
     
