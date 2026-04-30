@@ -10,7 +10,8 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove
+from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin
+from apps.users.decorators import staff_required
 from apps.barbers.models import Barber
 from apps.services.models import Service
 from .models import Booking, BlockedDate
@@ -249,8 +250,8 @@ def admin_bookings_list_view(request):
     profile = getattr(request.user, 'profile', None)
     queryset = Booking.objects.select_related('barber', 'service').all()
 
-    # Barbers can only see their own bookings
-    if profile and profile.is_barber and not profile.is_admin:
+    # Barbers and operational_admin can only see their own bookings
+    if profile and profile.role not in ('admin', 'superadmin'):
         barber_profile = getattr(request.user, 'barber_profile', None)
         if barber_profile:
             queryset = queryset.filter(barber=barber_profile)
@@ -298,9 +299,9 @@ def admin_booking_detail_view(request, booking_id):
     except Booking.DoesNotExist:
         return Response({'error': 'Reserva no encontrada'}, status=404)
 
-    # Barber can only modify their own bookings
+    # Barber and operational_admin can only modify their own bookings
     profile = getattr(request.user, 'profile', None)
-    if profile and profile.is_barber and not profile.is_admin:
+    if profile and profile.role not in ('admin', 'superadmin'):
         barber_profile = getattr(request.user, 'barber_profile', None)
         if booking.barber != barber_profile:
             return Response({'error': 'Sin permisos'}, status=403)
@@ -375,6 +376,14 @@ def admin_bookings_export_csv(request):
     """GET /api/admin/bookings/export/ — exportar a CSV."""
     bookings = Booking.objects.select_related('barber', 'service').all()
 
+    profile = getattr(request.user, 'profile', None)
+    if profile and profile.role not in ('admin', 'superadmin'):
+        barber_profile = getattr(request.user, 'barber_profile', None)
+        if barber_profile:
+            bookings = bookings.filter(barber=barber_profile)
+        else:
+            bookings = bookings.none()
+
     # Aplicar mismos filtros que la lista
     barber_id = request.query_params.get('barber')
     if barber_id:
@@ -415,7 +424,7 @@ def admin_bookings_export_csv(request):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAdminOrAbove])
+@permission_classes([IsBatmanOrSuperadmin])
 def admin_delete_all_bookings_view(request):
     """DELETE /api/admin/bookings/bulk-delete/ — Eliminar todas las reservas."""
     Booking.objects.all().delete()
