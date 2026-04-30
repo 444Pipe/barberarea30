@@ -177,6 +177,12 @@
         </div>
 
         <div class="flex items-center gap-4">
+          <!-- Botón Walk-in -->
+          <button onclick="openWalkinModal()" class="px-3 py-1.5 bg-gold/20 text-gold border border-gold/40 rounded text-[0.65rem] font-bold uppercase tracking-widest hover:bg-gold hover:text-jet transition-colors flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Walk-in
+          </button>
+          
           <a href="/" class="text-xs text-smoke/50 hover:text-gold transition-colors tracking-wider uppercase lg:hidden">Sitio</a>
           
           {% if user_role == 'superadmin' %}
@@ -284,5 +290,146 @@
   </script>
   <script src="{% static 'js/admin.js' %}"></script>
   {% block extra_js %}{% endblock %}
+
+  <!-- Walk-in Modal Global -->
+  <div id="walkin-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+    <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-white/5 flex justify-between items-center bg-jet-lighter">
+        <h3 class="text-lg font-bold text-gold flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Nueva Reserva (Walk-in)
+        </h3>
+        <button onclick="closeWalkinModal()" class="text-smoke/40 hover:text-white">✕</button>
+      </div>
+      <form id="walkin-form" class="p-6 space-y-4" onsubmit="submitWalkin(event)">
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Nombre del Cliente</label>
+          <input type="text" id="walkin-client" required placeholder="Ej: Cliente Físico" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Teléfono (Opcional)</label>
+          <input type="text" id="walkin-phone" placeholder="Ej: 3001234567" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Servicio</label>
+          <select id="walkin-service" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+            <option value="">Cargando servicios...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Barbero</label>
+          <select id="walkin-barber" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+            <option value="any">Cualquier Barbero Disponible</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Fecha</label>
+            <input type="date" id="walkin-date" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          </div>
+          <div>
+            <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Hora</label>
+            <input type="time" id="walkin-time" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          </div>
+        </div>
+        <div class="pt-4 border-t border-white/5 flex gap-3 justify-end">
+          <button type="button" onclick="closeWalkinModal()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
+          <button type="submit" class="px-6 py-2 bg-gold text-jet font-bold text-xs tracking-widest uppercase rounded hover:bg-white transition-colors">Agendar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openWalkinModal() {
+      document.getElementById('walkin-modal').classList.remove('hidden');
+      const d = new Date();
+      // Formato local YYYY-MM-DD
+      const offset = d.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(d - offset)).toISOString().slice(0, -1);
+      
+      document.getElementById('walkin-date').value = localISOTime.split('T')[0];
+      // Redondear a la media hora más cercana o poner la actual
+      document.getElementById('walkin-time').value = localISOTime.split('T')[1].substring(0,5);
+      
+      if (document.getElementById('walkin-service').options.length <= 1) {
+        fetch('/api/servicios-nativos/')
+          .then(r => r.json())
+          .then(data => {
+            const sel = document.getElementById('walkin-service');
+            sel.innerHTML = '<option value="">Seleccione un servicio...</option>';
+            data.servicios.forEach(s => {
+              sel.innerHTML += \`<option value="\${s.id}">\${s.name} - $\${parseInt(s.price).toLocaleString('es-CO')}</option>\`;
+            });
+          });
+      }
+      
+      if (document.getElementById('walkin-barber').options.length <= 1) {
+        fetch('/api/barbers/')
+          .then(r => r.json())
+          .then(barbers => {
+            const sel = document.getElementById('walkin-barber');
+            sel.innerHTML = '<option value="any">Cualquier Barbero Disponible</option>';
+            barbers.forEach(b => {
+              sel.innerHTML += \`<option value="\${b.id}">\${b.display_name || b.nombre}</option>\`;
+            });
+          });
+      }
+    }
+
+    function closeWalkinModal() {
+      document.getElementById('walkin-modal').classList.add('hidden');
+      document.getElementById('walkin-form').reset();
+    }
+
+    function submitWalkin(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector('[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Agendando...';
+      
+      const payload = {
+        client_name: document.getElementById('walkin-client').value,
+        client_phone: document.getElementById('walkin-phone').value,
+        service_id: document.getElementById('walkin-service').value,
+        barber_id: document.getElementById('walkin-barber').value,
+        date: document.getElementById('walkin-date').value,
+        time: document.getElementById('walkin-time').value,
+        is_walk_in: true,
+        privacy_accepted: true // overrides for walkin
+      };
+
+      fetch('/api/bookings/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          alert('Error: ' + (data.error || JSON.stringify(data.errors) || 'Error al agendar'));
+          btn.disabled = false;
+          btn.textContent = 'Agendar';
+        } else {
+          // Éxito
+          closeWalkinModal();
+          // Si estamos en la página de reservas, recargar la tabla
+          if (typeof loadBookings === 'function') {
+            loadBookings();
+            btn.disabled = false;
+            btn.textContent = 'Agendar';
+          } else {
+            // Sino, simplemente recargar la página para que se vea reflejado en la agenda
+            location.reload();
+          }
+        }
+      })
+      .catch(err => {
+        alert('Error: ' + err);
+        btn.disabled = false;
+        btn.textContent = 'Agendar';
+      });
+    }
+  </script>
 </body>
 </html>
