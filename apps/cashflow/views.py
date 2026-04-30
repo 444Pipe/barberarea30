@@ -73,6 +73,7 @@ def daily_close_view(request):
     from apps.cashflow.models import DailyClose, Expense, Sale, Commission
     from django.db.models import Sum
     from django.db import transaction
+    from django.utils import timezone
 
     today = timezone.localtime(timezone.now()).date()
     
