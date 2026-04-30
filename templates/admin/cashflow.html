@@ -61,6 +61,54 @@
 
 </div>
 
+    <!-- Historial de Cierres -->
+    <div class="mt-8">
+        <h2 class="text-lg font-serif text-white mb-4">Historial de Cierres</h2>
+        {% if recent_closes %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for close in recent_closes %}
+            <div class="bg-jet-card border border-white/5 p-5 rounded-sm hover:border-gold/30 transition-colors">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <div class="text-white font-bold">{{ close.date|date:"d M Y" }}</div>
+                        <div class="text-[0.65rem] text-smoke/40 uppercase tracking-widest">{{ close.closed_at|date:"h:i A" }} por {{ close.closed_by.username }}</div>
+                    </div>
+                    <div class="px-2 py-1 bg-gold/10 text-gold text-[0.6rem] uppercase tracking-widest font-bold rounded">
+                        Cerrado
+                    </div>
+                </div>
+                <div class="space-y-2 mt-4 border-t border-white/5 pt-4">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-smoke/60">Ventas Brutas:</span>
+                        <span class="text-white">${{ close.total_sales|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-smoke/60">Propinas:</span>
+                        <span class="text-white">${{ close.total_tips|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-smoke/60">Comisiones:</span>
+                        <span class="text-red-400">-${{ close.total_commissions|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-smoke/60">Egresos:</span>
+                        <span class="text-red-400">-${{ close.total_expenses|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm font-bold border-t border-white/5 pt-2 mt-2">
+                        <span class="text-gold">Neto:</span>
+                        <span class="text-gold">${{ close.net_income|floatformat:0 }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-smoke/40 text-sm border border-white/5 rounded-sm bg-jet">
+            No hay cierres de caja registrados aún.
+        </div>
+        {% endif %}
+    </div>
+
 <!-- Modal Confirmación -->
 <div id="modal-daily-close" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>

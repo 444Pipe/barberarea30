@@ -201,7 +201,7 @@ def admin_reels_view(request):
 
 
 from .decorators import operational_admin_required
-from apps.cashflow.models import Sale, Expense, Commission
+from apps.cashflow.models import Sale, Expense, Commission, DailyClose
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -224,6 +224,8 @@ def admin_cashflow_view(request):
     
     net_income = total_sales - total_commissions - total_expenses
 
+    recent_closes = DailyClose.objects.all().order_by('-date', '-closed_at')[:10]
+
     context = {
         'user_role': request.user.profile.role,
         'user_name': request.user.get_full_name() or request.user.username,
@@ -235,6 +237,7 @@ def admin_cashflow_view(request):
         'total_expenses': total_expenses,
         'total_commissions': total_commissions,
         'net_income': net_income,
+        'recent_closes': recent_closes,
     }
     return render(request, 'admin/cashflow.html', context)
 
