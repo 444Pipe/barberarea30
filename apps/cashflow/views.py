@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 
-from apps.users.permissions import IsOperationalAdminOrAbove, IsBarberOrAbove
+from apps.users.permissions import IsOperationalAdminOrAbove, IsBarberOrAbove, IsSuperAdmin
 from apps.bookings.models import Booking
 from apps.cashflow.models import PaymentMethod
 from apps.cashflow import services as cashflow_services
@@ -198,6 +198,31 @@ def add_expense_view(request):
         return Response({'ok': True, 'expense_id': expense.id, 'message': 'Egreso registrado correctamente.'})
     except Exception as e:
         return Response({'error': f'Error inesperado al guardar: {str(e)}'}, status=500)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsSuperAdmin])
+def delete_expense_view(request, expense_id):
+    """DELETE /api/admin/cashflow/expenses/<id>/ - Eliminar un egreso (solo superadmin)."""
+    from apps.cashflow.models import Expense
+    try:
+        expense = Expense.objects.get(pk=expense_id)
+        description = expense.description
+        amount = float(expense.amount)
+        log_audit(
+            user=request.user,
+            action='delete',
+            obj=expense,
+            changes={},
+            request=request,
+            extra_data={'msg': f"Eliminó el egreso '${amount:,.0f} - {description}'"}
+        )
+        expense.delete()
+        return Response({'ok': True, 'message': 'Egreso eliminado correctamente.'})
+    except Expense.DoesNotExist:
+        return Response({'error': 'Egreso no encontrado.'}, status=404)
+    except Exception as e:
+        return Response({'error': f'Error al eliminar: {str(e)}'}, status=500)
 
 
 # ─── SISTEMA DE APROBACIÓN DE VENTAS ──────────────────────────────────────────

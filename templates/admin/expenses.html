@@ -31,6 +31,9 @@
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Tipo</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Registrado Por</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold text-right">Monto</th>
+                        {% if user_role == 'superadmin' %}
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold text-right">Acc.</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
@@ -62,6 +65,14 @@
                         <td class="px-5 py-4 text-sm font-serif font-bold text-red-400 text-right">
                             -${{ exp.amount|floatformat:0 }}
                         </td>
+                        {% if user_role == 'superadmin' %}
+                        <td class="px-5 py-4 text-right">
+                            <button onclick="confirmDeleteExpense({{ exp.id }}, '{{ exp.description|escapejs }}', {{ exp.amount|floatformat:0 }})"
+                                class="p-1.5 rounded text-smoke/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" title="Eliminar egreso">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -127,6 +138,32 @@
         </div>
     </div>
 </div>
+{% if user_role == 'superadmin' %}
+<!-- Delete Expense Confirmation Modal -->
+<div id="modal-delete-expense" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeDeleteModal()"></div>
+    <div class="relative bg-jet-card border border-red-500/20 rounded-sm p-6 max-w-sm w-full shadow-2xl">
+        <div class="text-center mb-5">
+            <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-3">
+                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </div>
+            <h3 class="text-lg font-serif text-white mb-1">¿Eliminar egreso?</h3>
+            <p class="text-smoke/50 text-sm"><span id="del-exp-desc" class="text-white font-medium"></span></p>
+            <p class="text-red-400 font-bold font-serif text-lg mt-1" id="del-exp-amount"></p>
+            <p class="text-smoke/30 text-xs mt-2">Esta acción no se puede deshacer y quedará registrada en el log de auditoría.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2.5 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-white transition-colors">
+                Cancelar
+            </button>
+            <button id="btn-confirm-delete-expense" onclick="executeDeleteExpense()" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-sm text-xs tracking-widest uppercase font-bold transition-colors">
+                Sí, eliminar
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -176,5 +213,51 @@
             });
         });
     });
+
+    {% if user_role == 'superadmin' %}
+    let _deleteExpenseId = null;
+
+    function confirmDeleteExpense(id, desc, amount) {
+        _deleteExpenseId = id;
+        document.getElementById('del-exp-desc').textContent = desc;
+        document.getElementById('del-exp-amount').textContent = '$' + Number(amount).toLocaleString('es-CO');
+        document.getElementById('modal-delete-expense').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+        _deleteExpenseId = null;
+        document.getElementById('modal-delete-expense').classList.add('hidden');
+    }
+
+    function executeDeleteExpense() {
+        if (!_deleteExpenseId) return;
+        const btn = document.getElementById('btn-confirm-delete-expense');
+        btn.textContent = 'Eliminando...';
+        btn.disabled = true;
+
+        fetch(`/api/admin/cashflow/expenses/${_deleteExpenseId}/delete/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'No se pudo eliminar'));
+                btn.textContent = 'Sí, eliminar';
+                btn.disabled = false;
+                closeDeleteModal();
+            }
+        })
+        .catch(() => {
+            alert('Error de conexión');
+            btn.textContent = 'Sí, eliminar';
+            btn.disabled = false;
+            closeDeleteModal();
+        });
+    }
+    {% endif %}
+
 </script>
 {% endblock %}
