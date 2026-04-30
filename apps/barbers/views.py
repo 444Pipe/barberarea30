@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.http import JsonResponse
-from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove
+from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin
 from apps.bookings.models import Booking, BlockedDate
 from .models import Barber, GalleryImage, Reel
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
@@ -148,7 +148,7 @@ class BarberAdminListCreateView(generics.ListCreateAPIView):
     """GET/POST /api/admin/barbers/ — lista con stats y crear barbero."""
     queryset = Barber.objects.all().prefetch_related('specialties')
     serializer_class = BarberAdminSerializer
-    permission_classes = [IsAdminOrAbove]
+    permission_classes = [IsBatmanOrSuperadmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
@@ -168,7 +168,7 @@ class BarberAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/admin/barbers/{id}/"""
     queryset = Barber.objects.all()
     serializer_class = BarberAdminSerializer
-    permission_classes = [IsAdminOrAbove]
+    permission_classes = [IsBatmanOrSuperadmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 

@@ -11,6 +11,15 @@ class IsSuperAdmin(BasePermission):
         return profile and profile.is_superadmin
 
 
+class IsBatmanOrSuperadmin(BasePermission):
+    """Only super admins and pure admin (Batman). Operational admin (Frank) excluded."""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        profile = getattr(request.user, 'profile', None)
+        return profile and profile.role in ('superadmin', 'admin')
+
+
 class IsOperationalAdminOrAbove(BasePermission):
     """Operational admin (Frank) or super admin: cierre de caja, propinas, ventas."""
     def has_permission(self, request, view):
