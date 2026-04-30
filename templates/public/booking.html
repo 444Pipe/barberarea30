@@ -383,7 +383,13 @@ function loadAllBarberSlots() {
   fetch('/api/barberos-nativos/')
     .then(r => r.json())
     .then(data => {
-      const promises = data.barberos.map(b =>
+      // Filter if the service has an exclusive barber
+      let validBarbers = data.barberos;
+      if (state.service && state.service.exclusive_barber_id) {
+        validBarbers = validBarbers.filter(b => b.id === state.service.exclusive_barber_id);
+      }
+
+      const promises = validBarbers.map(b =>
         fetch(`/api/barbers/${b.id}/availability/?date=${state.date}`)
           .then(r => r.json())
           .then(avail => ({ ...b, avail }))
