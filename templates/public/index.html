@@ -207,6 +207,12 @@
         <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             <p class="text-smoke/40 text-sm col-span-full py-8">Cargando servicios...</p>
         </div>
+        <div class="mt-16">
+            <a href="/booking/" class="group inline-flex items-center gap-4 px-10 py-4 border border-gold/40 text-gold font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold hover:text-jet transition-all duration-300">
+              Ver todos los servicios
+              <span class="w-8 h-[1px] bg-gold group-hover:bg-jet/40 transition-all duration-300"></span>
+            </a>
+        </div>
     </div>
   </section>
 
@@ -445,7 +451,14 @@
           grid.innerHTML = '<p class="text-smoke/40 text-sm col-span-full py-8">No hay servicios disponibles</p>';
           return;
         }
-        grid.innerHTML = servicios.map((s, i) => {
+        let indexServices = servicios.filter(s => {
+            const n = s.name.toLowerCase();
+            return (n.includes('silver') || n.includes('gold') || n.includes('diamond')) && !n.includes('dama');
+        });
+        if (indexServices.length === 0) indexServices = servicios.slice(0, 3);
+        else indexServices = indexServices.slice(0, 3);
+        
+        grid.innerHTML = indexServices.map((s, i) => {
           const priceK = Number(s.price) >= 1000 ? `$${Math.round(Number(s.price)/1000)}k` : `$${Number(s.price).toLocaleString('es-CO')}`;
           
           const lowerName = s.name.toLowerCase();
