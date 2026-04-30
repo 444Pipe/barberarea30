@@ -213,11 +213,39 @@
         </div>
       </header>
 
-      <!-- Page content -->
-      <main class="flex-1 overflow-y-auto p-4 lg:p-8">
+      <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto bg-black relative">
+      
+      <!-- Global Django Messages (Toasts) -->
+      {% if messages %}
+      <div id="global-messages" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {% for message in messages %}
+        <div class="message-toast pointer-events-auto flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-sm shadow-xl transition-all duration-300 translate-x-0 opacity-100
+          {% if message.tags == 'success' %}bg-emerald-900/90 border border-emerald-500/50 text-emerald-100
+          {% elif message.tags == 'error' %}bg-red-900/90 border border-red-500/50 text-red-100
+          {% else %}bg-amber-900/90 border border-amber-500/50 text-amber-100{% endif %}">
+          <span>{{ message }}</span>
+          <button onclick="this.parentElement.style.opacity='0'; setTimeout(()=>this.parentElement.remove(), 300)" class="text-white/50 hover:text-white">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+      <script>
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+          const toasts = document.querySelectorAll('.message-toast');
+          toasts.forEach(t => {
+            t.style.opacity = '0';
+            t.style.transform = 'translateX(20px)';
+            setTimeout(() => t.remove(), 300);
+          });
+        }, 5000);
+      </script>
+      {% endif %}
+
+      <div class="p-4 sm:p-8 min-h-full">
         {% block content %}{% endblock %}
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 
   <script>

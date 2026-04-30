@@ -100,19 +100,7 @@
     </div>
   </div>
 
-  <!-- ══ MENSAJES DJANGO ══ -->
-  {% if messages %}
-  <div class="space-y-2">
-    {% for message in messages %}
-    <div class="px-4 py-3 rounded-lg text-sm
-      {% if message.tags == 'success' %}bg-emerald-900/40 border border-emerald-500/30 text-emerald-300
-      {% elif message.tags == 'error' %}bg-red-900/40 border border-red-500/30 text-red-300
-      {% else %}bg-amber-900/40 border border-amber-500/30 text-amber-300{% endif %}">
-      {{ message }}
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+
 
   <!-- ══ KPIs GLOBALES ══ -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
