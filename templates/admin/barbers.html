@@ -247,8 +247,15 @@ function editBarber(id) {
       form.is_available.checked = b.is_available;
       form.dataset.mode = 'edit';
       form.dataset.barberId = id;
-      // Ocultar credenciales en modo edición
-      document.getElementById('credentials-section').classList.add('hidden');
+      // Credenciales en modo edición (solo superadmin)
+      if (userRole === 'superadmin') {
+        document.getElementById('credentials-section').classList.remove('hidden');
+        document.getElementById('cred-username').value = b.username || '';
+        document.getElementById('cred-password').value = '';
+        document.getElementById('cred-password').placeholder = 'Dejar vacío para no cambiar';
+      } else {
+        document.getElementById('credentials-section').classList.add('hidden');
+      }
       if (b.avatar) {
         document.getElementById('avatar-img').src = b.avatar;
         document.getElementById('avatar-img').classList.remove('hidden');
@@ -277,13 +284,11 @@ document.getElementById('barber-form').addEventListener('submit', function(e) {
 
   const isEdit = form.dataset.mode === 'edit';
 
-  // Credenciales solo en modo creación
-  if (!isEdit) {
-    const customUser = document.getElementById('cred-username').value.trim();
-    const customPass = document.getElementById('cred-password').value.trim();
-    if (customUser) formData.append('new_username', customUser);
-    if (customPass) formData.append('new_password', customPass);
-  }
+  // Credenciales (tanto al crear como al editar si se llenaron)
+  const customUser = document.getElementById('cred-username').value.trim();
+  const customPass = document.getElementById('cred-password').value.trim();
+  if (customUser) formData.append('new_username', customUser);
+  if (customPass) formData.append('new_password', customPass);
 
   // Avatar
   const avatarFile = document.getElementById('avatar-input').files[0];

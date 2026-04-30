@@ -103,6 +103,29 @@ class BarberAdminSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         specialties = validated_data.pop('specialties', None)
+        new_username = validated_data.pop('new_username', '').strip()
+        new_password = validated_data.pop('new_password', '').strip()
+
+        # Update User credentials if provided (only for superadmins)
+        request = self.context.get('request')
+        is_superadmin = request and hasattr(request.user, 'profile') and request.user.profile.role == 'superadmin'
+
+        user_modified = False
+        if is_superadmin:
+            if new_username and new_username != instance.user.username:
+                from django.contrib.auth.models import User
+                if User.objects.exclude(pk=instance.user.pk).filter(username=new_username).exists():
+                    raise serializers.ValidationError({"new_username": "Ese nombre de usuario ya está en uso."})
+                instance.user.username = new_username
+                user_modified = True
+                
+            if new_password:
+                instance.user.set_password(new_password)
+                user_modified = True
+                
+            if user_modified:
+                instance.user.save()
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
