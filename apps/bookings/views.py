@@ -222,7 +222,7 @@ def public_reviews_view(request):
         'booking__barber', 'booking__service'
     ).filter(
         is_public=True, barber_rating__gte=4
-    ).order_by('-created_at')[:12]
+    ).order_by('-created_at')[:6]
 
     data = []
     for r in reviews:
