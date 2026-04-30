@@ -237,7 +237,7 @@ def public_reviews_view(request):
             'barber_rating': r.barber_rating,
             'shop_rating': r.shop_rating,
             'comment': r.comment,
-            'date': r.created_at.strftime('%d %b %Y'),
+            'date': timezone.localtime(r.created_at).strftime('%d %b %Y'),
         })
     return Response({'reviews': data})
 
@@ -417,7 +417,7 @@ def admin_bookings_export_csv(request):
             b.time.strftime('%H:%M'),
             b.price,
             b.get_status_display(),
-            b.created_at.strftime('%Y-%m-%d %H:%M'),
+            timezone.localtime(b.created_at).strftime('%Y-%m-%d %H:%M'),
         ])
 
     return response

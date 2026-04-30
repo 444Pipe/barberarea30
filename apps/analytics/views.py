@@ -1,5 +1,6 @@
 """Analytics API — stats computed from booking data."""
 from collections import defaultdict
+from django.utils import timezone as tz
 
 from django.db.models import Sum, Count, Avg
 
@@ -229,7 +230,7 @@ def notifications_view(request):
             'user': user_name,
             'action': log.action,
             'message': msg,
-            'time': log.created_at.strftime('%d %b, %I:%M %p')
+            'time': tz.localtime(log.created_at).strftime('%d %b, %I:%M %p')
         })
 
     return Response(result)
@@ -259,7 +260,7 @@ def audit_log_api_view(request):
         msg = log.extra_data.get('msg', f'Realizó: {log.get_action_display()}')
         result.append({
             'id':          log.id,
-            'datetime':    log.created_at.strftime('%d/%m/%Y  %H:%M:%S'),
+            'datetime':    tz.localtime(log.created_at).strftime('%d/%m/%Y  %H:%M:%S'),
             'user':        user_name,
             'action':      log.action,
             'model_name':  log.model_name,

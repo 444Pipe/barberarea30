@@ -1,3 +1,4 @@
+from django.utils import timezone as tz
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -221,7 +222,7 @@ def pending_approvals_view(request):
             'final_price': float(s.final_price),
             'tip_amount': float(s.tip_amount),
             'total_paid': float(s.total_paid),
-            'created_at': s.created_at.strftime('%Y-%m-%d %H:%M'),
+            'created_at': tz.localtime(s.created_at).strftime('%d/%m/%Y %I:%M %p'),
         })
     return Response({'pending_approvals': data})
 
