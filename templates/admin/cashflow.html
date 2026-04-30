@@ -41,16 +41,41 @@
         </div>
     </div>
 
+    <!-- ═══ ALERTA: Ventas por Aprobar ═══ -->
+    {% if pending_approvals_count and pending_approvals_count > 0 %}
+    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-5 flex items-start gap-4">
+        <div class="relative flex h-4 w-4 mt-0.5 flex-shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+        </div>
+        <div>
+            <p class="text-sm font-bold text-red-400 tracking-wider uppercase">{{ pending_approvals_count }} venta(s) pendiente(s) de aprobación</p>
+            <p class="text-xs text-smoke/60 mt-1">El cierre de caja está <strong class="text-red-400">bloqueado</strong> hasta que apruebe o rechace todas las ventas pendientes.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══ PANEL DE APROBACIONES ═══ -->
+    <div id="cashflow-approvals-section" class="{% if not pending_approvals_count or pending_approvals_count == 0 %}hidden{% endif %}">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Ventas por Aprobar</h2>
+            <span id="cf-approvals-count" class="bg-red-500 text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full">{{ pending_approvals_count }}</span>
+        </div>
+        <div id="cf-approvals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div class="text-center text-smoke/30 text-sm py-8 col-span-full">Cargando...</div>
+        </div>
+    </div>
+
     <!-- Info Message -->
     {% if pending_sales_count == 0 %}
     <div class="bg-jet border border-white/5 rounded-sm p-8 text-center">
         <svg class="w-12 h-12 text-smoke/20 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <h3 class="text-lg font-serif text-white mb-2">No hay ventas pendientes por cerrar</h3>
-        <p class="text-smoke/60 text-sm max-w-md mx-auto">Ya se realizó el cierre de caja para el día de hoy o aún no se han registrado nuevas ventas en el sistema.</p>
+        <h3 class="text-lg font-serif text-white mb-2">No hay ventas aprobadas pendientes por cerrar</h3>
+        <p class="text-smoke/60 text-sm max-w-md mx-auto">Ya se realizó el cierre de caja o aún no hay ventas aprobadas en el sistema.</p>
     </div>
     {% else %}
     <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-white/5 flex justify-between items-center">
+        <div class="px-5 py-4 border-b border-white/5">
             <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Desglose antes del cierre</h2>
         </div>
         <div class="p-5">
@@ -59,6 +84,47 @@
     </div>
     {% endif %}
 
+</div>
+
+<!-- ═══ MODAL DE RECHAZO (Cashflow) ═══ -->
+<div id="cf-modal-reject" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="cfCloseRejectModal()"></div>
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+    <div class="bg-jet-card border border-red-500/30 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
+        <h3 class="text-base font-serif text-white">Rechazar Venta</h3>
+        <button onclick="cfCloseRejectModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <svg class="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          <div class="text-xs text-smoke/70 leading-relaxed">
+            Venta de: <strong class="text-white" id="cf-reject-barber-name"></strong><br>
+            La reserva volverá a estado <span class="text-amber-400 font-semibold">Pendiente</span>.
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs tracking-widest uppercase text-smoke/50 mb-2 font-semibold">Razón del Rechazo <span class="text-smoke/30">(opcional)</span></label>
+          <textarea id="cf-reject-reason-input"
+                    class="w-full bg-jet border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-smoke/30 focus:outline-none focus:border-red-500/50 resize-none transition-colors"
+                    rows="3" placeholder="Ej: Monto incorrecto, servicio no coincide..."></textarea>
+        </div>
+        <div id="cf-reject-error" class="hidden p-3 bg-red-500/20 border border-red-500/40 text-red-400 text-xs rounded-lg"></div>
+      </div>
+      <div class="px-6 pb-6 flex gap-3 justify-end">
+        <button onclick="cfCloseRejectModal()" class="px-5 py-2.5 text-smoke/70 hover:text-white transition-colors text-xs tracking-widest uppercase border border-white/10 rounded-lg">
+          Cancelar
+        </button>
+        <button id="cf-btn-confirm-reject" onclick="cfConfirmRejectSale()"
+                class="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs tracking-widest uppercase transition-all flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          Rechazar Venta
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
     <!-- Historial de Cierres -->
@@ -134,48 +200,187 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const btnOpen = document.getElementById('btn-daily-close');
-        const modal = document.getElementById('modal-daily-close');
-        const btnConfirm = document.getElementById('btn-confirm-close');
-        const errorDiv = document.getElementById('close-error');
+document.addEventListener('DOMContentLoaded', () => {
 
-        if (btnOpen) {
-            btnOpen.addEventListener('click', () => {
-                modal.classList.remove('hidden');
-                errorDiv.classList.add('hidden');
+    // ── Cierre de Caja ───────────────────────────────────────────────────────
+    const btnOpen   = document.getElementById('btn-daily-close');
+    const modal     = document.getElementById('modal-daily-close');
+    const btnConfirm = document.getElementById('btn-confirm-close');
+    const errorDiv  = document.getElementById('close-error');
+
+    if (btnOpen) {
+        btnOpen.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+        });
+    }
+    if (btnConfirm) {
+        btnConfirm.addEventListener('click', () => {
+            const originalText = btnConfirm.innerHTML;
+            btnConfirm.innerHTML = 'Procesando...';
+            btnConfirm.disabled = true;
+            fetch('/api/admin/cashflow/daily-close/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(r => r.json().then(data => ({ status: r.status, body: data })))
+            .then(res => {
+                if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
+                    window.location.reload();
+                } else {
+                    throw new Error(res.body.error || 'Error al ejecutar cierre');
+                }
+            })
+            .catch(err => {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+                btnConfirm.innerHTML = originalText;
+                btnConfirm.disabled = false;
             });
+        });
+    }
+
+    // ── Panel de Aprobaciones (Cashflow) ─────────────────────────────────────
+    function cfLoadApprovals() {
+        fetch('/api/admin/cashflow/pending-approvals/')
+            .then(r => r.json())
+            .then(data => cfRenderApprovals(data.pending_approvals || []))
+            .catch(() => {});
+    }
+
+    function cfRenderApprovals(sales) {
+        const section   = document.getElementById('cashflow-approvals-section');
+        const container = document.getElementById('cf-approvals-container');
+        const countEl   = document.getElementById('cf-approvals-count');
+
+        if (!section) return;
+
+        if (!sales || sales.length === 0) {
+            section.classList.add('hidden');
+            // Quitar también el banner de alerta
+            const banner = section.previousElementSibling;
+            if (banner && banner.classList.contains('bg-red-500\\/10')) banner.classList.add('hidden');
+            return;
         }
 
-        if (btnConfirm) {
-            btnConfirm.addEventListener('click', () => {
-                const originalText = btnConfirm.innerHTML;
-                btnConfirm.innerHTML = 'Procesando...';
-                btnConfirm.disabled = true;
+        if (countEl) countEl.textContent = sales.length;
+        section.classList.remove('hidden');
 
-                fetch('/api/admin/cashflow/daily-close/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    }
-                })
-                .then(r => r.json().then(data => ({status: r.status, body: data})))
-                .then(res => {
-                    if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
-                        window.location.reload();
-                    } else {
-                        throw new Error(res.body.error || 'Error al ejecutar cierre');
-                    }
-                })
-                .catch(err => {
-                    errorDiv.textContent = err.message;
-                    errorDiv.classList.remove('hidden');
-                    btnConfirm.innerHTML = originalText;
-                    btnConfirm.disabled = false;
-                });
-            });
-        }
-    });
+        container.innerHTML = sales.map(s => `
+          <div class="bg-jet-card border border-red-500/30 rounded-xl p-4 shadow-lg flex flex-col gap-3" id="cf-card-${s.id}">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-white font-bold text-sm">${s.barber_name}</div>
+                <div class="text-[0.65rem] text-smoke/50 uppercase tracking-widest">${s.service_name}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-gold font-bold">$${s.final_price.toLocaleString('es-CO')}</div>
+                ${s.tip_amount > 0 ? `<div class="text-[0.6rem] text-amber-400">+ $${s.tip_amount.toLocaleString('es-CO')} propina</div>` : ''}
+              </div>
+            </div>
+            <div class="text-xs text-smoke/60 border-t border-white/5 pt-2 space-y-0.5">
+              <div>Cliente: <span class="text-white">${s.client_name}</span></div>
+              <div>Hora: <span class="text-smoke/80">${s.created_at}</span></div>
+            </div>
+            <div class="flex gap-2 mt-auto pt-1">
+              <button onclick="cfApproveSale(${s.id})"
+                      class="flex-1 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                Aprobar
+              </button>
+              <button onclick="cfOpenRejectModal(${s.id}, '${s.barber_name.replace(/'/g, "\\'")}')"
+                      class="flex-1 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                Rechazar
+              </button>
+            </div>
+          </div>
+        `).join('');
+    }
+
+    window.cfApproveSale = function(id) {
+        const card = document.getElementById(`cf-card-${id}`);
+        if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
+        fetch(`/api/admin/cashflow/sales/${id}/approve/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                cfLoadApprovals();
+            } else {
+                if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+                alert(data.error || 'Error al aprobar.');
+            }
+        })
+        .catch(() => {
+            if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+            alert('Error de conexión.');
+        });
+    };
+
+    // Modal de rechazo (Cashflow)
+    let cfRejectId = null;
+
+    window.cfOpenRejectModal = function(id, name) {
+        cfRejectId = id;
+        document.getElementById('cf-reject-barber-name').textContent = name;
+        document.getElementById('cf-reject-reason-input').value = '';
+        document.getElementById('cf-reject-error').classList.add('hidden');
+        const btn = document.getElementById('cf-btn-confirm-reject');
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
+        document.getElementById('cf-modal-reject').classList.remove('hidden');
+        setTimeout(() => document.getElementById('cf-reject-reason-input').focus(), 80);
+    };
+
+    window.cfCloseRejectModal = function() {
+        document.getElementById('cf-modal-reject').classList.add('hidden');
+        cfRejectId = null;
+    };
+
+    window.cfConfirmRejectSale = function() {
+        if (!cfRejectId) return;
+        const reason = document.getElementById('cf-reject-reason-input').value.trim();
+        const btn    = document.getElementById('cf-btn-confirm-reject');
+        const errDiv = document.getElementById('cf-reject-error');
+        btn.disabled = true;
+        btn.textContent = 'Procesando...';
+        errDiv.classList.add('hidden');
+
+        fetch(`/api/admin/cashflow/sales/${cfRejectId}/reject/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ reason: reason || 'Sin razón especificada.' })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                cfCloseRejectModal();
+                cfLoadApprovals();
+            } else {
+                errDiv.textContent = data.error || 'Error al rechazar.';
+                errDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
+            }
+        })
+        .catch(() => {
+            errDiv.textContent = 'Error de conexión.';
+            errDiv.classList.remove('hidden');
+            btn.disabled = false;
+            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
+        });
+    };
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cfCloseRejectModal(); });
+
+    // Cargar aprobaciones si hay pendientes
+    {% if pending_approvals_count and pending_approvals_count > 0 %}
+    cfLoadApprovals();
+    {% endif %}
+
+});
 </script>
 {% endblock %}

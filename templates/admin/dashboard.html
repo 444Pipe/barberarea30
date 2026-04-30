@@ -13,15 +13,15 @@
       <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Dashboard Diario</h1>
       <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Resumen del día — <span id="today-date-header"></span></p>
     </div>
-    
+
     <!-- Date Navigation Component -->
     <div class="flex items-center gap-2 bg-jet-lighter border border-white/10 rounded-lg p-1.5 shadow-lg w-fit">
       <a href="?date={{ prev_date }}" class="p-2 text-smoke/50 hover:text-gold hover:bg-white/5 rounded-md transition-colors" title="Día Anterior">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </a>
-      
+
       <form id="date-form" class="relative m-0 p-0 flex items-center">
-        <input type="date" id="date-picker" name="date" value="{{ today_str }}" 
+        <input type="date" id="date-picker" name="date" value="{{ today_str }}"
                class="bg-transparent text-sm font-medium text-white px-2 py-1 focus:outline-none focus:ring-0 w-[130px] cursor-pointer appearance-none text-center [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                style="color-scheme: dark;">
         <div class="absolute right-2 pointer-events-none text-gold">
@@ -46,7 +46,7 @@
     </a>
   </div>
 
-  <!-- KPI Cards - datos reales del día inyectados desde Django -->
+  <!-- KPI Cards -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-cards">
     <div class="kpi-card">
       <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Ingresos Hoy</div>
@@ -74,20 +74,24 @@
     </div>
   </div>
 
-  {% if pending_approvals_count and pending_approvals_count > 0 %}
-  <!-- Approvals Section -->
-  <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-6" id="approvals-section">
-    <div class="flex items-center justify-between mb-4">
+  <!-- ═══ PANEL DE APROBACIONES ═══
+       Siempre presente en el DOM — JS lo muestra/oculta según haya ventas pendientes.
+       Visible solo para operational_admin, admin y superadmin. -->
+  {% if user_role == 'operational_admin' or user_role == 'superadmin' or user_role == 'admin' %}
+  <div id="approvals-section" class="bg-red-500/10 border border-red-500/20 rounded-xl p-6 hidden">
+    <div class="flex items-center justify-between mb-5">
       <h2 class="text-xs tracking-[0.3em] uppercase text-red-400 font-bold flex items-center gap-2">
         <span class="relative flex h-3 w-3">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
         </span>
-        Ventas por Aprobar ({{ pending_approvals_count }})
+        Ventas por Aprobar — <span id="approvals-count-label">0</span>
       </h2>
+      <a href="/admin-panel/cashflow/" class="text-[0.65rem] tracking-widest uppercase text-red-400/60 hover:text-red-400 transition-colors">
+        Ver en Caja →
+      </a>
     </div>
     <div id="approvals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <div class="text-center text-red-400/50 text-sm py-4 col-span-full">Cargando aprobaciones pendientes...</div>
     </div>
   </div>
   {% endif %}
@@ -103,42 +107,88 @@
   </div>
 </div>
 
+<!-- ═══ MODAL DE RECHAZO ═══ -->
+<div id="modal-reject" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeRejectModal()"></div>
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+    <div class="bg-jet-card border border-red-500/30 rounded-xl shadow-2xl overflow-hidden">
+      <!-- Header del modal -->
+      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
+        <h3 class="text-base font-serif text-white">Rechazar Venta</h3>
+        <button onclick="closeRejectModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <!-- Body del modal -->
+      <div class="p-6 space-y-4">
+        <div class="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <svg class="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          <div class="text-xs text-smoke/70 leading-relaxed">
+            Venta de: <strong class="text-white" id="reject-barber-name"></strong><br>
+            La reserva del cliente volverá a estado <span class="text-amber-400 font-semibold">Pendiente</span> para que el barbero la procese correctamente.
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs tracking-widest uppercase text-smoke/50 mb-2 font-semibold">Razón del Rechazo <span class="text-smoke/30">(opcional)</span></label>
+          <textarea id="reject-reason-input"
+                    class="w-full bg-jet border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-smoke/30 focus:outline-none focus:border-red-500/50 resize-none transition-colors"
+                    rows="3"
+                    placeholder="Ej: Monto incorrecto, servicio no coincide..."></textarea>
+        </div>
+        <div id="reject-error" class="hidden p-3 bg-red-500/20 border border-red-500/40 text-red-400 text-xs rounded-lg"></div>
+      </div>
+      <!-- Footer del modal -->
+      <div class="px-6 pb-6 flex gap-3 justify-end">
+        <button onclick="closeRejectModal()"
+                class="px-5 py-2.5 text-smoke/70 hover:text-white transition-colors text-xs tracking-widest uppercase border border-white/10 rounded-lg hover:border-white/20">
+          Cancelar
+        </button>
+        <button id="btn-confirm-reject" onclick="confirmRejectSale()"
+                class="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs tracking-widest uppercase transition-all flex items-center gap-2 shadow-lg shadow-red-900/30">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          Rechazar Venta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Configurar la fecha en el título superior y Kanban
+
+  // ── Fechas ──────────────────────────────────────────────────────────────────
   const selectedDateStr = '{{ today_str }}';
-  const todayObj = new Date(selectedDateStr + 'T00:00:00'); // Evitar desajustes de zona horaria
+  const todayObj = new Date(selectedDateStr + 'T00:00:00');
   const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const formattedDate = todayObj.toLocaleDateString('es-CO', opts);
   document.getElementById('today-date-header').textContent = formattedDate;
   document.getElementById('kanban-date').textContent = formattedDate;
 
-  // Auto-enviar formulario al cambiar la fecha
-  const datePicker = document.getElementById('date-picker');
-  datePicker.addEventListener('change', function() {
+  // Auto-submit al cambiar la fecha
+  document.getElementById('date-picker').addEventListener('change', function() {
     document.getElementById('date-form').submit();
   });
 
+  // ── Dashboard Stats API ──────────────────────────────────────────────────────
   let dashData = null;
   const urlParams = new URLSearchParams(window.location.search);
   const dateParam = urlParams.get('date');
   let apiUrl = '/api/admin/stats/dashboard/';
-  if (dateParam) {
-    apiUrl += `?date=${dateParam}`;
-  }
+  if (dateParam) apiUrl += `?date=${dateParam}`;
 
   fetch(apiUrl)
     .then(r => r.json())
     .then(data => {
       dashData = data;
       updateRevenue('day');
-      document.getElementById('kpi-pending').textContent = data.pending_count;
-      document.getElementById('kpi-top-barber').textContent = data.top_barber;
-      document.getElementById('kpi-cancel-rate').textContent = data.cancel_rate + '%';
       renderKanban(data.today_kanban);
     })
     .catch(() => {
-      document.getElementById('kanban-container').innerHTML = '<div class="text-center text-smoke/30 text-sm py-8 col-span-full">Sin datos disponibles</div>';
+      document.getElementById('kanban-container').innerHTML =
+        '<div class="text-center text-smoke/30 text-sm py-8 col-span-full">Sin datos disponibles</div>';
     });
 
   function updateRevenue(period) {
@@ -155,90 +205,182 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Approvals Logic
-  {% if pending_approvals_count and pending_approvals_count > 0 %}
+  // ── Panel de Aprobaciones (solo para administradores) ────────────────────────
+  {% if user_role == 'operational_admin' or user_role == 'superadmin' or user_role == 'admin' %}
+
   function loadApprovals() {
     fetch('/api/admin/cashflow/pending-approvals/')
       .then(r => r.json())
-      .then(data => renderApprovals(data.pending_approvals))
-      .catch(() => {
-        document.getElementById('approvals-container').innerHTML = '<div class="text-center text-red-400/50 text-sm py-4 col-span-full">Error al cargar aprobaciones</div>';
-      });
+      .then(data => renderApprovals(data.pending_approvals || []))
+      .catch(() => { /* silencioso */ });
   }
 
   function renderApprovals(sales) {
+    const section   = document.getElementById('approvals-section');
     const container = document.getElementById('approvals-container');
+    const countLbl  = document.getElementById('approvals-count-label');
+
     if (!sales || sales.length === 0) {
-      document.getElementById('approvals-section').style.display = 'none';
+      section.classList.add('hidden');
       return;
     }
-    
+
+    countLbl.textContent = sales.length;
+    section.classList.remove('hidden');
+
     container.innerHTML = sales.map(s => `
-      <div class="bg-jet-card border border-red-500/30 rounded-lg p-4 shadow-lg">
-        <div class="flex justify-between items-start mb-2">
+      <div class="bg-jet-card border border-red-500/30 rounded-xl p-4 shadow-lg flex flex-col gap-3 transition-opacity duration-300" id="approval-card-${s.id}">
+        <div class="flex justify-between items-start">
           <div>
             <div class="text-white font-bold text-sm">${s.barber_name}</div>
             <div class="text-[0.65rem] text-smoke/50 uppercase tracking-widest">${s.service_name}</div>
           </div>
           <div class="text-right">
-            <div class="text-gold font-bold">$${s.final_price.toLocaleString('es-CO')}</div>
-            ${s.tip_amount > 0 ? `<div class="text-[0.6rem] text-amber-400 uppercase tracking-widest">+ $${s.tip_amount.toLocaleString('es-CO')} propina</div>` : ''}
+            <div class="text-gold font-bold text-base">$${s.final_price.toLocaleString('es-CO')}</div>
+            ${s.tip_amount > 0
+              ? `<div class="text-[0.6rem] text-amber-400 uppercase tracking-widest">+ $${s.tip_amount.toLocaleString('es-CO')} propina</div>`
+              : ''}
           </div>
         </div>
-        <div class="text-xs text-smoke/60 mb-4 border-b border-white/5 pb-2">
-          Cliente: <span class="text-white">${s.client_name}</span><br>
-          Hora: ${s.created_at}
+        <div class="text-xs text-smoke/60 border-t border-white/5 pt-2 space-y-0.5">
+          <div>Cliente: <span class="text-white">${s.client_name}</span></div>
+          <div>Registrada: <span class="text-smoke/80">${s.created_at}</span></div>
         </div>
-        <div class="flex gap-2">
-          <button onclick="approveSale(${s.id})" class="flex-1 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider rounded transition-colors">Confirmar</button>
-          <button onclick="promptRejectSale(${s.id})" class="flex-1 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 text-xs font-bold uppercase tracking-wider rounded transition-colors">Rechazar</button>
+        <div class="flex gap-2 mt-auto pt-1">
+          <button onclick="approveSale(${s.id})"
+                  class="flex-1 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            Aprobar
+          </button>
+          <button onclick="openRejectModal(${s.id}, '${s.barber_name.replace(/'/g, "\\'")}')"
+                  class="flex-1 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            Rechazar
+          </button>
         </div>
       </div>
     `).join('');
   }
 
+  // Aprobar venta
   window.approveSale = function(id) {
-    if (!confirm('¿Confirmas que el barbero realizó el cobro correctamente?')) return;
+    const card = document.getElementById(`approval-card-${id}`);
+    if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
+
     fetch(`/api/admin/cashflow/sales/${id}/approve/`, {
       method: 'POST',
       headers: { 'X-CSRFToken': getCSRF() }
-    }).then(r => {
-      if (r.ok) {
-        window.location.reload(); // Recargar para actualizar contadores
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        loadApprovals();
+        updateSidebarBadge();
       } else {
-        alert('Error al aprobar venta');
+        if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+        alert(data.error || 'Error al aprobar la venta.');
       }
+    })
+    .catch(() => {
+      if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+      alert('Error de conexión al aprobar la venta.');
     });
   };
 
-  window.promptRejectSale = function(id) {
-    const reason = prompt('Razón del rechazo (ej: "Se equivocó en el servicio", "No cobró propina"):');
-    if (reason === null) return;
-    
-    fetch(`/api/admin/cashflow/sales/${id}/reject/`, {
+  // ── Modal de Rechazo ────────────────────────────────────────────────────────
+  let rejectTargetId = null;
+
+  window.openRejectModal = function(id, barberName) {
+    rejectTargetId = id;
+    document.getElementById('reject-barber-name').textContent = barberName;
+    document.getElementById('reject-reason-input').value = '';
+    document.getElementById('reject-error').classList.add('hidden');
+    const btn = document.getElementById('btn-confirm-reject');
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
+    document.getElementById('modal-reject').classList.remove('hidden');
+    setTimeout(() => document.getElementById('reject-reason-input').focus(), 80);
+  };
+
+  window.closeRejectModal = function() {
+    document.getElementById('modal-reject').classList.add('hidden');
+    rejectTargetId = null;
+  };
+
+  window.confirmRejectSale = function() {
+    if (!rejectTargetId) return;
+    const reason = document.getElementById('reject-reason-input').value.trim();
+    const btn    = document.getElementById('btn-confirm-reject');
+    const errDiv = document.getElementById('reject-error');
+
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+    errDiv.classList.add('hidden');
+
+    fetch(`/api/admin/cashflow/sales/${rejectTargetId}/reject/`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRF() 
+        'X-CSRFToken': getCSRF()
       },
-      body: JSON.stringify({ reason: reason || 'Sin razón especificada' })
-    }).then(r => {
-      if (r.ok) {
-        window.location.reload();
+      body: JSON.stringify({ reason: reason || 'Sin razón especificada.' })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        closeRejectModal();
+        loadApprovals();
+        updateSidebarBadge();
       } else {
-        alert('Error al rechazar venta');
+        errDiv.textContent = data.error || 'Error al rechazar la venta.';
+        errDiv.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
       }
+    })
+    .catch(() => {
+      errDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+      errDiv.classList.remove('hidden');
+      btn.disabled = false;
+      btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
     });
   };
 
-  function getCSRF() {
-    const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
-    return cookie ? cookie.split('=')[1] : '';
+  // Cerrar con tecla ESC
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRejectModal(); });
+
+  // Actualizar badge del sidebar después de aprobar/rechazar
+  function updateSidebarBadge() {
+    fetch('/api/admin/cashflow/pending-approvals/')
+      .then(r => r.json())
+      .then(data => {
+        const count = (data.pending_approvals || []).length;
+        // El badge está en el <a> que tiene data-section="cashflow"
+        const link = document.querySelector('.sidebar-link[data-section="cashflow"]');
+        if (!link) return;
+        let badge = link.querySelector('span.bg-red-500');
+        if (count > 0) {
+          if (badge) {
+            badge.textContent = count;
+          } else {
+            badge = document.createElement('span');
+            badge.className = 'bg-red-500 text-white text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full animate-pulse';
+            badge.textContent = count;
+            link.appendChild(badge);
+          }
+        } else {
+          if (badge) badge.remove();
+        }
+      });
   }
 
+  // Carga inicial + polling cada 30 segundos
   loadApprovals();
-  {% endif %}
+  setInterval(loadApprovals, 30000);
 
+  {% endif %} {# fin bloque admin #}
+
+  // ── Kanban ───────────────────────────────────────────────────────────────────
   function renderKanban(kanban) {
     const container = document.getElementById('kanban-container');
     if (!kanban || Object.keys(kanban).length === 0) {
@@ -256,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       bookings.forEach(b => {
         const statusColors = {
-          'pending': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+          'pending':   'bg-amber-500/20 text-amber-400 border-amber-500/30',
           'confirmed': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
           'completed': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
           'cancelled': 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -277,6 +419,13 @@ document.addEventListener('DOMContentLoaded', function() {
       container.appendChild(col);
     }
   }
-});
+
+  // ── Utilidad CSRF ────────────────────────────────────────────────────────────
+  function getCSRF() {
+    const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1].trim() : '';
+  }
+
+}); // DOMContentLoaded
 </script>
 {% endblock %}
