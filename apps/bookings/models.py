@@ -56,7 +56,7 @@ class Booking(models.Model):
 
     @property
     def can_cancel(self):
-        """Solo se puede cancelar hasta 2 horas antes de la cita."""
+        """Se puede cancelar si la cita no ha empezado aún y no está completada ni cancelada."""
         if self.status in ['completed', 'cancelled']:
             return False
         
@@ -65,7 +65,8 @@ class Booking(models.Model):
             datetime.combine(self.date, self.time), 
             timezone.get_current_timezone()
         )
-        return timezone.now() <= (booking_datetime - timedelta(hours=2))
+        # Allow cancellation up until the moment of the appointment
+        return timezone.now() < booking_datetime
 
 
 class Review(models.Model):

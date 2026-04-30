@@ -501,25 +501,57 @@ def client_booking_detail_view(request, signed_id):
                 booking.status = 'cancelled'
                 booking.save()
                 
-                # Registrar en auditoría
+                # Registrar en auditoría (aparece en el panel de notificaciones del admin)
                 from apps.analytics.models import AuditLog
                 AuditLog.objects.create(
-                    user=None, # Cliente anónimo
+                    user=None,  # Cliente anónimo
                     action='update',
                     model_name='Booking',
                     object_id=booking.id,
                     object_repr=str(booking),
                     changes={'status': ['pending/confirmed', 'cancelled']},
-                    extra_data={'msg': 'Reserva cancelada por el cliente desde el enlace público.'}
+                    extra_data={
+                        'msg': f'⚠️ {booking.client_name} canceló su reserva del {booking.date} a las {booking.time} con {booking.barber.display_name if booking.barber else "barbero"}.'
+                    }
                 )
                 
-                # Notificar al barbero
-                from apps.bookings.emails import send_barber_cancellation_notification
+                # Notificar al barbero por email
+                from apps.bookings.emails import send_barber_cancellation_notification, _send_html_email
+                from django.conf import settings
                 send_barber_cancellation_notification(booking)
                 
-                messages.success(request, "Tu reserva ha sido cancelada correctamente.")
+                # Notificar también a todos los admins/operational_admins por email
+                from django.contrib.auth.models import User
+                admin_emails = list(
+                    User.objects.filter(
+                        profile__role__in=['admin', 'operational_admin', 'superadmin'],
+                        email__isnull=False
+                    ).exclude(email='').values_list('email', flat=True)
+                )
+                if admin_emails:
+                    from django.core.mail import send_mail
+                    from django.conf import settings as dj_settings
+                    try:
+                        send_mail(
+                            subject=f'⚠️ Cliente canceló cita — {booking.client_name}',
+                            message=(
+                                f'{booking.client_name} ha cancelado su reserva.\n'
+                                f'Fecha: {booking.date}\n'
+                                f'Hora: {booking.time}\n'
+                                f'Servicio: {booking.service.name if booking.service else "-"}\n'
+                                f'Barbero: {booking.barber.display_name if booking.barber else "-"}\n\n'
+                                f'Ingresa al panel para verificar.'
+                            ),
+                            from_email=dj_settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=admin_emails,
+                            fail_silently=True,
+                        )
+                    except Exception:
+                        pass
+                
+                messages.success(request, "Tu reserva ha sido cancelada correctamente. Ya notificamos a tu barbero.")
             else:
-                messages.error(request, "No puedes cancelar esta reserva. El tiempo límite ha pasado o ya estaba cancelada.")
+                messages.error(request, "No puedes cancelar esta reserva. La cita ya pasó o está completada/cancelada.")
                 
         return redirect('client_booking_detail', signed_id=signed_id)
 
@@ -527,6 +559,7 @@ def client_booking_detail_view(request, signed_id):
         'booking': booking,
     }
     return render(request, 'public/booking_detail.html', context)
+
 
 
 @api_view(['DELETE'])

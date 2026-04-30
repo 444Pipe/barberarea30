@@ -98,16 +98,34 @@
 
       {% if booking.can_cancel %}
         <div class="mt-10 border-t border-red-500/20 pt-6">
-          <p class="text-smoke/50 text-xs mb-4">Si necesitas cancelar tu cita, puedes hacerlo presionando el botón abajo. Solo es posible cancelar hasta 2 horas antes de la hora programada.</p>
-          <form method="POST" onsubmit="return confirm('¿Estás seguro que deseas cancelar tu reserva? Esta acción no se puede deshacer y perderás tu turno.');">
+          <div class="flex items-start gap-3 mb-4">
+            <svg class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            <p class="text-smoke/50 text-xs leading-relaxed">Si necesitas cancelar, te lo comunicaremos al barbero de inmediato. Esta acción no se puede deshacer.</p>
+          </div>
+          <form method="POST" id="cancel-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="cancel">
-            <button type="submit" class="w-full sm:w-auto px-6 py-3 border border-red-500/30 text-red-400 rounded-sm text-xs tracking-widest uppercase hover:bg-red-500 hover:text-white transition-all font-bold">
+            <button type="button" onclick="showCancelModal()"
+              class="w-full sm:w-auto px-6 py-3 border border-red-500/30 text-red-400 rounded-sm text-xs tracking-widest uppercase hover:bg-red-500 hover:text-white transition-all duration-300 font-bold flex items-center gap-2">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               Cancelar Reserva
             </button>
           </form>
         </div>
+      {% elif booking.status == 'cancelled' %}
+        <div class="mt-10 border-t border-red-500/20 pt-6 text-center">
+          <p class="text-red-400/70 text-sm">Esta reserva ha sido cancelada.</p>
+        </div>
+      {% elif booking.status == 'completed' %}
+        <div class="mt-10 border-t border-emerald-500/20 pt-6 text-center">
+          <p class="text-emerald-400/70 text-sm">Esta reserva ya fue completada. ¡Gracias por visitarnos!</p>
+        </div>
+      {% else %}
+        <div class="mt-10 border-t border-white/10 pt-6 text-center">
+          <p class="text-smoke/30 text-xs">Ya no es posible cancelar esta cita porque la hora de la cita ya pasó.</p>
+        </div>
       {% endif %}
+
     </div>
 
     <div class="mt-12 text-center">
@@ -120,6 +138,40 @@
       <p class="text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
     </div>
   </footer>
+  <!-- Cancel Confirmation Modal -->
+  <div id="cancel-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="hideCancelModal()"></div>
+    <div class="relative bg-jet-lighter border border-red-500/20 rounded-sm p-8 max-w-md w-full shadow-2xl">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>
+        <h3 class="text-xl font-serif text-white mb-2">¿Cancelar tu cita?</h3>
+        <p class="text-smoke/50 text-sm leading-relaxed">
+          Estás a punto de cancelar tu reserva con <strong class="text-white">{{ booking.barber.display_name|default:"tu barbero" }}</strong>
+          el <strong class="text-white">{{ booking.date|date:"d/m/Y" }}</strong> a las <strong class="text-white">{{ booking.time|time:"g:i A" }}</strong>.
+        </p>
+        <p class="text-red-400/70 text-xs mt-3">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="hideCancelModal()" class="flex-1 px-4 py-3 border border-white/10 text-smoke/60 rounded-sm text-xs tracking-widest uppercase hover:text-white transition-colors">
+          Mantener cita
+        </button>
+        <button onclick="document.getElementById('cancel-form').submit()" class="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-sm text-xs tracking-widest uppercase font-bold transition-colors">
+          Sí, cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showCancelModal() {
+      document.getElementById('cancel-modal').classList.remove('hidden');
+    }
+    function hideCancelModal() {
+      document.getElementById('cancel-modal').classList.add('hidden');
+    }
+  </script>
 
 </body>
 </html>
