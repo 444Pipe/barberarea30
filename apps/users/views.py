@@ -177,7 +177,7 @@ def admin_settings_view(request):
     return render(request, 'admin/settings.html', context)
 
 
-@admin_required
+@staff_required
 def admin_gallery_view(request):
     context = {
         'user_role': request.user.profile.role,
@@ -187,7 +187,7 @@ def admin_gallery_view(request):
     return render(request, 'admin/gallery.html', context)
 
 
-@admin_required
+@staff_required
 def admin_reels_view(request):
     from apps.barbers.models import Barber
     barbers = Barber.objects.filter(is_available=True)

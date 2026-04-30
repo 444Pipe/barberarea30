@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.http import JsonResponse
-from apps.users.permissions import IsAdminOrAbove
+from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove
 from apps.bookings.models import Booking, BlockedDate
 from .models import Barber, GalleryImage, Reel
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
@@ -243,7 +243,7 @@ class GalleryAdminListCreateView(generics.ListCreateAPIView):
     """GET/POST /api/admin/gallery/"""
     queryset = GalleryImage.objects.select_related('barber').all()
     serializer_class = GalleryImageSerializer
-    permission_classes = [IsAdminOrAbove]
+    permission_classes = [IsBarberOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
@@ -252,7 +252,7 @@ class GalleryAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/admin/gallery/{id}/"""
     queryset = GalleryImage.objects.all()
     serializer_class = GalleryImageSerializer
-    permission_classes = [IsAdminOrAbove]
+    permission_classes = [IsBarberOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
@@ -270,7 +270,7 @@ class ReelAdminListCreateView(generics.ListCreateAPIView):
     """GET/POST /api/admin/reels/ — lista completa y subir reel."""
     queryset = Reel.objects.all().select_related('barber')
     serializer_class = ReelSerializer
-    permission_classes = [IsAdminOrAbove]
+    permission_classes = [IsBarberOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
@@ -279,7 +279,7 @@ class ReelAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/admin/reels/{id}/"""
     queryset = Reel.objects.all()
     serializer_class = ReelSerializer
-    permission_classes = [IsAdminOrAbove]
+    permission_classes = [IsBarberOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
 
