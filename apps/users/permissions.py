@@ -20,6 +20,22 @@ class IsBatmanOrSuperadmin(BasePermission):
         return profile and profile.role in ('superadmin', 'admin')
 
 
+class IsAdminOrAboveWithWriteBatman(BasePermission):
+    """Permite GET a operational_admin (Frank), pero POST/PUT/DELETE solo a admin/superadmin."""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        profile = getattr(request.user, 'profile', None)
+        if not profile:
+            return False
+        
+        from rest_framework.permissions import SAFE_METHODS
+        if request.method in SAFE_METHODS:
+            return profile.is_admin
+        
+        return profile.role in ('superadmin', 'admin')
+
+
 class IsOperationalAdminOrAbove(BasePermission):
     """Operational admin (Frank) or super admin: cierre de caja, propinas, ventas."""
     def has_permission(self, request, view):

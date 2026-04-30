@@ -126,7 +126,7 @@ def admin_bookings_view(request):
     return render(request, 'admin/bookings.html', context)
 
 
-@role_required('superadmin', 'admin')
+@admin_required
 def admin_barbers_view(request):
     context = {
         'user_role': request.user.profile.role,
