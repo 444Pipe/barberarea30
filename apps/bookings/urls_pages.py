@@ -20,4 +20,6 @@ urlpatterns = [
     path('rate/<int:booking_id>/', TemplateView.as_view(template_name='public/rate.html'), name='rate_booking'),
     path('reels/', TemplateView.as_view(template_name='public/reels.html'), name='reels'),
     path('reels', TemplateView.as_view(template_name='public/reels.html')),
+    path('profesionales/', TemplateView.as_view(template_name='public/profesionales.html'), name='profesionales'),
+    path('profesionales', TemplateView.as_view(template_name='public/profesionales.html')),
 ]
