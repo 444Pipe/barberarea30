@@ -74,6 +74,24 @@
     </div>
   </div>
 
+  {% if pending_approvals_count and pending_approvals_count > 0 %}
+  <!-- Approvals Section -->
+  <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-6" id="approvals-section">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xs tracking-[0.3em] uppercase text-red-400 font-bold flex items-center gap-2">
+        <span class="relative flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+        </span>
+        Ventas por Aprobar ({{ pending_approvals_count }})
+      </h2>
+    </div>
+    <div id="approvals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div class="text-center text-red-400/50 text-sm py-4 col-span-full">Cargando aprobaciones pendientes...</div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Today Kanban View -->
   <div class="bg-jet-card border border-white/5 rounded-xl p-6">
     <h2 class="text-xs tracking-[0.3em] uppercase text-smoke/40 font-semibold mb-4">
@@ -136,6 +154,90 @@ document.addEventListener('DOMContentLoaded', function() {
       updateRevenue(btn.dataset.period);
     });
   });
+
+  // Approvals Logic
+  {% if pending_approvals_count and pending_approvals_count > 0 %}
+  function loadApprovals() {
+    fetch('/api/admin/cashflow/pending-approvals/')
+      .then(r => r.json())
+      .then(data => renderApprovals(data.pending_approvals))
+      .catch(() => {
+        document.getElementById('approvals-container').innerHTML = '<div class="text-center text-red-400/50 text-sm py-4 col-span-full">Error al cargar aprobaciones</div>';
+      });
+  }
+
+  function renderApprovals(sales) {
+    const container = document.getElementById('approvals-container');
+    if (!sales || sales.length === 0) {
+      document.getElementById('approvals-section').style.display = 'none';
+      return;
+    }
+    
+    container.innerHTML = sales.map(s => `
+      <div class="bg-jet-card border border-red-500/30 rounded-lg p-4 shadow-lg">
+        <div class="flex justify-between items-start mb-2">
+          <div>
+            <div class="text-white font-bold text-sm">${s.barber_name}</div>
+            <div class="text-[0.65rem] text-smoke/50 uppercase tracking-widest">${s.service_name}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-gold font-bold">$${s.final_price.toLocaleString('es-CO')}</div>
+            ${s.tip_amount > 0 ? `<div class="text-[0.6rem] text-amber-400 uppercase tracking-widest">+ $${s.tip_amount.toLocaleString('es-CO')} propina</div>` : ''}
+          </div>
+        </div>
+        <div class="text-xs text-smoke/60 mb-4 border-b border-white/5 pb-2">
+          Cliente: <span class="text-white">${s.client_name}</span><br>
+          Hora: ${s.created_at}
+        </div>
+        <div class="flex gap-2">
+          <button onclick="approveSale(${s.id})" class="flex-1 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider rounded transition-colors">Confirmar</button>
+          <button onclick="promptRejectSale(${s.id})" class="flex-1 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 text-xs font-bold uppercase tracking-wider rounded transition-colors">Rechazar</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.approveSale = function(id) {
+    if (!confirm('¿Confirmas que el barbero realizó el cobro correctamente?')) return;
+    fetch(`/api/admin/cashflow/sales/${id}/approve/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCSRF() }
+    }).then(r => {
+      if (r.ok) {
+        window.location.reload(); // Recargar para actualizar contadores
+      } else {
+        alert('Error al aprobar venta');
+      }
+    });
+  };
+
+  window.promptRejectSale = function(id) {
+    const reason = prompt('Razón del rechazo (ej: "Se equivocó en el servicio", "No cobró propina"):');
+    if (reason === null) return;
+    
+    fetch(`/api/admin/cashflow/sales/${id}/reject/`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRF() 
+      },
+      body: JSON.stringify({ reason: reason || 'Sin razón especificada' })
+    }).then(r => {
+      if (r.ok) {
+        window.location.reload();
+      } else {
+        alert('Error al rechazar venta');
+      }
+    });
+  };
+
+  function getCSRF() {
+    const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1] : '';
+  }
+
+  loadApprovals();
+  {% endif %}
 
   function renderKanban(kanban) {
     const container = document.getElementById('kanban-container');

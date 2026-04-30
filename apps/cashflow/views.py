@@ -86,6 +86,14 @@ def daily_close_view(request):
     if not pending_sales.exists():
         return Response({'error': 'No hay ventas pendientes por cerrar.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Validar si hay ventas esperando aprobación (pending)
+    unapproved_sales = pending_sales.filter(approval_status=Sale.STATUS_PENDING)
+    if unapproved_sales.exists():
+        return Response({'error': 'Hay ventas pendientes de aprobación. Por favor apruébelas o rechácelas antes de cerrar la caja.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Solo considerar las aprobadas
+    pending_sales = pending_sales.filter(approval_status=Sale.STATUS_APPROVED)
+
     with transaction.atomic():
         total_sales = pending_sales.aggregate(total=Sum('base_price'))['total'] or 0
         total_tips = pending_sales.aggregate(total=Sum('tip_amount'))['total'] or 0
@@ -189,3 +197,99 @@ def add_expense_view(request):
         return Response({'ok': True, 'expense_id': expense.id, 'message': 'Egreso registrado correctamente.'})
     except Exception as e:
         return Response({'error': f'Error inesperado al guardar: {str(e)}'}, status=500)
+
+
+# ─── SISTEMA DE APROBACIÓN DE VENTAS ──────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def pending_approvals_view(request):
+    """GET /api/admin/cashflow/pending-approvals/"""
+    from apps.cashflow.models import Sale
+    sales = Sale.objects.select_related('barber', 'service', 'booking').filter(
+        approval_status=Sale.STATUS_PENDING,
+        included_in_daily_close__isnull=True
+    ).order_by('-created_at')
+
+    data = []
+    for s in sales:
+        data.append({
+            'id': s.id,
+            'barber_name': s.barber.display_name if s.barber else 'N/A',
+            'service_name': s.service.name if s.service else 'General',
+            'client_name': s.booking.client_name if s.booking else 'N/A',
+            'final_price': float(s.final_price),
+            'tip_amount': float(s.tip_amount),
+            'total_paid': float(s.total_paid),
+            'created_at': s.created_at.strftime('%Y-%m-%d %H:%M'),
+        })
+    return Response({'pending_approvals': data})
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def approve_sale_view(request, sale_id):
+    """POST /api/admin/cashflow/approvals/<sale_id>/approve/"""
+    from apps.cashflow.models import Sale
+    from django.utils import timezone
+    try:
+        sale = Sale.objects.get(id=sale_id, approval_status=Sale.STATUS_PENDING)
+    except Sale.DoesNotExist:
+        return Response({'error': 'Venta no encontrada o ya procesada.'}, status=404)
+
+    sale.approval_status = Sale.STATUS_APPROVED
+    sale.approved_by = request.user
+    sale.approved_at = timezone.now()
+    sale.save(update_fields=['approval_status', 'approved_by', 'approved_at'])
+
+    log_audit(
+        user=request.user,
+        action='update',
+        obj=sale,
+        changes={'approval_status': 'approved'},
+        request=request,
+        extra_data={'msg': f"Aprobó la venta #{sale.id} del barbero {sale.barber.display_name if sale.barber else 'N/A'}"}
+    )
+
+    return Response({'ok': True, 'message': 'Venta aprobada.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def reject_sale_view(request, sale_id):
+    """POST /api/admin/cashflow/approvals/<sale_id>/reject/"""
+    from apps.cashflow.models import Sale
+    from django.utils import timezone
+    from django.db import transaction
+
+    reason = request.data.get('reason', 'Sin razón especificada.')
+
+    try:
+        sale = Sale.objects.get(id=sale_id, approval_status=Sale.STATUS_PENDING)
+    except Sale.DoesNotExist:
+        return Response({'error': 'Venta no encontrada o ya procesada.'}, status=404)
+
+    with transaction.atomic():
+        booking = sale.booking
+        barber_name = sale.barber.display_name if sale.barber else 'N/A'
+
+        # Restaurar estado del booking a pendiente
+        if booking:
+            booking.status = 'pending'
+            booking.completed_at = None
+            booking.save(update_fields=['status', 'completed_at'])
+
+        # Eliminar la venta (que por cascada elimina la comisión)
+        sale_id_num = sale.id
+        sale.delete()
+
+        log_audit(
+            user=request.user,
+            action='delete',
+            obj=None,
+            changes={},
+            request=request,
+            extra_data={'msg': f"Rechazó y eliminó la venta #{sale_id_num} del barbero {barber_name}. Razón: {reason}"}
+        )
+
+    return Response({'ok': True, 'message': 'Venta rechazada y eliminada. La reserva vuelve a estar Pendiente.'})

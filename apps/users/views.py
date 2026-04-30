@@ -84,6 +84,10 @@ def admin_dashboard_view(request):
         .first()
     )
 
+    pending_approvals_count = 0
+    if profile and profile.role in ('operational_admin', 'superadmin', 'admin'):
+        pending_approvals_count = Sale.objects.filter(approval_status=Sale.STATUS_PENDING, included_in_daily_close__isnull=True).count()
+
     context = {
         'user_role': profile.role if profile else 'unknown',
         'user_name': request.user.get_full_name() or request.user.username,
@@ -98,6 +102,7 @@ def admin_dashboard_view(request):
         'today_revenue': today_revenue,
         'today_tips': today_tips,
         'top_barber_today': top_today['barber__display_name'] if top_today else '—',
+        'pending_approvals_count': pending_approvals_count,
     }
     return render(request, 'admin/dashboard.html', context)
 
@@ -213,13 +218,19 @@ def admin_cashflow_view(request):
     pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
     pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
     
+    # Solo consideramos las ventas aprobadas para las finanzas y comisiones
+    approved_sales = pending_sales.filter(approval_status=Sale.STATUS_APPROVED)
+    
+    # Pendientes de aprobación (para notificaciones de Frank)
+    pending_approvals_count = pending_sales.filter(approval_status=Sale.STATUS_PENDING).count()
+
     # Totales parciales
-    total_sales = pending_sales.aggregate(t=Sum('final_price'))['t'] or 0
-    total_tips = pending_sales.aggregate(t=Sum('tip_amount'))['t'] or 0
+    total_sales = approved_sales.aggregate(t=Sum('final_price'))['t'] or 0
+    total_tips = approved_sales.aggregate(t=Sum('tip_amount'))['t'] or 0
     total_expenses = pending_expenses.aggregate(t=Sum('amount'))['t'] or 0
     
     # Comisiones parciales
-    commissions = Commission.objects.filter(sale__in=pending_sales)
+    commissions = Commission.objects.filter(sale__in=approved_sales)
     total_commissions = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
     
     net_income = total_sales - total_commissions - total_expenses
@@ -231,7 +242,8 @@ def admin_cashflow_view(request):
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'cashflow',
         'today': today,
-        'pending_sales_count': pending_sales.count(),
+        'pending_sales_count': approved_sales.count(),
+        'pending_approvals_count': pending_approvals_count,
         'total_sales': total_sales,
         'total_tips': total_tips,
         'total_expenses': total_expenses,
