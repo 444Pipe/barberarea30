@@ -95,26 +95,35 @@ pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 
 pm2, _ = PaymentMethod.objects.get_or_create(slug='transferencia', defaults={'name': 'Transferencia (Nequi/Bancolombia)', 'is_active': True, 'requires_reference': True})
 
 # Crear superusuarios automáticamente para Railway
-usernames_to_promote = ['camilo', 'juan david', 'juandavid', 'juan.david']
-for uname in usernames_to_promote:
+users_to_create = [
+    {'username': 'camilorf', 'password': 'area30*', 'email': 'camilo@area30.co'},
+    {'username': 'Juandavid.castro', 'password': 'Liam2711*', 'email': 'juandavid@area30.co'},
+    {'username': 'soporte_tecnico', 'password': 'soporte_tecnico_pass', 'email': 'soporte@area30.co'}, # Assuming some pass or keeping existing
+]
+
+for user_data in users_to_create:
     try:
-        user, created = User.objects.get_or_create(username=uname, defaults={'email': f'{uname.replace(" ", "")}@area30.com'})
-        if created:
-            user.set_password('area30')
+        uname = user_data['username']
+        user, created = User.objects.get_or_create(username=uname, defaults={'email': user_data['email']})
+        user.set_password(user_data['password'])
         user.is_staff = True
         user.is_superuser = True
         user.save()
         UserProfile.objects.get_or_create(user=user, defaults={'role': 'superadmin'})
+        print(f"OK: Usuario {uname} {'creado' if created else 'actualizado'} correctamente.")
     except Exception as e:
-        print(f"No se pudo promover al usuario {uname}: {e}")
+        print(f"No se pudo procesar al usuario {uname}: {e}")
+
+# Eliminar usuarios antiguos si existen para evitar duplicados/confusión
+User.objects.filter(username__in=['camilo', 'juan david', 'juandavid', 'juan.david']).delete()
 
 # --- Asegurar que solo existan Camilo y Juan David como socios ---
 try:
     from apps.roi.models import Partner
     
     # 1. Obtener usuarios canónicos
-    camilo_user = User.objects.filter(username='camilo').first()
-    jd_user = User.objects.filter(username='juan david').first()
+    camilo_user = User.objects.filter(username='camilorf').first()
+    jd_user = User.objects.filter(username='Juandavid.castro').first()
     
     # 2. Eliminar socios duplicados o con alias (manteniendo solo los que tengan estos usuarios)
     valid_users = [u for u in [camilo_user, jd_user] if u]
@@ -122,14 +131,14 @@ try:
     
     # 3. Crear/Asegurar socio Camilo
     if camilo_user:
-        Partner.objects.get_or_create(
+        Partner.objects.update_or_create(
             user=camilo_user,
             defaults={'display_name': 'Camilo', 'share_percentage': 50.00}
         )
         
     # 4. Crear/Asegurar socio Juan David
     if jd_user:
-        Partner.objects.get_or_create(
+        Partner.objects.update_or_create(
             user=jd_user,
             defaults={'display_name': 'Juan David', 'share_percentage': 50.00}
         )
