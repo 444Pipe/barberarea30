@@ -19,12 +19,12 @@ class Command(BaseCommand):
              'duration_minutes': 40, 'features': ['Corte completo', 'Diseño freestyle personalizado', 'Cejas y styling'],
              'is_popular': True},
             {'name': 'Corte con Barba', 'slug': 'corte-barba', 'price': 40000,
-             'duration_minutes': 40, 'features': ['Corte de cabello', 'Perfilado de barba', 'Cejas y styling']},
+             'duration_minutes': 40, 'features': ['Corte de cabello', 'Diseño de barba', 'Cejas y styling']},
             {'name': 'The Club Experience', 'slug': 'club-experience', 'price': 60000,
              'duration_minutes': 60, 'features': ['Corte imperial', 'Diseño de barba ritual', 'Vapor ozono', 'Mascarilla'],
              'is_popular': True},
             {'name': 'Ritual de Barba', 'slug': 'ritual-barba', 'price': 25000,
-             'duration_minutes': 30, 'features': ['Perfilación a navaja', 'Toallas calientes aromáticas', 'Aceites premium']},
+             'duration_minutes': 30, 'features': ['Diseño a navaja', 'Toallas calientes aromáticas', 'Aceites premium']},
             {'name': 'Corte para Dama', 'slug': 'corte-dama', 'price': 35000,
              'duration_minutes': 40, 'features': ['Corte personalizado', 'Limpieza de cejas con cuchilla']},
             {'name': 'Freestyle Creativo', 'slug': 'freestyle-creativo', 'price': 40000,
@@ -40,7 +40,7 @@ class Command(BaseCommand):
                 slug=svc['slug'],
                 defaults={**svc, 'display_order': i}
             )
-        self.stdout.write(self.style.SUCCESS(f'✓ {len(services_data)} servicios creados/actualizados'))
+        self.stdout.write(self.style.SUCCESS(f'OK {len(services_data)} servicios creados/actualizados'))
 
         # ─── Barbershop ──────────────────────────
         shop, created = Barbershop.objects.get_or_create(
@@ -54,7 +54,7 @@ class Command(BaseCommand):
             }
         )
         action = 'creada' if created else 'ya existía'
-        self.stdout.write(self.style.SUCCESS(f'✓ Barbería "{shop.name}" {action}'))
+        self.stdout.write(self.style.SUCCESS(f'OK Barbería "{shop.name}" {action}'))
 
         # ─── Admin User ──────────────────────────
         admin_user, created = User.objects.get_or_create(
@@ -79,7 +79,7 @@ class Command(BaseCommand):
             }
         )
         self.stdout.write(self.style.SUCCESS(
-            f'✓ Usuario admin {"creado (pass: admin123)" if created else "ya existía"}'
+            f'OK Usuario admin {"creado (pass: admin123)" if created else "ya existía"}'
         ))
 
-        self.stdout.write(self.style.SUCCESS('\n✓ Seed completado exitosamente'))
+        self.stdout.write(self.style.SUCCESS('\nOK Seed completado exitosamente'))
