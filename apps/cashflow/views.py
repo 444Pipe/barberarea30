@@ -163,11 +163,13 @@ def daily_close_detail_view(request, close_id):
         return Response({'error': 'Cierre no encontrado'}, status=404)
 
     # Ventas asociadas a este cierre
-    sales = daily_close.sales.all().select_related('barber', 'service', 'commission')
+    sales = daily_close.sales.all().select_related('barber', 'service', 'commission', 'booking', 'payment_method', 'approved_by')
     expenses = daily_close.expenses.all()
 
+    from django.utils import timezone
     # Desglose por barbero
     barbers_data = {}
+    sales_detail = []
     for sale in sales:
         barber_id = sale.barber.id if sale.barber else 'unassigned'
         barber_name = sale.barber.display_name if sale.barber else 'Sin Barbero'
@@ -188,6 +190,18 @@ def daily_close_detail_view(request, close_id):
         
         if hasattr(sale, 'commission'):
             b_data['total_commissions'] += float(sale.commission.commission_amount)
+
+        sales_detail.append({
+            'client_name': sale.booking.client_name if sale.booking else 'N/A',
+            'service_name': sale.service.name if sale.service else 'General',
+            'time': timezone.localtime(sale.created_at).strftime('%I:%M %p'),
+            'base_price': float(sale.base_price),
+            'final_price': float(sale.final_price),
+            'tip_amount': float(sale.tip_amount),
+            'payment_method': sale.payment_method.name if sale.payment_method else 'N/A',
+            'barber_name': barber_name,
+            'approved_by': sale.approved_by.username if sale.approved_by else 'N/A'
+        })
 
     # Detalle de egresos
     expenses_data = []
@@ -210,6 +224,135 @@ def daily_close_detail_view(request, close_id):
         'net_income': float(daily_close.net_income),
         'barbers': list(barbers_data.values()),
         'expenses': expenses_data,
+        'sales_detail': sales_detail,
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsSuperAdmin])
+def delete_daily_close_view(request, close_id):
+    """DELETE /api/admin/cashflow/daily-close/<id>/delete/ - Eliminar cierre de caja (solo superadmin)."""
+    from apps.cashflow.models import DailyClose
+    try:
+        daily_close = DailyClose.objects.get(pk=close_id)
+        date_str = daily_close.date.strftime('%Y-%m-%d')
+        
+        # Desvincular ventas y egresos
+        daily_close.sales.update(included_in_daily_close=None)
+        daily_close.expenses.update(included_in_daily_close=None)
+        
+        daily_close.delete()
+        
+        log_audit(
+            user=request.user,
+            action='delete',
+            obj=None,
+            changes={},
+            request=request,
+            extra_data={'msg': f"Eliminó el Cierre de Caja del {date_str}"}
+        )
+        return Response({'ok': True, 'message': 'Cierre de caja eliminado correctamente.'})
+    except DailyClose.DoesNotExist:
+        return Response({'error': 'Cierre no encontrado.'}, status=404)
+    except Exception as e:
+        return Response({'error': f'Error al eliminar: {str(e)}'}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def live_cashflow_detail_view(request):
+    """GET /api/admin/cashflow/live-detail/ - Detalles en vivo del día actual (antes del cierre)."""
+    from apps.cashflow.models import Sale, Expense, Commission
+    from django.db.models import Sum
+    from django.utils import timezone
+
+    today = timezone.localtime(timezone.now()).date()
+
+    # Ventas aprobadas pendientes de cierre
+    approved_sales = Sale.objects.filter(
+        approval_status=Sale.STATUS_APPROVED, 
+        included_in_daily_close__isnull=True
+    ).select_related('barber', 'service', 'commission', 'booking', 'payment_method', 'approved_by')
+    
+    # Ventas pendientes de aprobación
+    pending_approvals_count = Sale.objects.filter(
+        approval_status=Sale.STATUS_PENDING, 
+        included_in_daily_close__isnull=True
+    ).count()
+
+    expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
+
+    barbers_data = {}
+    sales_detail = []
+    
+    total_sales_overall = 0
+    total_tips_overall = 0
+    total_commissions_overall = 0
+
+    for sale in approved_sales:
+        barber_id = sale.barber.id if sale.barber else 'unassigned'
+        barber_name = sale.barber.display_name if sale.barber else 'Sin Barbero'
+        
+        if barber_id not in barbers_data:
+            barbers_data[barber_id] = {
+                'name': barber_name,
+                'sales_count': 0,
+                'total_sales': 0,
+                'total_tips': 0,
+                'total_commissions': 0,
+            }
+        
+        b_data = barbers_data[barber_id]
+        b_data['sales_count'] += 1
+        
+        f_price = float(sale.final_price)
+        t_tip = float(sale.tip_amount)
+        c_amount = float(sale.commission.commission_amount) if hasattr(sale, 'commission') else 0
+        
+        b_data['total_sales'] += f_price
+        b_data['total_tips'] += t_tip
+        b_data['total_commissions'] += c_amount
+        
+        total_sales_overall += f_price
+        total_tips_overall += t_tip
+        total_commissions_overall += c_amount
+
+        sales_detail.append({
+            'client_name': sale.booking.client_name if sale.booking else 'N/A',
+            'service_name': sale.service.name if sale.service else 'General',
+            'time': timezone.localtime(sale.created_at).strftime('%I:%M %p'),
+            'base_price': float(sale.base_price),
+            'final_price': f_price,
+            'tip_amount': t_tip,
+            'payment_method': sale.payment_method.name if sale.payment_method else 'N/A',
+            'barber_name': barber_name,
+            'approved_by': sale.approved_by.username if sale.approved_by else 'N/A'
+        })
+
+    expenses_data = []
+    total_expenses_overall = 0
+    for exp in expenses:
+        amt = float(exp.amount)
+        total_expenses_overall += amt
+        expenses_data.append({
+            'description': exp.description,
+            'amount': amt,
+            'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
+        })
+
+    net_income = total_sales_overall - total_commissions_overall - total_expenses_overall
+
+    return Response({
+        'date': today.strftime('%Y-%m-%d'),
+        'total_sales': total_sales_overall,
+        'total_tips': total_tips_overall,
+        'total_commissions': total_commissions_overall,
+        'total_expenses': total_expenses_overall,
+        'net_income': net_income,
+        'pending_approvals_count': pending_approvals_count,
+        'barbers': list(barbers_data.values()),
+        'expenses': expenses_data,
+        'sales_detail': sales_detail,
     })
 
 

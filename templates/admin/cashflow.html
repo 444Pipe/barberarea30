@@ -9,7 +9,11 @@
             <h1 class="text-2xl font-serif text-white">Caja y Finanzas</h1>
             <p class="text-smoke/60 text-sm mt-1">Resumen financiero del día: {{ today }}</p>
         </div>
-        <div>
+        <div class="flex items-center gap-3">
+            <button onclick="showLiveDetails()" class="px-5 py-2.5 bg-jet-card hover:bg-white/5 border border-gold/30 text-gold font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                VER RESUMEN EN VIVO
+            </button>
             <button id="btn-daily-close" class="px-6 py-2.5 bg-gold hover:bg-gold-light text-jet font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-colors flex items-center gap-2" {% if pending_sales_count == 0 %}disabled style="opacity:0.5; cursor:not-allowed;"{% endif %}>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 EJECUTAR CIERRE DE CAJA
@@ -164,10 +168,15 @@
                         <span class="text-gold">Neto:</span>
                         <span class="text-gold">${{ close.net_income|floatformat:0 }}</span>
                     </div>
-                    <div class="mt-4 text-center">
-                        <button onclick="showDailyCloseDetails({{ close.id }})" class="w-full text-xs tracking-widest uppercase font-semibold text-smoke/50 hover:text-gold border border-white/5 hover:border-gold/30 bg-white/[0.02] hover:bg-gold/5 py-2 rounded-sm transition-all duration-300">
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="showDailyCloseDetails({{ close.id }})" class="flex-1 text-xs tracking-widest uppercase font-semibold text-smoke/50 hover:text-gold border border-white/5 hover:border-gold/30 bg-white/[0.02] hover:bg-gold/5 py-2 rounded-sm transition-all duration-300">
                             + Ver Detalles
                         </button>
+                        {% if user_role == 'superadmin' %}
+                        <button onclick="deleteDailyClose({{ close.id }}, '{{ close.date|date:"d M Y" }}')" class="px-3 text-xs tracking-widest text-smoke/30 hover:text-red-400 border border-transparent hover:border-red-400/30 hover:bg-red-500/10 rounded-sm transition-all duration-300" title="Borrar Cierre">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -467,9 +476,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 html += '</div>';
                 
+                // Detailed Sales List
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Transacciones Individuales</h4>';
+                if (data.sales_detail && data.sales_detail.length > 0) {
+                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
+                    html += `
+                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/10 text-[0.6rem] tracking-widest uppercase text-smoke/40 font-bold bg-black/50">
+                            <div class="col-span-3">Cliente / Hora</div>
+                            <div class="col-span-3">Servicio</div>
+                            <div class="col-span-2 text-right">Método</div>
+                            <div class="col-span-2 text-right">Venta</div>
+                            <div class="col-span-2 text-right">Propina</div>
+                        </div>`;
+                    data.sales_detail.forEach(sale => {
+                        html += `
+                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/5 last:border-0 text-xs items-center hover:bg-white/[0.02]">
+                            <div class="col-span-3">
+                                <span class="text-white block font-medium truncate" title="${sale.client_name}">${sale.client_name}</span>
+                                <span class="text-[0.6rem] text-smoke/40">${sale.time} - ${sale.barber_name}</span>
+                            </div>
+                            <div class="col-span-3">
+                                <span class="text-smoke/80 block truncate" title="${sale.service_name}">${sale.service_name}</span>
+                                <span class="text-[0.55rem] text-gold/60 tracking-widest uppercase">Por: ${sale.approved_by}</span>
+                            </div>
+                            <div class="col-span-2 text-right text-smoke/60 text-[0.65rem] uppercase tracking-widest">
+                                ${sale.payment_method}
+                            </div>
+                            <div class="col-span-2 text-right text-white font-medium">
+                                $${Number(sale.final_price).toLocaleString('es-CO')}
+                            </div>
+                            <div class="col-span-2 text-right text-emerald-400 font-medium">
+                                ${sale.tip_amount > 0 ? '+$' + Number(sale.tip_amount).toLocaleString('es-CO') : '-'}
+                            </div>
+                        </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se encontraron ventas para este cierre.</div>';
+                }
+                
                 // Expenses Breakdown
                 html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Egresos Registrados</h4>';
-                if (data.expenses.length > 0) {
+                if (data.expenses && data.expenses.length > 0) {
                     html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
                     data.expenses.forEach(e => {
                         html += `
@@ -503,7 +551,205 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => {
                 body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles.</div>';
             });
+    }
+    
+    // Función reutilizable para renderizar el contenido del modal
+    function renderDetailContent(data, isLive = false) {
+                let html = '';
+                
+                if (isLive && data.pending_approvals_count > 0) {
+                    html += `
+                    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start gap-4">
+                        <div class="relative flex h-4 w-4 mt-0.5 flex-shrink-0">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-red-400 tracking-wider uppercase">¡Atención!</p>
+                            <p class="text-xs text-smoke/80 mt-1">Hay <strong class="text-red-400">${data.pending_approvals_count} venta(s)</strong> pendiente(s) de aprobación. Estas no están incluidas en el resumen abajo. Aprobarlas actualizará estos números.</p>
+                        </div>
+                    </div>`;
+                }
+
+                // Barber Breakdown
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Rendimiento por Barbero</h4>';
+                html += '<div class="space-y-3 mb-8">';
+                data.barbers.forEach(b => {
+                    html += `
+                    <div class="bg-jet-lighter border border-white/5 rounded-sm p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-white">${b.name} <span class="text-[0.6rem] text-smoke/40 ml-1">(${b.sales_count} ventas)</span></span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
+                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Ventas</span>
+                                <span class="text-white font-bold">$${Number(b.total_sales).toLocaleString('es-CO')}</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
+                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Comisión (-50%)</span>
+                                <span class="text-red-400 font-bold">-$${Number(b.total_commissions).toLocaleString('es-CO')}</span>
+                            </div>
+                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
+                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Propinas (+100%)</span>
+                                <span class="text-emerald-400 font-bold">$${Number(b.total_tips).toLocaleString('es-CO')}</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-right border-t border-white/5 pt-2">
+                            <span class="text-[0.65rem] text-smoke/60 tracking-widest uppercase mr-2">Ganancia del Barbero:</span>
+                            <span class="text-white font-bold">$${Number(b.total_commissions + b.total_tips).toLocaleString('es-CO')}</span>
+                        </div>
+                    </div>`;
+                });
+                if (data.barbers.length === 0) {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center">No hay ventas registradas aún.</div>';
+                }
+                html += '</div>';
+                
+                // Detailed Sales List
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Transacciones Individuales</h4>';
+                if (data.sales_detail && data.sales_detail.length > 0) {
+                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
+                    html += `
+                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/10 text-[0.6rem] tracking-widest uppercase text-smoke/40 font-bold bg-black/50">
+                            <div class="col-span-3">Cliente / Hora</div>
+                            <div class="col-span-3">Servicio</div>
+                            <div class="col-span-2 text-right">Método</div>
+                            <div class="col-span-2 text-right">Venta</div>
+                            <div class="col-span-2 text-right">Propina</div>
+                        </div>`;
+                    data.sales_detail.forEach(sale => {
+                        html += `
+                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/5 last:border-0 text-xs items-center hover:bg-white/[0.02]">
+                            <div class="col-span-3">
+                                <span class="text-white block font-medium truncate" title="${sale.client_name}">${sale.client_name}</span>
+                                <span class="text-[0.6rem] text-smoke/40">${sale.time} - ${sale.barber_name}</span>
+                            </div>
+                            <div class="col-span-3">
+                                <span class="text-smoke/80 block truncate" title="${sale.service_name}">${sale.service_name}</span>
+                                <span class="text-[0.55rem] text-gold/60 tracking-widest uppercase">Por: ${sale.approved_by}</span>
+                            </div>
+                            <div class="col-span-2 text-right text-smoke/60 text-[0.65rem] uppercase tracking-widest">
+                                ${sale.payment_method}
+                            </div>
+                            <div class="col-span-2 text-right text-white font-medium">
+                                $${Number(sale.final_price).toLocaleString('es-CO')}
+                            </div>
+                            <div class="col-span-2 text-right text-emerald-400 font-medium">
+                                ${sale.tip_amount > 0 ? '+$' + Number(sale.tip_amount).toLocaleString('es-CO') : '-'}
+                            </div>
+                        </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se encontraron ventas para mostrar.</div>';
+                }
+                
+                // Expenses Breakdown
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Egresos Registrados</h4>';
+                if (data.expenses && data.expenses.length > 0) {
+                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
+                    data.expenses.forEach(e => {
+                        html += `
+                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
+                            <div>
+                                <span class="text-white block font-medium">${e.description}</span>
+                                <span class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${e.type}</span>
+                            </div>
+                            <span class="text-red-400 font-bold">-$${Number(e.amount).toLocaleString('es-CO')}</span>
+                        </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron egresos.</div>';
+                }
+                
+                // Totals summary
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
+                html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
+                html += `
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Ventas (Ingresos Brutos):</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Propinas (Pasan derecho):</span><span class="text-emerald-400 font-medium">+$${Number(data.total_tips).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Comisiones Barberos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_commissions).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Egresos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_expenses).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center pt-3 mt-3 border-t border-white/10 text-lg font-bold font-serif"><span class="text-gold tracking-widest uppercase">INGRESO NETO BARBERÍA:</span><span class="text-gold">$${Number(data.net_income).toLocaleString('es-CO')}</span></div>
+                `;
+                html += '</div>';
+        
+        return html;
+    }
+    
+    window.showDailyCloseDetails = function(closeId) {
+        const modal = document.getElementById('modal-close-detail');
+        const body = document.getElementById('detail-body');
+        const dateEl = document.getElementById('detail-date');
+        
+        modal.classList.remove('hidden');
+        body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
+        
+        fetch(`/api/admin/cashflow/daily-close/${closeId}/detail/`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
+                    return;
+                }
+                
+                dateEl.textContent = `${data.date} (Cerrado a las ${data.closed_at.split(' ')[1]} por ${data.closed_by})`;
+                
+                body.innerHTML = renderDetailContent(data, false);
+            })
+            .catch(() => {
+                body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles.</div>';
+            });
     };
+    
+    window.showLiveDetails = function() {
+        const modal = document.getElementById('modal-close-detail');
+        const body = document.getElementById('detail-body');
+        const dateEl = document.getElementById('detail-date');
+        
+        modal.classList.remove('hidden');
+        body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
+        
+        fetch(`/api/admin/cashflow/live-detail/`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
+                    return;
+                }
+                
+                dateEl.textContent = `En Vivo: ${data.date} (Antes del cierre) - Auto actualizable`;
+                
+                body.innerHTML = renderDetailContent(data, true);
+            })
+            .catch(() => {
+                body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles en vivo.</div>';
+            });
+    };
+
+    {% if user_role == 'superadmin' %}
+    window.deleteDailyClose = function(closeId, dateStr) {
+        if (!confirm(`¿Estás 100% seguro que deseas BORRAR el cierre de caja del ${dateStr}?\n\nLas ventas y egresos volverán a estar pendientes para un nuevo cierre. Esta acción es reportada al log de auditoría.`)) {
+            return;
+        }
+        
+        fetch(`/api/admin/cashflow/daily-close/${closeId}/delete/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert('Cierre de caja eliminado exitosamente.');
+                window.location.reload();
+            } else {
+                alert(data.error || 'Error al eliminar el cierre.');
+            }
+        })
+        .catch(err => alert('Error de conexión.'));
+    };
+    {% endif %}
 
 });
 </script>
