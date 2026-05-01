@@ -66,28 +66,49 @@
 
   <div class="max-w-7xl mx-auto px-4 py-24">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="services-full">
-      <div class="service-card p-10 rounded-sm relative overflow-hidden group fade-in-up">
-        <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-gold/10 to-transparent"></div>
-        <div class="flex justify-between items-start mb-6 mt-4">
-          <h3 class="text-xl font-serif text-white group-hover:text-gold transition-colors">Corte Imperial</h3>
-          <span class="text-gold font-medium tracking-wide">$30.000</span>
-        </div>
-        <div class="w-full h-[1px] bg-gold/20 mb-6 group-hover:bg-gold/50 transition-colors"></div>
-        <ul class="text-smoke/60 text-sm font-light space-y-3 mb-8">
-          <li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> Asesoría visajista premium</li>
-          <li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> Corte de precisión</li>
-          <li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> Lavado spa y styling</li>
-        </ul>
-        <div class="flex items-center justify-between mt-auto">
-          <span class="text-smoke/50 text-xs tracking-wider uppercase">45 min</span>
-          <a href="booking.html" class="text-gold text-sm tracking-wider uppercase hover:text-white transition-colors flex items-center gap-2 group-hover:gap-3 duration-300">
-            Agendar <span class="text-lg">→</span>
-          </a>
-        </div>
-      </div>
-      <!-- Add other services here if needed or keep existing ones -->
+      <!-- Los servicios se cargarán dinámicamente aquí -->
     </div>
   </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      fetch('/api/servicios-nativos/')
+        .then(response => response.json())
+        .then(data => {
+            const contenedor = document.getElementById('services-full');
+            if (!contenedor) return;
+            let htmlFragment = '';
+            
+            data.servicios.forEach((servicio, index) => {
+                const delay = index * 100;
+                const formatPrice = parseFloat(servicio.price).toLocaleString('es-CO');
+                const slug = servicio.name.toLowerCase().replace(/[\s\W-]+/g, '-');
+                
+                htmlFragment += `
+                  <div class="service-card p-10 rounded-sm relative overflow-hidden group fade-in-up" style="animation-delay: ${delay}ms;">
+                    <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-gold/10 to-transparent"></div>
+                    <div class="flex justify-between items-start mb-6 mt-4">
+                      <h3 class="text-xl font-serif text-white group-hover:text-gold transition-colors">${servicio.name}</h3>
+                      <span class="text-gold font-medium tracking-wide">$${formatPrice}</span>
+                    </div>
+                    <div class="w-full h-[1px] bg-gold/20 mb-6 group-hover:bg-gold/50 transition-colors"></div>
+                    <ul class="text-smoke/60 text-sm font-light space-y-3 mb-8">
+                      <li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> ${servicio.features ? servicio.features.join('</li><li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> ') : 'Atención premium'}</li>
+                    </ul>
+                    <div class="flex items-center justify-between mt-auto">
+                      <span class="text-smoke/50 text-xs tracking-wider uppercase">${servicio.duration_minutes} min</span>
+                      <a href="booking.html#${slug}" class="text-gold text-sm tracking-wider uppercase hover:text-white transition-colors flex items-center gap-2 group-hover:gap-3 duration-300">
+                        Agendar <span class="text-lg">→</span>
+                      </a>
+                    </div>
+                  </div>
+                `;
+            });
+            contenedor.innerHTML = htmlFragment;
+        })
+        .catch(error => console.error('Error loading services:', error));
+    });
+  </script>
 
   <footer class="bg-black pt-24 pb-12 px-4 border-t border-white/5">
     <div class="max-w-7xl mx-auto">

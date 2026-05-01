@@ -56,6 +56,12 @@ for i, svc in enumerate(services_data):
 Barber.objects.filter(display_name__in=['Barbero Prueba', 'Juan Pérez', 'Carlos Estilista']).delete()
 User.objects.filter(username__in=['barberoprueba', 'juan', 'carlos']).delete()
 
+# Limpiar servicios ficticios
+Service.objects.filter(name__in=[
+    'Corte Básico', 'Corte + Freestyle', 'Corte con Barba', 'Corte para Dama',
+    'Corte Imperial', 'Ritual de Barba', 'The Club Experience', 
+    'Freestyle Creativo', 'Rayitos o Mechas', 'Trenzados'
+]).delete()
 print("Datos cargados correctamente")
 # Asegurarnos de que la tabla bookings_blockeddate exista en producción si la migración falló misteriosamente
 from django.db import connection

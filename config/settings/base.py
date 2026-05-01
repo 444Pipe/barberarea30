@@ -144,5 +144,6 @@ EMAIL_USE_TLS = os.environ.get('SMTP_USE_TLS', 'True').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('SMTP_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('SMTP_FROM', 'Área 30 Barber Club <area30barberclub@area30barberclub.com>')
-EMAIL_ADMIN = os.environ.get('SMTP_ADMIN', 'area30barberclub@area30barberclub.com')
+# Correo exclusivo de Frank para notificaciones del sistema (nuevas reservas, cancelaciones, etc.)
+EMAIL_ADMIN = os.environ.get('SMTP_ADMIN', 'frankodraw@gmail.com')
 SITE_URL = os.environ.get('SITE_URL', 'https://www.area30barberclub.com')

@@ -1,3 +1,4 @@
+
 // Gestionar modal de reserva
 function openBookingModal() {
   const modal = document.getElementById('booking-modal');

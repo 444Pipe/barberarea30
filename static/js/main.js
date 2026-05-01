@@ -11,7 +11,15 @@ function cargarServicios() {
         })
         .then(data => {
             const contenedor = document.getElementById('lista-servicios');
-            if (!contenedor) return;
+            const modalSelect = document.querySelector('select[name="service"]');
+            
+            if (modalSelect) {
+                modalSelect.innerHTML = '<option value="" class="bg-jet">Selecciona un servicio</option>';
+            }
+            if (typeof MODAL_SERVICE_OPTIONS !== 'undefined') {
+                MODAL_SERVICE_OPTIONS = {};
+            }
+            
             let htmlFragment = '';
             
             data.servicios.forEach((servicio, index) => {
@@ -19,6 +27,18 @@ function cargarServicios() {
                 // Add comma separators to price
                 const formatPrice = parseFloat(servicio.price).toLocaleString('es-CO');
                 const slug = servicio.name.toLowerCase().replace(/[\s\W-]+/g, '-');
+                
+                // Populate MODAL_SERVICE_OPTIONS and modal select
+                if (typeof MODAL_SERVICE_OPTIONS !== 'undefined') {
+                    MODAL_SERVICE_OPTIONS[servicio.name] = { slug: slug, price: parseFloat(servicio.price) };
+                }
+                if (modalSelect) {
+                    const option = document.createElement('option');
+                    option.value = servicio.name;
+                    option.className = 'bg-jet';
+                    option.textContent = `${servicio.name} - $${formatPrice}`;
+                    modalSelect.appendChild(option);
+                }
                 
                 htmlFragment += `
                     <div class="service-card p-12 rounded-sm relative overflow-hidden group border border-white/5 bg-jet shadow-2xl transition-all duration-300 hover:border-gold/60" style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${delay}ms; opacity: 0;">
@@ -32,7 +52,9 @@ function cargarServicios() {
                 `;
             });
             
-            contenedor.innerHTML = htmlFragment;
+            if (contenedor) {
+                contenedor.innerHTML = htmlFragment;
+            }
         })
         .catch(error => console.error(error));
 }
