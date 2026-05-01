@@ -221,8 +221,9 @@ def create_booking_view(request):
         )
 
         try:
-            from .emails import send_booking_confirmation_email
+            from .emails import send_booking_confirmation_email, send_admin_new_booking_notification
             send_booking_confirmation_email(booking)
+            send_admin_new_booking_notification(booking)
         except Exception as e:
             print("Error enviando email:", e)
 
@@ -625,6 +626,10 @@ def client_booking_detail_view(request, signed_id):
                         email__isnull=False
                     ).exclude(email='').values_list('email', flat=True)
                 )
+                admin_email_setting = getattr(settings, 'EMAIL_ADMIN', '')
+                if admin_email_setting and admin_email_setting not in admin_emails:
+                    admin_emails.append(admin_email_setting)
+                    
                 if admin_emails:
                     from django.core.mail import send_mail
                     from django.conf import settings as dj_settings

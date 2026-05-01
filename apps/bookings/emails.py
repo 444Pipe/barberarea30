@@ -65,3 +65,35 @@ def send_barber_cancellation_notification(booking):
         'site_url': domain
     }
     _send_html_email(subject, 'emails/barber_cancellation_notification.html', context, booking.barber.user.email)
+
+def send_admin_new_booking_notification(booking):
+    """Notifica a los administradores que se ha creado una nueva reserva."""
+    from django.core.mail import send_mail
+    from django.conf import settings as dj_settings
+    
+    admin_email = getattr(dj_settings, 'EMAIL_ADMIN', '')
+    if not admin_email:
+        return
+        
+    subject = f"Nueva Reserva: {booking.client_name} - {booking.date}"
+    message = (
+        f"Se ha creado una nueva reserva en el sistema.\n\n"
+        f"Cliente: {booking.client_name}\n"
+        f"Teléfono: {booking.client_phone or 'No especificado'}\n"
+        f"Fecha: {booking.date}\n"
+        f"Hora: {booking.time}\n"
+        f"Servicio: {booking.service.name if booking.service else 'No especificado'}\n"
+        f"Barbero: {booking.barber.display_name if booking.barber else 'Cualquier barbero'}\n\n"
+        f"Ingresa al panel de administración para más detalles."
+    )
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=dj_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[admin_email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        print("Error enviando notificación a admin:", e)
