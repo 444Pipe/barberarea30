@@ -41,7 +41,7 @@ def checkout_booking_view(request, booking_id):
             discount_assumed_by=data.get('discount_assumed_by', 'none'),
             added_value_amount=_safe_decimal(data.get('added_value_amount'), 0),
             added_value_description=data.get('added_value_description', ''),
-            commission_percentage=_safe_decimal(data.get('commission_percentage'), 50),
+            commission_percentage=_safe_decimal(data.get('commission_percentage'), booking.barber.commission_percentage if booking.barber else 40),
             notes=data.get('notes', ''),
             request=request,
         )
@@ -562,7 +562,8 @@ def reject_sale_view(request, sale_id):
         if booking:
             booking.status = 'pending'
             booking.completed_at = None
-            booking.save(update_fields=['status', 'completed_at'])
+            booking.price = sale.base_price
+            booking.save(update_fields=['status', 'completed_at', 'price'])
 
         # Eliminar la venta (que por cascada elimina la comisión)
         sale_id_num = sale.id

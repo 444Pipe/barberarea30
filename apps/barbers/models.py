@@ -38,6 +38,10 @@ class Barber(models.Model):
     total_cuts = models.IntegerField(default=0)
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=5.0)
     display_order = models.IntegerField(default=0, help_text='Orden de aparición en la web pública')
+    commission_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=40.0,
+        help_text='Porcentaje de comisión estándar (0-100)'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

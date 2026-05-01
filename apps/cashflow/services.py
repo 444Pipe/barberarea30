@@ -122,7 +122,8 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
         # ── 5. Actualizar estado de la Reserva ─────────────────────────
         booking.status = 'completed'
         booking.completed_at = timezone.now()
-        booking.save(update_fields=['status', 'completed_at'])
+        booking.price = sale.final_price
+        booking.save(update_fields=['status', 'completed_at', 'price'])
 
         # ── 6. Registro de Auditoría ────────────────────────────────────
         log_audit(

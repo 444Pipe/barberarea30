@@ -31,7 +31,7 @@ class BarberAdminSerializer(serializers.ModelSerializer):
         model = Barber
         fields = ['id', 'display_name', 'username', 'email', 'avatar', 'phone',
                   'bio', 'specialties', 'specialty_ids', 'is_available',
-                  'schedule', 'color_tag', 'total_cuts', 'rating', 'created_at',
+                  'schedule', 'color_tag', 'total_cuts', 'rating', 'commission_percentage', 'created_at',
                   'new_username', 'new_password']
 
     def validate(self, attrs):
