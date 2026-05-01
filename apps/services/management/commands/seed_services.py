@@ -21,7 +21,7 @@ class Command(BaseCommand):
             {'name': 'Corte con Barba', 'slug': 'corte-barba', 'price': 40000,
              'duration_minutes': 40, 'features': ['Corte de cabello', 'Perfilado de barba', 'Cejas y styling']},
             {'name': 'The Club Experience', 'slug': 'club-experience', 'price': 60000,
-             'duration_minutes': 60, 'features': ['Corte imperial', 'Arreglo de barba ritual', 'Vapor ozono', 'Mascarilla'],
+             'duration_minutes': 60, 'features': ['Corte imperial', 'Diseño de barba ritual', 'Vapor ozono', 'Mascarilla'],
              'is_popular': True},
             {'name': 'Ritual de Barba', 'slug': 'ritual-barba', 'price': 25000,
              'duration_minutes': 30, 'features': ['Perfilación a navaja', 'Toallas calientes aromáticas', 'Aceites premium']},
