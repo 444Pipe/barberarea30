@@ -130,28 +130,31 @@
 </div>
 
 <!-- Checkout Modal -->
-<div id="checkout-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
-  <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
-    <div class="p-4 border-b border-white/5 flex justify-between items-center">
-      <h3 class="text-lg font-bold text-gold">Checkout del Servicio</h3>
-      <button onclick="closeCheckout()" class="text-smoke/40 hover:text-white">✕</button>
+<div id="checkout-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-3">
+  <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl flex flex-col" style="max-height: 92vh;">
+    <!-- Header fijo -->
+    <div class="px-4 py-3 border-b border-white/5 flex justify-between items-center flex-shrink-0">
+      <h3 class="text-base font-bold text-gold">Checkout del Servicio</h3>
+      <button onclick="closeCheckout()" class="text-smoke/40 hover:text-white text-lg leading-none">✕</button>
     </div>
-    <form id="checkout-form" class="p-6 space-y-4" onsubmit="submitCheckout(event)">
+
+    <!-- Cuerpo scrollable -->
+    <div class="overflow-y-auto flex-1 px-4 py-4 space-y-3">
       <input type="hidden" id="checkout-booking-id">
       
       <div>
-        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Cliente</label>
-        <p id="checkout-client-name" class="text-white font-medium"></p>
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Cliente</label>
+        <p id="checkout-client-name" class="text-white font-semibold text-sm"></p>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Total a cobrar</label>
-          <p id="checkout-base-price" class="text-xl text-emerald-400 font-bold"></p>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Total a cobrar</label>
+          <p id="checkout-base-price" class="text-lg text-emerald-400 font-bold"></p>
         </div>
         <div>
-          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Método de pago</label>
-          <select id="checkout-payment-method" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Método de pago</label>
+          <select id="checkout-payment-method" required class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
             <option value="">Seleccione...</option>
             {% for method in payment_methods %}
               <option value="{{ method.id }}">{{ method.name }}</option>
@@ -161,24 +164,24 @@
       </div>
 
       <div>
-        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Referencia (Opcional)</label>
-        <input type="text" id="checkout-reference" placeholder="Ej: Nequi 1234" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Referencia (Opcional)</label>
+        <input type="text" id="checkout-reference" placeholder="Ej: Nequi 1234" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Propina</label>
-          <input type="number" id="checkout-tip" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Propina</label>
+          <input type="number" id="checkout-tip" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
         </div>
         <div>
-          <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Descuento</label>
-          <input type="number" id="checkout-discount" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Descuento</label>
+          <input type="number" id="checkout-discount" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
         </div>
       </div>
 
       <div>
-        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">¿Quién asume el descuento?</label>
-        <select id="checkout-assumed-by" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">¿Quién asume el descuento?</label>
+        <select id="checkout-assumed-by" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
           <option value="none">No aplica</option>
           <option value="company">Empresa (Afecta caja general)</option>
           <option value="barber">Barbero (Afecta su comisión)</option>
@@ -187,23 +190,26 @@
       </div>
 
       <div>
-        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-1">Observaciones</label>
-        <textarea id="checkout-notes" rows="2" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none"></textarea>
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Observaciones</label>
+        <textarea id="checkout-notes" rows="2" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"></textarea>
       </div>
 
       <!-- CONSUMIBLES -->
       <div>
-        <label class="block text-xs text-smoke/60 uppercase tracking-widest mb-2">🍺 Consumibles del Cliente <span class="text-smoke/30 normal-case font-normal">(opcional)</span></label>
-        <div id="consumables-loading" class="text-xs text-smoke/30 italic py-2">Cargando productos…</div>
-        <div id="consumables-grid" class="hidden space-y-2 max-h-48 overflow-y-auto pr-1"></div>
-        <div id="consumables-empty" class="hidden text-xs text-smoke/30 italic py-2">No hay consumibles disponibles en inventario.</div>
-        <div id="consumables-total" class="hidden mt-2 pt-2 border-t border-white/10 flex justify-between items-center">
-          <span class="text-xs text-smoke/50 uppercase tracking-widest">Total consumibles:</span>
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">🍺 Consumibles del Cliente <span class="text-smoke/30 normal-case font-normal">(opcional)</span></label>
+        <div id="consumables-loading" class="text-xs text-smoke/30 italic py-1">Cargando productos…</div>
+        <div id="consumables-grid" class="hidden space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+        <div id="consumables-empty" class="hidden text-xs text-smoke/30 italic py-1">No hay consumibles disponibles en inventario.</div>
+        <div id="consumables-total" class="hidden mt-1.5 pt-1.5 border-t border-white/10 flex justify-between items-center">
+          <span class="text-[0.65rem] text-smoke/50 uppercase tracking-widest">Total consumibles:</span>
           <span id="consumables-total-amount" class="text-sm text-gold font-bold">$0</span>
         </div>
       </div>
+    </div>
 
-      <div class="pt-4 border-t border-white/5 flex gap-3 justify-end">
+    <!-- Footer fijo -->
+    <form id="checkout-form" onsubmit="submitCheckout(event)">
+      <div class="px-4 py-3 border-t border-white/5 flex gap-3 justify-end flex-shrink-0 bg-jet-card rounded-b-xl">
         <button type="button" onclick="closeCheckout()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
         <button type="submit" class="px-6 py-2 bg-gold text-jet font-bold text-sm rounded hover:bg-white transition-colors">Confirmar Pago</button>
       </div>
@@ -509,7 +515,7 @@ function getSelectedConsumables() {
 function submitCheckout(e) {
   e.preventDefault();
   const id = document.getElementById('checkout-booking-id').value;
-  const btn = e.target.querySelector('[type="submit"]');
+  const btn = document.querySelector('#checkout-form [type="submit"]');
 
   const payload = {
     payment_method_id: document.getElementById('checkout-payment-method').value,
