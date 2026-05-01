@@ -65,6 +65,29 @@ class Barber(models.Model):
         super().save(*args, **kwargs)
 
 
+class BarberUnavailability(models.Model):
+    """Bloqueo temporal de un barbero en una fecha y rango de hora."""
+    barber = models.ForeignKey(
+        Barber, on_delete=models.CASCADE, related_name='unavailabilities'
+    )
+    date = models.DateField(help_text='Fecha del bloqueo')
+    start_time = models.TimeField(help_text='Hora de inicio del bloqueo')
+    end_time = models.TimeField(help_text='Hora de fin del bloqueo')
+    reason = models.CharField(
+        max_length=255, blank=True,
+        help_text='Motivo opcional (emergencia, cita médica, etc.)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Inactividad Temporal'
+        verbose_name_plural = 'Inactividades Temporales'
+        ordering = ['date', 'start_time']
+
+    def __str__(self):
+        return f'{self.barber.display_name} – {self.date} {self.start_time}–{self.end_time}'
+
+
 class GalleryImage(models.Model):
     """Imagen de galería — trabajos realizados."""
     image = models.ImageField(upload_to='gallery/')

@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin, IsAdminOrAboveWithWriteBatman
 from apps.bookings.models import Booking, BlockedDate
-from .models import Barber, GalleryImage, Reel
+from .models import Barber, GalleryImage, Reel, BarberUnavailability
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
 
 
@@ -96,6 +96,15 @@ def barber_availability_view(request, barber_id):
         bk_end = bk_start + timedelta(minutes=bk_duration or 60)
         booked_ranges.append((bk_start, bk_end))
 
+    # Get barber-specific unavailability blocks for this date
+    unavail_blocks = BarberUnavailability.objects.filter(
+        barber=barber, date=target_date
+    ).values_list('start_time', 'end_time')
+    unavail_ranges = [
+        (datetime.combine(target_date, s), datetime.combine(target_date, e))
+        for s, e in unavail_blocks
+    ]
+
     # Generate 60-minute slots
     slots = []
     current = datetime.combine(target_date, start_time)
@@ -104,10 +113,17 @@ def barber_availability_view(request, barber_id):
     while current < end:
         slot_end = current + timedelta(minutes=60)
         is_available = True
+
         for br_start, br_end in booked_ranges:
             if current < br_end and slot_end > br_start:
                 is_available = False
                 break
+
+        if is_available:
+            for ur_start, ur_end in unavail_ranges:
+                if current < ur_end and slot_end > ur_start:
+                    is_available = False
+                    break
 
         # If date is today, mark past times as unavailable
         now_local = timezone.localtime()
@@ -213,6 +229,7 @@ def barber_stats_view(request, barber_id):
     })
 
 from django.http import JsonResponse
+import json
 
 def obtener_barberos_nativos(request):
     """Endpoint nativo de barberos para JS Vanilla"""
@@ -227,6 +244,73 @@ def obtener_barberos_nativos(request):
             'avatar': b.avatar.url if b.avatar else None,
         })
     return JsonResponse({'barberos': barberos}, safe=False)
+
+
+# ─── Barber Unavailability ────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminOrAbove])
+def barber_unavailability_list(request, barber_id):
+    """
+    GET  /api/admin/barbers/{id}/unavailability/ — lista bloqueos
+    POST /api/admin/barbers/{id}/unavailability/ — crear bloqueo
+    Body JSON: {date, start_time, end_time, reason?}
+    """
+    barber = get_object_or_404(Barber, pk=barber_id)
+
+    if request.method == 'GET':
+        items = BarberUnavailability.objects.filter(barber=barber)
+        data = [{
+            'id': u.id,
+            'date': u.date.strftime('%Y-%m-%d'),
+            'start_time': u.start_time.strftime('%H:%M'),
+            'end_time': u.end_time.strftime('%H:%M'),
+            'reason': u.reason,
+        } for u in items]
+        return Response(data)
+
+    # POST
+    payload = request.data
+    date_str = payload.get('date')
+    start_str = payload.get('start_time')
+    end_str = payload.get('end_time')
+    reason = payload.get('reason', '')
+
+    if not (date_str and start_str and end_str):
+        return Response({'error': 'Faltan campos: date, start_time, end_time'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        from datetime import date as _date, time as _time
+        d = datetime.strptime(date_str, '%Y-%m-%d').date()
+        s = datetime.strptime(start_str, '%H:%M').time()
+        e = datetime.strptime(end_str, '%H:%M').time()
+    except ValueError:
+        return Response({'error': 'Formato incorrecto. Use YYYY-MM-DD y HH:MM'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if s >= e:
+        return Response({'error': 'La hora de inicio debe ser anterior a la de fin'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    u = BarberUnavailability.objects.create(
+        barber=barber, date=d, start_time=s, end_time=e, reason=reason
+    )
+    return Response({
+        'id': u.id,
+        'date': u.date.strftime('%Y-%m-%d'),
+        'start_time': u.start_time.strftime('%H:%M'),
+        'end_time': u.end_time.strftime('%H:%M'),
+        'reason': u.reason,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAdminOrAbove])
+def barber_unavailability_delete(request, barber_id, unavail_id):
+    """DELETE /api/admin/barbers/{id}/unavailability/{uid}/"""
+    u = get_object_or_404(BarberUnavailability, pk=unavail_id, barber_id=barber_id)
+    u.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ─── Gallery ─────────────────────────────────────────────
