@@ -150,6 +150,26 @@ def create_booking_view(request):
         except Barber.DoesNotExist:
             return Response({'error': 'Barbero no disponible'}, status=400)
 
+    # ── Nivel 2: Validación explícita de doble agendamiento ───────────────────
+    requested_date = data.get('date')
+    requested_time = data.get('time')
+    duplicate = Booking.objects.filter(
+        barber=barber,
+        date=requested_date,
+        time=requested_time,
+        status__in=['pending', 'confirmed'],
+    ).exists()
+    if duplicate:
+        return Response({
+            'ok': False,
+            'error': (
+                f'{barber.display_name} ya tiene una cita activa a las '
+                f'{requested_time} el {requested_date}. '
+                f'Por favor elige otro horario.'
+            )
+        }, status=409)
+    # ─────────────────────────────────────────────────────────────────────────
+
     serializer = BookingCreateSerializer(data=data)
     if serializer.is_valid():
         booking = serializer.save(

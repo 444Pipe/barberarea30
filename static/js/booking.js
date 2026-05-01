@@ -89,6 +89,9 @@ async function loadAvailableSlots(barberId, date) {
 document.getElementById('booking-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.textContent : '';
+
   const formData = new FormData(e.target);
   const name    = formData.get('name')?.trim();
   const phone   = formData.get('phone')?.trim();
@@ -108,6 +111,13 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
     showErrorMessage('Por favor ingresa un email válido');
     return;
   }
+
+  // ── Nivel 3: Deshabilitar botón para evitar múltiples envíos ─────────────
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Procesando...';
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Obtener service_id y price del select de servicios
   const serviceSelect = document.getElementById('service-select');
@@ -140,13 +150,24 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
       showSuccessMessage();
       e.target.reset();
       document.getElementById('time-select').innerHTML = '<option value="">Selecciona barbero y fecha primero</option>';
+      // Mantener el botón deshabilitado tras éxito para evitar re-envío
+      if (submitBtn) submitBtn.textContent = '✓ Reserva enviada';
     } else {
       const errMsg = result.error || result.errors || 'Error al guardar la reserva. Intenta de nuevo.';
       showErrorMessage(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
+      // Re-habilitar el botón solo en caso de error para que el usuario corrija y reintente
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+      }
     }
   } catch (error) {
     console.error('Error al crear reserva:', error);
     showErrorMessage('Ocurrió un error al enviar la reserva.');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+    }
   }
 });
 

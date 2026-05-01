@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta, datetime
 
@@ -50,6 +51,31 @@ class Booking(models.Model):
         verbose_name = 'Reserva'
         verbose_name_plural = 'Reservas'
         ordering = ['-date', '-time']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['barber', 'date', 'time'],
+                condition=models.Q(status__in=['pending', 'confirmed']),
+                name='unique_active_booking_barber_date_time',
+            ),
+        ]
+
+    def clean(self):
+        """Validación a nivel de modelo: impide el doble agendamiento de un barbero."""
+        if self.barber and self.date and self.time:
+            conflict_qs = Booking.objects.filter(
+                barber=self.barber,
+                date=self.date,
+                time=self.time,
+                status__in=['pending', 'confirmed'],
+            )
+            if self.pk:  # Excluir la propia instancia en caso de edición
+                conflict_qs = conflict_qs.exclude(pk=self.pk)
+            if conflict_qs.exists():
+                raise ValidationError(
+                    f'{self.barber.display_name} ya tiene una cita activa a las '
+                    f'{self.time.strftime("%H:%M")} el {self.date.strftime("%d/%m/%Y")}. '
+                    f'Por favor elige otro horario.'
+                )
 
     def __str__(self):
         return f'{self.client_name} — {self.service} ({self.date} {self.time})'
