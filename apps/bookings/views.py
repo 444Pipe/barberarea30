@@ -418,6 +418,10 @@ def admin_booking_detail_view(request, booking_id):
         old_status = booking.status
         new_status = data.get('status', old_status)
 
+        if old_status == 'completed':
+            if not (profile and profile.is_superadmin):
+                return Response({'error': 'Esta reserva ya está pagada y bloqueada. No se permiten cambios.'}, status=403)
+
         if new_status == 'completed' and old_status != 'completed':
             booking.completed_at = timezone.now()
             # Update barber's total cuts

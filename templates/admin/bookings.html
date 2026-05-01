@@ -350,12 +350,12 @@ function renderTable(bookings) {
               💰 COBRAR
             </button>
           ` : ''}
-          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1">
+          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1" ${b.status === 'completed' ? 'disabled title="Reserva pagada y bloqueada"' : ''}>
             <option value="">Cambiar...</option>
-            <option value="pending">Pendiente</option>
-            <option value="confirmed">Confirmado</option>
-            <option value="completed">Completado</option>
-            <option value="cancelled">Cancelado</option>
+            <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pendiente</option>
+            <option value="confirmed" ${b.status === 'confirmed' ? 'selected' : ''}>Confirmado</option>
+            <option value="completed" ${b.status === 'completed' ? 'selected' : 'disabled title="Usa el botón COBRAR para completar"'}>Completado</option>
+            <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
           </select>
           <button onclick="deleteBooking(${b.id})" class="text-red-400 hover:text-red-300 text-[0.6rem] uppercase tracking-wider text-left pl-1">Eliminar</button>
         </div>
