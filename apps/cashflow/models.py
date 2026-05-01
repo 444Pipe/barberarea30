@@ -159,6 +159,40 @@ class Commission(models.Model):
         super().save(*args, **kwargs)
 
 
+class InventorySale(models.Model):
+    """Venta directa de un producto de inventario (Ej. Bebidas)."""
+    item = models.ForeignKey(
+        'inventory.InventoryItem', on_delete=models.SET_NULL, null=True, related_name='direct_sales'
+    )
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=0)
+    total_price = models.DecimalField(max_digits=10, decimal_places=0)
+    payment_method = models.ForeignKey(
+        PaymentMethod, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    sold_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='inventory_sales_made'
+    )
+    included_in_daily_close = models.ForeignKey(
+        'DailyClose', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='inventory_sales'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Venta de Inventario'
+        verbose_name_plural = 'Ventas de Inventario'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        item_name = self.item.name if self.item else 'Producto Eliminado'
+        return f'{self.quantity}x {item_name} — ${self.total_price:,.0f}'
+
+    def save(self, *args, **kwargs):
+        self.total_price = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
+
+
 class Expense(models.Model):
     """Egresos fijos y variables."""
     # Solo superadmins gestionan los "fixed". Operativos gestionan "variable".
@@ -202,12 +236,14 @@ class DailyClose(models.Model):
         User, on_delete=models.PROTECT, related_name='daily_closes'
     )
     total_sales = models.DecimalField(max_digits=12, decimal_places=0, default=0,
-        help_text='Ingresos brutos por ventas (sin propinas)')
+        help_text='Ingresos brutos por ventas de servicios (sin propinas)')
+    total_inventory_sales = models.DecimalField(max_digits=12, decimal_places=0, default=0,
+        help_text='Ingresos por ventas directas de inventario (bebidas, etc.)')
     total_tips = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     total_commissions = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     total_expenses = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     net_income = models.DecimalField(max_digits=12, decimal_places=0, default=0,
-        help_text='(Ventas - Comisiones - Egresos Variables)')
+        help_text='(Ventas Servicios + Ventas Inventario - Comisiones - Egresos Variables)')
     notes = models.TextField(blank=True)
     is_verified = models.BooleanField(default=False,
         help_text='SuperAdmin verifica que el cuadre sea correcto y consignado')

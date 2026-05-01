@@ -212,11 +212,16 @@ from django.utils import timezone
 
 @operational_admin_required
 def admin_cashflow_view(request):
+    from apps.cashflow.models import Sale, Expense, Commission, DailyClose, InventorySale, PaymentMethod
+    from apps.inventory.models import InventoryItem
+    from django.db.models import Sum
+    from django.utils import timezone
     today = timezone.localtime(timezone.now()).date()
     
     # Pendientes por cerrar
     pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
     pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
+    pending_inventory_sales = InventorySale.objects.filter(included_in_daily_close__isnull=True)
     
     # Solo consideramos las ventas aprobadas para las finanzas y comisiones
     approved_sales = pending_sales.filter(approval_status=Sale.STATUS_APPROVED)
@@ -226,6 +231,7 @@ def admin_cashflow_view(request):
 
     # Totales parciales
     total_sales = approved_sales.aggregate(t=Sum('final_price'))['t'] or 0
+    total_inventory_sales = pending_inventory_sales.aggregate(t=Sum('total_price'))['t'] or 0
     total_tips = approved_sales.aggregate(t=Sum('tip_amount'))['t'] or 0
     total_expenses = pending_expenses.aggregate(t=Sum('amount'))['t'] or 0
     
@@ -233,23 +239,30 @@ def admin_cashflow_view(request):
     commissions = Commission.objects.filter(sale__in=approved_sales)
     total_commissions = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
     
-    net_income = total_sales - total_commissions - total_expenses
+    net_income = total_sales + total_inventory_sales - total_commissions - total_expenses
 
     recent_closes = DailyClose.objects.all().order_by('-date', '-closed_at')[:10]
+    
+    # Data for inventory sales modal
+    inventory_items = InventoryItem.objects.filter(is_active=True).order_by('category', 'name')
+    payment_methods = PaymentMethod.objects.filter(is_active=True).order_by('name')
 
     context = {
         'user_role': request.user.profile.role,
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'cashflow',
         'today': today,
-        'pending_sales_count': approved_sales.count(),
+        'pending_sales_count': approved_sales.count() + pending_inventory_sales.count(),
         'pending_approvals_count': pending_approvals_count,
         'total_sales': total_sales,
+        'total_inventory_sales': total_inventory_sales,
         'total_tips': total_tips,
         'total_expenses': total_expenses,
         'total_commissions': total_commissions,
         'net_income': net_income,
         'recent_closes': recent_closes,
+        'inventory_items': inventory_items,
+        'payment_methods': payment_methods,
     }
     return render(request, 'admin/cashflow.html', context)
 

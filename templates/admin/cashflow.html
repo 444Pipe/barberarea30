@@ -1,6 +1,123 @@
 {% extends 'admin/base_admin.html' %}
 
-{% block title %}Caja y Finanzas - Área 30{% endblock %}
+{% block title %}Caja y Finanzas - Área 30
+<!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
+<div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
+    <div class="bg-jet-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
+        <h3 class="text-base font-serif text-white">Venta Rápida (Bebidas / Productos)</h3>
+        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-5">
+        <div>
+            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
+            <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none" onchange="updateInvPrice()">
+                <option value="" data-price="0">Selecciona un producto...</option>
+                {% for item in inventory_items %}
+                <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
+                    {{ item.name }} - ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
+                <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
+            </div>
+            <div>
+                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Total</label>
+                <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded-sm px-4 py-3 outline-none cursor-not-allowed">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Método de Pago</label>
+            <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none">
+                {% for method in payment_methods %}
+                <option value="{{ method.id }}">{{ method.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-white/5 bg-jet/50 flex justify-end gap-3">
+        <button onclick="closeInventorySaleModal()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-white hover:bg-white/5 transition-colors">Cancelar</button>
+        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-jet bg-gold hover:bg-gold-light transition-colors">Confirmar Venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openInventorySaleModal() {
+    document.getElementById('modal-inventory-sale').classList.remove('hidden');
+    document.getElementById('inv-item-id').value = '';
+    document.getElementById('inv-qty').value = '1';
+    updateInvPrice();
+}
+
+function closeInventorySaleModal() {
+    document.getElementById('modal-inventory-sale').classList.add('hidden');
+}
+
+function updateInvPrice() {
+    const select = document.getElementById('inv-item-id');
+    const option = select.options[select.selectedIndex];
+    const price = parseFloat(option ? option.getAttribute('data-price') : 0);
+    const qty = parseInt(document.getElementById('inv-qty').value) || 1;
+    const total = price * qty;
+    document.getElementById('inv-total').value = '$' + total.toLocaleString('es-CO');
+}
+
+async function submitInventorySale() {
+    const btn = document.getElementById('btn-submit-inv-sale');
+    const itemId = document.getElementById('inv-item-id').value;
+    const qty = document.getElementById('inv-qty').value;
+    const methodId = document.getElementById('inv-payment-method').value;
+
+    if (!itemId) {
+        showToast('Selecciona un producto', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'PROCESANDO...';
+
+    try {
+        const response = await fetch('/api/admin/cashflow/inventory-sales/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                item_id: itemId,
+                quantity: qty,
+                payment_method_id: methodId
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            showToast(data.message, 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showToast(data.error || 'Error procesando venta', 'error');
+            btn.disabled = false;
+            btn.innerHTML = 'Confirmar Venta';
+        }
+    } catch (e) {
+        showToast('Error de conexión', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Confirmar Venta';
+    }
+}
+</script>
+
+{% endblock %}
 
 {% block content %}
 <div class="space-y-6 fade-in">
@@ -10,6 +127,10 @@
             <p class="text-smoke/60 text-sm mt-1">Resumen financiero del día: {{ today }}</p>
         </div>
         <div class="flex items-center gap-3">
+            <button onclick="openInventorySaleModal()" class="px-5 py-2.5 bg-jet-card hover:bg-white/5 border border-white/10 text-white font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                VENTA RÁPIDA
+            </button>
             <button onclick="showLiveDetails()" class="px-5 py-2.5 bg-jet-card hover:bg-white/5 border border-gold/30 text-gold font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-all flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                 VER RESUMEN EN VIVO
@@ -22,11 +143,16 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
-            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Ventas Brutas</div>
+            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Ventas Servicios</div>
             <div class="text-2xl font-serif text-white">${{ total_sales|floatformat:0 }}</div>
-            <div class="text-xs text-smoke/40 mt-1">{{ pending_sales_count }} ventas pendientes</div>
+            <div class="text-xs text-smoke/40 mt-1">{{ pending_sales_count }} operaciones pendientes</div>
+        </div>
+        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
+            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Ventas Productos</div>
+            <div class="text-2xl font-serif text-white">${{ total_inventory_sales|floatformat:0 }}</div>
+            <div class="text-xs text-smoke/40 mt-1">100% ganancia local</div>
         </div>
         <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
             <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Propinas</div>
@@ -235,6 +361,123 @@
         </div>
     </div>
 </div>
+
+
+<!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
+<div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
+    <div class="bg-jet-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
+        <h3 class="text-base font-serif text-white">Venta Rápida (Bebidas / Productos)</h3>
+        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-5">
+        <div>
+            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
+            <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none" onchange="updateInvPrice()">
+                <option value="" data-price="0">Selecciona un producto...</option>
+                {% for item in inventory_items %}
+                <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
+                    {{ item.name }} - ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
+                <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
+            </div>
+            <div>
+                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Total</label>
+                <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded-sm px-4 py-3 outline-none cursor-not-allowed">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Método de Pago</label>
+            <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none">
+                {% for method in payment_methods %}
+                <option value="{{ method.id }}">{{ method.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-white/5 bg-jet/50 flex justify-end gap-3">
+        <button onclick="closeInventorySaleModal()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-white hover:bg-white/5 transition-colors">Cancelar</button>
+        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-jet bg-gold hover:bg-gold-light transition-colors">Confirmar Venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openInventorySaleModal() {
+    document.getElementById('modal-inventory-sale').classList.remove('hidden');
+    document.getElementById('inv-item-id').value = '';
+    document.getElementById('inv-qty').value = '1';
+    updateInvPrice();
+}
+
+function closeInventorySaleModal() {
+    document.getElementById('modal-inventory-sale').classList.add('hidden');
+}
+
+function updateInvPrice() {
+    const select = document.getElementById('inv-item-id');
+    const option = select.options[select.selectedIndex];
+    const price = parseFloat(option ? option.getAttribute('data-price') : 0);
+    const qty = parseInt(document.getElementById('inv-qty').value) || 1;
+    const total = price * qty;
+    document.getElementById('inv-total').value = '$' + total.toLocaleString('es-CO');
+}
+
+async function submitInventorySale() {
+    const btn = document.getElementById('btn-submit-inv-sale');
+    const itemId = document.getElementById('inv-item-id').value;
+    const qty = document.getElementById('inv-qty').value;
+    const methodId = document.getElementById('inv-payment-method').value;
+
+    if (!itemId) {
+        showToast('Selecciona un producto', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'PROCESANDO...';
+
+    try {
+        const response = await fetch('/api/admin/cashflow/inventory-sales/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                item_id: itemId,
+                quantity: qty,
+                payment_method_id: methodId
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            showToast(data.message, 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showToast(data.error || 'Error procesando venta', 'error');
+            btn.disabled = false;
+            btn.innerHTML = 'Confirmar Venta';
+        }
+    } catch (e) {
+        showToast('Error de conexión', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Confirmar Venta';
+    }
+}
+</script>
 
 {% endblock %}
 
@@ -538,7 +781,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
                 html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
                 html += `
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Ventas (Ingresos Brutos):</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Servicios:</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Productos:</span><span class="text-emerald-400 font-medium">+$${Number(data.total_inventory_sales).toLocaleString('es-CO')}</span></div>
                     <div class="flex justify-between items-center"><span class="text-smoke/60">Total Propinas (Pasan derecho):</span><span class="text-emerald-400 font-medium">+$${Number(data.total_tips).toLocaleString('es-CO')}</span></div>
                     <div class="flex justify-between items-center"><span class="text-smoke/60">Total Comisiones Barberos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_commissions).toLocaleString('es-CO')}</span></div>
                     <div class="flex justify-between items-center"><span class="text-smoke/60">Total Egresos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_expenses).toLocaleString('es-CO')}</span></div>
@@ -667,7 +911,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
                 html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
                 html += `
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Ventas (Ingresos Brutos):</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Servicios:</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Productos:</span><span class="text-emerald-400 font-medium">+$${Number(data.total_inventory_sales).toLocaleString('es-CO')}</span></div>
                     <div class="flex justify-between items-center"><span class="text-smoke/60">Total Propinas (Pasan derecho):</span><span class="text-emerald-400 font-medium">+$${Number(data.total_tips).toLocaleString('es-CO')}</span></div>
                     <div class="flex justify-between items-center"><span class="text-smoke/60">Total Comisiones Barberos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_commissions).toLocaleString('es-CO')}</span></div>
                     <div class="flex justify-between items-center"><span class="text-smoke/60">Total Egresos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_expenses).toLocaleString('es-CO')}</span></div>
@@ -753,4 +998,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 </script>
+
+<!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
+<div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
+  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
+    <div class="bg-jet-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
+        <h3 class="text-base font-serif text-white">Venta Rápida (Bebidas / Productos)</h3>
+        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-5">
+        <div>
+            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
+            <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none" onchange="updateInvPrice()">
+                <option value="" data-price="0">Selecciona un producto...</option>
+                {% for item in inventory_items %}
+                <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
+                    {{ item.name }} - ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
+                <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
+            </div>
+            <div>
+                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Total</label>
+                <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded-sm px-4 py-3 outline-none cursor-not-allowed">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Método de Pago</label>
+            <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none">
+                {% for method in payment_methods %}
+                <option value="{{ method.id }}">{{ method.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-white/5 bg-jet/50 flex justify-end gap-3">
+        <button onclick="closeInventorySaleModal()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-white hover:bg-white/5 transition-colors">Cancelar</button>
+        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-jet bg-gold hover:bg-gold-light transition-colors">Confirmar Venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openInventorySaleModal() {
+    document.getElementById('modal-inventory-sale').classList.remove('hidden');
+    document.getElementById('inv-item-id').value = '';
+    document.getElementById('inv-qty').value = '1';
+    updateInvPrice();
+}
+
+function closeInventorySaleModal() {
+    document.getElementById('modal-inventory-sale').classList.add('hidden');
+}
+
+function updateInvPrice() {
+    const select = document.getElementById('inv-item-id');
+    const option = select.options[select.selectedIndex];
+    const price = parseFloat(option ? option.getAttribute('data-price') : 0);
+    const qty = parseInt(document.getElementById('inv-qty').value) || 1;
+    const total = price * qty;
+    document.getElementById('inv-total').value = '$' + total.toLocaleString('es-CO');
+}
+
+async function submitInventorySale() {
+    const btn = document.getElementById('btn-submit-inv-sale');
+    const itemId = document.getElementById('inv-item-id').value;
+    const qty = document.getElementById('inv-qty').value;
+    const methodId = document.getElementById('inv-payment-method').value;
+
+    if (!itemId) {
+        showToast('Selecciona un producto', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'PROCESANDO...';
+
+    try {
+        const response = await fetch('/api/admin/cashflow/inventory-sales/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                item_id: itemId,
+                quantity: qty,
+                payment_method_id: methodId
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            showToast(data.message, 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showToast(data.error || 'Error procesando venta', 'error');
+            btn.disabled = false;
+            btn.innerHTML = 'Confirmar Venta';
+        }
+    } catch (e) {
+        showToast('Error de conexión', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Confirmar Venta';
+    }
+}
+</script>
+
 {% endblock %}
