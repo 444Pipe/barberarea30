@@ -183,10 +183,12 @@ function renderBarberCards(barbers) {
       </div>
       <div class="flex gap-2">
         <a href="/admin-panel/barbers/my-agenda/?barber=${b.id}" class="flex-1 py-2 rounded-md bg-jet-lighter border border-white/10 text-center text-[0.65rem] tracking-wider uppercase text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">Ver Agenda</a>
-        ${['admin', 'superadmin'].includes(userRole) ? `
+        ${['operational_admin', 'admin', 'superadmin'].includes(userRole) ? `
         <button onclick="openUnavailability(${b.id}, '${b.display_name.replace(/'/g, "\\'")}')" title="Marcar inactivo en un horario" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-amber-400 hover:border-amber-400/30 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </button>
+        ` : ''}
+        ${['admin', 'superadmin'].includes(userRole) ? `
         <button onclick="editBarber(${b.id})" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         </button>
