@@ -254,9 +254,12 @@
       <div id="prod-error" class="hidden p-3 bg-red-500/15 border border-red-500/40 text-red-400 text-xs rounded-lg"></div>
 
       <!-- Actions -->
-      <div class="flex gap-3 justify-end pt-2">
-        <button type="button" class="btn-ghost" onclick="closeProductModal()">Cancelar</button>
-        <button type="submit" id="btn-prod-submit" class="btn-gold">Guardar Producto</button>
+      <div class="flex justify-between items-center pt-2">
+        <button type="button" id="btn-prod-delete" class="hidden text-red-500 hover:text-red-400 text-[0.65rem] tracking-widest uppercase font-bold transition-colors" onclick="confirmDeleteProduct()">Eliminar</button>
+        <div class="flex gap-3">
+          <button type="button" class="btn-ghost" onclick="closeProductModal()">Cancelar</button>
+          <button type="submit" id="btn-prod-submit" class="btn-gold">Guardar Producto</button>
+        </div>
       </div>
     </form>
   </div>
@@ -458,6 +461,7 @@ function openCreateModal() {
   document.getElementById('form-product').reset();
   document.getElementById('img-preview').style.display = 'none';
   document.getElementById('prod-error').classList.add('hidden');
+  document.getElementById('btn-prod-delete').classList.add('hidden');
   document.getElementById('modal-product').classList.remove('hidden');
 }
 
@@ -472,6 +476,7 @@ function openEditModal(item) {
   document.getElementById('prod-cost').value = item.cost_per_unit;
   document.getElementById('prod-sale-price').value = item.sale_price;
   document.getElementById('prod-error').classList.add('hidden');
+  document.getElementById('btn-prod-delete').classList.remove('hidden');
 
   const preview = document.getElementById('img-preview');
   if (item.image) { preview.src = item.image; preview.style.display = 'block'; }
@@ -525,6 +530,26 @@ async function submitProductForm(e) {
   } finally {
     submitBtn.textContent = 'Guardar Producto';
     submitBtn.disabled = false;
+  }
+}
+
+async function confirmDeleteProduct() {
+  const itemId = document.getElementById('prod-id').value;
+  if (!itemId) return;
+  if (!confirm('¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.')) return;
+  
+  try {
+    const resp = await fetch(`/api/admin/inventory/items/${itemId}/delete/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': CSRF }
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || 'Error al eliminar');
+    closeProductModal();
+    loadInventory();
+  } catch(err) {
+    document.getElementById('prod-error').textContent = err.message;
+    document.getElementById('prod-error').classList.remove('hidden');
   }
 }
 
