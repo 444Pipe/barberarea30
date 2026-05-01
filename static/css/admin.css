@@ -195,3 +195,48 @@
   .kpi-card { padding: 0.85rem; }
   .kpi-card .text-xl { font-size: 1rem; }
 }
+
+/* ─── Date & Time inputs — legibilidad en fondo oscuro ─── */
+input[type="date"].admin-input,
+input[type="time"].admin-input {
+  background: #1c1c1c;
+  border: 1px solid rgba(245, 180, 0, 0.25);
+  color: #f5f5f5;
+  cursor: pointer;
+}
+
+input[type="date"].admin-input:hover,
+input[type="time"].admin-input:hover {
+  border-color: rgba(245, 180, 0, 0.5);
+  background: #242424;
+}
+
+input[type="date"].admin-input:focus,
+input[type="time"].admin-input:focus {
+  border-color: #D4AF37;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+  background: #242424;
+}
+
+/* Ícono del calendario/reloj en navegadores Webkit (Chrome, Edge, Safari) */
+input[type="date"].admin-input::-webkit-calendar-picker-indicator,
+input[type="time"].admin-input::-webkit-calendar-picker-indicator {
+  filter: invert(80%) sepia(40%) saturate(600%) hue-rotate(5deg) brightness(110%);
+  cursor: pointer;
+  opacity: 0.8;
+  padding: 2px;
+  border-radius: 3px;
+  transition: opacity 0.2s;
+}
+
+input[type="date"].admin-input::-webkit-calendar-picker-indicator:hover,
+input[type="time"].admin-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Texto placeholder del valor vacío */
+input[type="date"].admin-input:not([value=""]),
+input[type="time"].admin-input:not([value=""]) {
+  color: #f5f5f5;
+}
+
