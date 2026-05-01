@@ -21,14 +21,39 @@ shop, _ = Barbershop.objects.get_or_create(
 
 from django.utils.text import slugify
 
-# Ya no se crean servicios desde data.json, solo se usarán los ingresados por el usuario.
+# Crear/Actualizar servicios oficiales
+services_data = [
+    {'name': 'Corte Imperial', 'slug': 'corte-imperial', 'price': 30000,
+     'duration_minutes': 30, 'features': ['Asesoría visajista', 'Precisión milimétrica', 'Acabado impecable']},
+    {'name': 'Corte + Freestyle', 'slug': 'corte-freestyle', 'price': 35000,
+     'duration_minutes': 40, 'features': ['Corte completo', 'Diseño freestyle personalizado', 'Cejas y styling'],
+     'is_popular': True},
+    {'name': 'Corte con Barba', 'slug': 'corte-barba', 'price': 40000,
+     'duration_minutes': 40, 'features': ['Corte de cabello', 'Diseño de barba', 'Cejas y styling']},
+    {'name': 'The Club Experience', 'slug': 'club-experience', 'price': 60000,
+     'duration_minutes': 60, 'features': ['Corte imperial', 'Diseño de barba ritual', 'Vapor ozono', 'Mascarilla'],
+     'is_popular': True},
+    {'name': 'Ritual de Barba', 'slug': 'ritual-barba', 'price': 25000,
+     'duration_minutes': 30, 'features': ['Diseño a navaja', 'Toallas calientes aromáticas', 'Aceites premium']},
+    {'name': 'Corte para Dama', 'slug': 'corte-dama', 'price': 35000,
+     'duration_minutes': 40, 'features': ['Corte personalizado', 'Limpieza de cejas con cuchilla']},
+    {'name': 'Freestyle Creativo', 'slug': 'freestyle-creativo', 'price': 40000,
+     'duration_minutes': 45, 'features': ['Diseño artístico', 'Freestyle avanzado', 'Styling premium']},
+    {'name': 'Rayitos o Mechas', 'slug': 'rayitos-mechas', 'price': 225000,
+     'duration_minutes': 120, 'features': ['Color profesional', 'Proceso completo', 'Post-tratamiento']},
+    {'name': 'Trenzados', 'slug': 'trenzados', 'price': 70000,
+     'duration_minutes': 90, 'features': ['Trenzado completo', 'Styling profesional']},
+]
+
+for i, svc in enumerate(services_data):
+    Service.objects.update_or_create(
+        slug=svc['slug'],
+        defaults={**svc, 'display_order': i}
+    )
 
 # Limpiar barberos de prueba si existen
 Barber.objects.filter(display_name__in=['Barbero Prueba', 'Juan Pérez', 'Carlos Estilista']).delete()
 User.objects.filter(username__in=['barberoprueba', 'juan', 'carlos']).delete()
-
-# Limpiar servicios ficticios
-Service.objects.filter(name__in=['Corte Básico', 'Corte + Freestyle', 'Corte con Barba', 'Corte para Dama']).delete()
 
 print("Datos cargados correctamente")
 # Asegurarnos de que la tabla bookings_blockeddate exista en producción si la migración falló misteriosamente

@@ -1,10 +1,3 @@
-// Configuración de servicios manejados en el frontend (mismo mapa que booking.js)
-const MODAL_SERVICE_OPTIONS = {
-  'Corte Imperial': { slug: 'corte-basico', price: 30000 },
-  'Club Experience': { slug: 'asesoria-visajista', price: 60000 },
-  'Ritual de Barba': { slug: 'corte-barba', price: 25000 }
-};
-
 // Gestionar modal de reserva
 function openBookingModal() {
   const modal = document.getElementById('booking-modal');
@@ -30,8 +23,6 @@ document.querySelectorAll('[data-open-booking]').forEach(btn => {
   });
 });
 
-// Configuración al cargar el documento: cerrar modal con click en fondo
-// y establecer fecha mínima (hoy) en todos los inputs de fecha
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('booking-modal');
   if (modal) {
@@ -41,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Botón cerrar
     const closeBtn = modal.querySelector('[data-close-modal]');
     if (closeBtn) {
       closeBtn.addEventListener('click', closeBookingModal);
@@ -55,30 +45,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const dd = String(now.getDate()).padStart(2, '0');
   const todayStr = `${yyyy}-${mm}-${dd}`;
 
-  document.querySelectorAll('input[type="date"]').forEach(input => {
-    input.setAttribute('min', todayStr);
-  });
-
-  // Preparar labels y listeners para disponibilidad de horas en el modal
-  const timeSelect = document.querySelector('#booking-form-modal select[name="time"]');
-  const dateInput = document.querySelector('#booking-form-modal input[name="date"]');
-
-  if (timeSelect) {
-    timeSelect.querySelectorAll('option').forEach(opt => {
-      if (!opt.dataset.label) {
-        opt.dataset.label = opt.textContent;
-      }
-    });
+  const dateInput = document.getElementById('modal-date-input');
+  if (dateInput) {
+      dateInput.setAttribute('min', todayStr);
   }
 
-  if (dateInput && timeSelect) {
-    dateInput.addEventListener('change', () => {
-      const value = dateInput.value;
-      if (value) {
-        updateModalTimeAvailability(value, timeSelect);
-      }
-    });
-  }
+  // Cargar servicios y barberos dinámicamente
+  cargarModalServicios();
+  cargarModalBarberos();
+
+  // Escuchar cambios para cargar horarios
+  const barberSelect = document.getElementById('modal-barber-select');
+  const serviceSelect = document.getElementById('modal-service-select');
+
+  if (barberSelect) barberSelect.addEventListener('change', tryLoadModalSlots);
+  if (dateInput) dateInput.addEventListener('change', tryLoadModalSlots);
+  if (serviceSelect) serviceSelect.addEventListener('change', tryLoadModalSlots);
 
   // Formulario de reserva en modal
   const form = document.getElementById('booking-form-modal');
@@ -86,125 +68,231 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn ? submitBtn.textContent : '';
+
       const formData = new FormData(e.target);
       const name = formData.get('name')?.trim();
       const phone = formData.get('phone')?.trim();
       const email = formData.get('email')?.trim();
-      const service = formData.get('service');
+      const service = formData.get('service'); // This is the service ID or Name depending on options
+      const barber = formData.get('barber');
       const date = formData.get('date');
       const time = formData.get('time');
       const notes = formData.get('notes')?.trim();
 
-      // Validar campos obligatorios
       if (!name || !phone || !email || !service || !date || !time) {
-        showErrorMessage('Por favor completa todos los campos requeridos');
+        showModalErrorMessage('Por favor completa todos los campos requeridos');
         return;
       }
 
-      // Validar formato de email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        showErrorMessage('Por favor ingresa un email válido');
+        showModalErrorMessage('Por favor ingresa un email válido');
         return;
       }
 
-      // Validar que la fecha no sea anterior a hoy
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      if (date < todayStr) {
-        showErrorMessage('La fecha debe ser hoy o una fecha futura');
-        return;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Procesando...';
       }
 
-      const serviceInfo = MODAL_SERVICE_OPTIONS[service];
-      if (!serviceInfo) {
-        showErrorMessage('Servicio seleccionado no es válido');
-        return;
-      }
+      const selectedOption = serviceSelect?.options[serviceSelect.selectedIndex];
+      const serviceId = selectedOption?.dataset.serviceId || selectedOption?.value;
+      const servicePrice = selectedOption?.dataset.price || 0;
 
-      const data = {
-        name,
-        phone,
-        email,
-        service_slug: serviceInfo.slug,
-        service,
-        price_num: serviceInfo.price,
+      const payload = {
+        client_name: name,
+        client_phone: phone,
+        client_email: email,
+        service_id: serviceId,
+        barber_id: barber || 'any',
         date,
         time,
-        notes
+        price: servicePrice,
+        notes: notes,
+        privacy_accepted: 'true',
       };
 
       try {
-        const response = await fetch('/api/bookings', {
+        const response = await fetch('/api/bookings/', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
         });
 
-        if (response.ok) {
-          localStorage.setItem('lastBooking', JSON.stringify(data));
-          showSuccessMessage();
+        const result = await response.json();
+
+        if (response.ok && result.ok) {
+          showModalSuccessMessage();
           form.reset();
+          document.getElementById('modal-time-select').innerHTML = '<option value="">Selecciona barbero y fecha primero</option>';
+          if (submitBtn) submitBtn.textContent = '✓ Reserva enviada';
           setTimeout(() => closeBookingModal(), 2000);
         } else {
-          showErrorMessage('Error al guardar la reserva. Intenta de nuevo.');
+          const errMsg = result.error || result.errors || 'Error al guardar la reserva. Intenta de nuevo.';
+          showModalErrorMessage(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          }
         }
       } catch (error) {
         console.error('Error al crear reserva (modal):', error);
-        showErrorMessage('Ocurrió un error al enviar la reserva.');
+        showModalErrorMessage('Ocurrió un error al enviar la reserva.');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+        }
       }
     });
   }
 });
 
-async function updateModalTimeAvailability(date, timeSelect) {
-  try {
-    const res = await fetch(`/api/availability?date=${encodeURIComponent(date)}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data.ok) return;
-
-    const taken = data.taken_times || [];
-    let availableCount = 0;
-
-    timeSelect.querySelectorAll('option').forEach(opt => {
-      if (!opt.value) return;
-      const baseLabel = opt.dataset.label || opt.textContent;
-      const isTaken = taken.includes(opt.value);
-      opt.disabled = isTaken;
-      opt.textContent = isTaken ? `${baseLabel} (Ocupado)` : baseLabel;
-      if (!isTaken) availableCount += 1;
+function cargarModalServicios() {
+  fetch('/api/servicios-nativos/')
+    .then(response => {
+      if (!response.ok) throw new Error("Error en servicios");
+      return response.json();
+    })
+    .then(data => {
+      const select = document.getElementById('modal-service-select');
+      if (!select) return;
+      
+      let optionsHtml = '<option value="" class="bg-jet">Selecciona un servicio</option>';
+      data.servicios.forEach(servicio => {
+        const precioFormat = parseFloat(servicio.price).toLocaleString('es-CO');
+        optionsHtml += `<option value="${servicio.name}" data-service-id="${servicio.id}" data-price="${servicio.price}" class="bg-jet">${servicio.name} - $${precioFormat}</option>`;
+      });
+      select.innerHTML = optionsHtml;
+    })
+    .catch(err => {
+      console.error(err);
+      const select = document.getElementById('modal-service-select');
+      if (select) select.innerHTML = '<option value="" class="bg-jet">Error al cargar servicios</option>';
     });
+}
 
-    const placeholder = timeSelect.querySelector('option[value=""]');
-    if (placeholder) {
-      placeholder.textContent = availableCount > 0
-        ? 'Selecciona una hora'
-        : 'No hay horarios disponibles en esta fecha';
-    }
+function cargarModalBarberos() {
+  fetch('/api/barberos-nativos/')
+    .then(response => {
+      if (!response.ok) throw new Error("Error en barberos");
+      return response.json();
+    })
+    .then(data => {
+      const select = document.getElementById('modal-barber-select');
+      if (!select) return;
+      
+      let optionsHtml = '<option value="" class="bg-jet">Cualquier Barbero Disponible</option>';
+      data.barberos.forEach(barbero => {
+        optionsHtml += `<option value="${barbero.id}" class="bg-jet">${barbero.nombre} (${barbero.especialidad || 'Barbero'})</option>`;
+      });
+      select.innerHTML = optionsHtml;
+    })
+    .catch(err => {
+      console.error(err);
+      const select = document.getElementById('modal-barber-select');
+      if (select) select.innerHTML = '<option value="" class="bg-jet">Error al cargar barberos</option>';
+    });
+}
 
-    if (timeSelect.value && taken.includes(timeSelect.value)) {
-      timeSelect.value = '';
-    }
-  } catch (err) {
-    console.error('Error obteniendo disponibilidad (modal):', err);
+const MODAL_HOUR_LABELS = {
+  '09:00': '09:00 AM', '10:00': '10:00 AM', '11:00': '11:00 AM',
+  '12:00': '12:00 PM', '13:00': '01:00 PM', '14:00': '02:00 PM',
+  '15:00': '03:00 PM', '16:00': '04:00 PM', '17:00': '05:00 PM',
+  '18:00': '06:00 PM', '19:00': '07:00 PM', '20:00': '08:00 PM',
+};
+
+function tryLoadModalSlots() {
+  const barberId  = document.getElementById('modal-barber-select')?.value || 'any';
+  const date      = document.getElementById('modal-date-input')?.value;
+  const serviceEl = document.getElementById('modal-service-select');
+  const serviceId = serviceEl?.options[serviceEl.selectedIndex]?.dataset?.serviceId
+                    || serviceEl?.value
+                    || null;
+  if (date && serviceId) {
+    loadModalAvailableSlots(barberId, date, serviceId);
   }
 }
 
-function showSuccessMessage() {
-  const message = document.createElement('div');
-  message.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-[9999] animate-pulse';
-  message.textContent = '✓ ¡Solicitud recibida! Te contactaremos pronto.';
-  document.body.appendChild(message);
-  setTimeout(() => message.remove(), 5000);
+async function loadModalAvailableSlots(barberId, date, serviceId) {
+  const timeSelect = document.getElementById('modal-time-select');
+  const hint       = document.getElementById('modal-time-hint');
+  const durationBadge = document.getElementById('modal-service-duration-badge');
+  if (!timeSelect) return;
+
+  timeSelect.innerHTML = '<option value="">Cargando horarios...</option>';
+  timeSelect.disabled = true;
+
+  try {
+    let url = `/api/barbers/${barberId}/availability/?date=${date}`;
+    if (serviceId) url += `&service_id=${serviceId}`;
+
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.day_off) {
+      timeSelect.innerHTML = '<option value="">Sin horario este día</option>';
+      if (hint) hint.classList.add('hidden');
+      if (durationBadge) durationBadge.classList.add('hidden');
+      return;
+    }
+
+    if (durationBadge) {
+      const dur = data.service_duration || 60;
+      if (dur > 60) {
+        durationBadge.textContent = `⏱ Este servicio dura ${dur} min y bloquea ${data.slots_needed} hora${data.slots_needed > 1 ? 's' : ''} consecutivas`;
+        durationBadge.classList.remove('hidden');
+      } else {
+        durationBadge.classList.add('hidden');
+      }
+    }
+
+    const slots = data.slots || [];
+    if (!slots.length) {
+      timeSelect.innerHTML = '<option value="">No hay horarios disponibles</option>';
+      if (hint) hint.classList.add('hidden');
+      return;
+    }
+
+    let html = '<option value="" class="bg-jet">Selecciona una hora</option>';
+    let hasAvailable = false;
+    slots.forEach(slot => {
+      const label = MODAL_HOUR_LABELS[slot.time] || slot.time;
+      if (slot.available) {
+        html += `<option value="${slot.time}" class="bg-jet">${label}</option>`;
+        hasAvailable = true;
+      } else {
+        html += `<option value="${slot.time}" disabled class="bg-jet text-smoke/30">${label} — No disponible</option>`;
+      }
+    });
+
+    timeSelect.innerHTML = html;
+    if (hint) hint.classList.toggle('hidden', !slots.some(s => !s.available));
+
+    if (!hasAvailable) {
+      timeSelect.innerHTML = '<option value="">Sin horarios libres este día</option>';
+    }
+  } catch (err) {
+    console.error('Error cargando slots:', err);
+    timeSelect.innerHTML = '<option value="">Error al cargar horarios</option>';
+  } finally {
+    timeSelect.disabled = false;
+  }
 }
 
-function showErrorMessage(customMessage) {
+function showModalSuccessMessage() {
   const message = document.createElement('div');
-  message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg z-[9999]';
+  message.className = 'fixed top-4 right-4 bg-emerald-600 text-white px-6 py-4 rounded-lg shadow-lg z-[9999]';
+  message.textContent = '✓ ¡Solicitud recibida! Te contactaremos pronto por WhatsApp';
+  document.body.appendChild(message);
+  setTimeout(() => message.remove(), 6000);
+}
+
+function showModalErrorMessage(customMessage) {
+  const message = document.createElement('div');
+  message.className = 'fixed top-4 right-4 bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg z-[9999] max-w-sm';
   message.textContent = customMessage || '✗ Error al enviar. Por favor intenta de nuevo.';
   document.body.appendChild(message);
-  setTimeout(() => message.remove(), 5000);
+  setTimeout(() => message.remove(), 6000);
 }

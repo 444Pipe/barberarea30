@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.contrib.auth.models import User
 
-from apps.cashflow.models import Sale, Commission, Expense
+from apps.cashflow.models import Sale, Commission, Expense, InventorySale
 from .models import Partner, PartnerInvestment, MonthlyROISnapshot, PartnerMonthlyShare
 
 
@@ -37,7 +37,16 @@ def get_net_income_for_month(year: int, month: int) -> dict:
         approval_status='approved',
     )
 
-    gross = sales_qs.aggregate(t=Sum('final_price'))['t'] or Decimal('0')
+    gross_services = sales_qs.aggregate(t=Sum('final_price'))['t'] or Decimal('0')
+
+    # Ventas de inventario del mes
+    inventory_sales_qs = InventorySale.objects.filter(
+        created_at__date__gte=start,
+        created_at__date__lte=end,
+    )
+    gross_inventory = inventory_sales_qs.aggregate(t=Sum('total_price'))['t'] or Decimal('0')
+
+    gross = gross_services + gross_inventory
 
     commissions = Commission.objects.filter(
         sale__in=sales_qs
