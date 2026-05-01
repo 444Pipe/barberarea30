@@ -2,6 +2,30 @@
 
 from django.db import migrations, models
 
+def clean_duplicate_bookings(apps, schema_editor):
+    """
+    Busca y cancela reservas duplicadas (mismo barbero, fecha y hora en estado activo)
+    para permitir que la restricción UniqueConstraint se aplique sin errores.
+    """
+    Booking = apps.get_model('bookings', 'Booking')
+    active_statuses = ['pending', 'confirmed']
+    
+    seen = set()
+    duplicates_to_cancel = []
+    
+    # Ordenamos por ID para mantener la primera reserva creada y cancelar las posteriores
+    for booking in Booking.objects.filter(status__in=active_statuses).order_by('id'):
+        key = (booking.barber_id, booking.date, booking.time)
+        if key in seen:
+            duplicates_to_cancel.append(booking.id)
+        else:
+            seen.add(key)
+            
+    if duplicates_to_cancel:
+        Booking.objects.filter(id__in=duplicates_to_cancel).update(
+            status='cancelled', 
+            notes='Cancelado automáticamente para resolver conflicto de integridad (duplicado detectado).'
+        )
 
 class Migration(migrations.Migration):
 
@@ -12,8 +36,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(clean_duplicate_bookings, reverse_code=migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='booking',
-            constraint=models.UniqueConstraint(condition=models.Q(('status__in', ['pending', 'confirmed'])), fields=('barber', 'date', 'time'), name='unique_active_booking_barber_date_time'),
+            constraint=models.UniqueConstraint(
+                condition=models.Q(('status__in', ['pending', 'confirmed'])), 
+                fields=('barber', 'date', 'time'), 
+                name='unique_active_booking_barber_date_time'
+            ),
         ),
     ]
