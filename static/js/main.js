@@ -18,6 +18,7 @@ function cargarServicios() {
                 const delay = index * 100;
                 // Add comma separators to price
                 const formatPrice = parseFloat(servicio.price).toLocaleString('es-CO');
+                const slug = servicio.name.toLowerCase().replace(/[\s\W-]+/g, '-');
                 
                 htmlFragment += `
                     <div class="service-card p-12 rounded-sm relative overflow-hidden group border border-white/5 bg-jet shadow-2xl transition-all duration-300 hover:border-gold/60" style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${delay}ms; opacity: 0;">
@@ -26,7 +27,7 @@ function cargarServicios() {
                             <span class="text-gold font-medium tracking-widest">$${formatPrice}</span>
                         </div>
                         <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">Duración: ${servicio.duration_minutes} min</p>
-                        <a href="booking.html#servicio-${servicio.id}" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
+                        <a href="booking.html#${slug}" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
                     </div>
                 `;
             });

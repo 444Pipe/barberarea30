@@ -303,9 +303,10 @@ document.addEventListener('DOMContentLoaded', function() {
           : `<span title="Servicio para Caballeros" class="inline-flex items-center justify-center bg-blue-500/10 rounded-full p-1 ml-2"><svg class="w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="14" r="5"></circle><path d="M13.5 10.5L19 5"></path><path d="M19 5v4"></path><path d="M19 5h-4"></path></svg></span>`;
 
         const safeJson = JSON.stringify(s).replace(/'/g, "&#39;");
+        const slug = lowerName.replace(/[\s\W-]+/g, '-');
 
         return `
-          <div id="servicio-${s.id}" class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group ${theme.borderHover} ${theme.shadowHover} border border-white/5 bg-jet transition-all duration-500 shadow-2xl"
+          <div id="${slug}" class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group ${theme.borderHover} ${theme.shadowHover} border border-white/5 bg-jet transition-all duration-500 shadow-2xl"
                style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${idx*100}ms; opacity: 0;"
                data-service='${safeJson}' onclick="selectService(this)">
             <div class="flex justify-between items-start mb-4 gap-2">
@@ -325,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Lógica de Scroll y Highlight
       const hash = window.location.hash;
-      if (hash && hash.startsWith('#servicio-')) {
+      if (hash) {
         setTimeout(() => {
           const targetCard = document.querySelector(hash);
           if (targetCard) {
