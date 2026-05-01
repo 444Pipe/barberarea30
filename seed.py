@@ -164,3 +164,14 @@ except Exception as e:
     print("Error creando a Frank:", e)
 
 print("Superusuarios actualizados correctamente.")
+
+# Actualizar email de Samuel para notificaciones exclusivas
+try:
+    from apps.barbers.models import Barber
+    samuel = Barber.objects.filter(display_name__icontains='samuel').first()
+    if samuel and samuel.user:
+        samuel.user.email = 'samuelmedf@gmail.com'
+        samuel.user.save()
+        print("Email de Samuel actualizado a samuelmedf@gmail.com")
+except Exception as e:
+    print("Error actualizando email de Samuel:", e)
