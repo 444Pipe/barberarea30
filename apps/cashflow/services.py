@@ -24,6 +24,7 @@ from apps.analytics.models import log_audit
 def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                      payment_reference='', tip_amount=0,
                      discount_amount=0, discount_assumed_by='none',
+                     added_value_amount=0, added_value_description='',
                      commission_percentage=50, notes='', request=None):
     """
     Procesa el checkout completo de una reserva de forma atómica.
@@ -74,6 +75,8 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
             barber=booking.barber,
             service=booking.service,
             base_price=booking.price,
+            added_value_amount=added_value_amount,
+            added_value_description=added_value_description,
             discount_amount=discount_amount,
             discount_assumed_by=discount_assumed_by,
             tip_amount=tip_amount,

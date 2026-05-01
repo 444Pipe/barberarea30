@@ -40,6 +40,8 @@ class Sale(models.Model):
     )
     # Totales
     base_price = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    added_value_amount = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    added_value_description = models.CharField(max_length=200, blank=True)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     final_price = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     tip_amount = models.DecimalField(max_digits=10, decimal_places=0, default=0)
@@ -104,7 +106,7 @@ class Sale(models.Model):
         return f'Venta #{self.pk} — {desc} — ${self.final_price:,.0f}'
 
     def save(self, *args, **kwargs):
-        self.final_price = self.base_price - self.discount_amount
+        self.final_price = self.base_price + self.added_value_amount - self.discount_amount
         self.total_paid = self.final_price + self.tip_amount
         super().save(*args, **kwargs)
 
@@ -148,10 +150,10 @@ class Commission(models.Model):
         elif self.sale.discount_assumed_by == 'shared':
             # Mitad y mitad: se resta el 50% del descuento al precio base
             half_discount = self.sale.discount_amount / Decimal('2.0')
-            self.basis_amount = self.sale.base_price - half_discount
+            self.basis_amount = self.sale.base_price + self.sale.added_value_amount - half_discount
         else:
             # Empresa asume (o sin descuento): comisión sobre el precio BASE
-            self.basis_amount = self.sale.base_price
+            self.basis_amount = self.sale.base_price + self.sale.added_value_amount
 
         self.commission_amount = (self.basis_amount * self.percentage) / Decimal('100.00')
         self.tip_amount = self.sale.tip_amount

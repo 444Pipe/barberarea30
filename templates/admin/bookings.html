@@ -168,6 +168,23 @@
         <input type="text" id="checkout-reference" placeholder="Ej: Nequi 1234" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
       </div>
 
+      <div class="mt-2 p-2 bg-jet-lighter border border-white/5 rounded">
+        <label class="flex items-center gap-2 cursor-pointer mb-2">
+          <input type="checkbox" id="checkout-has-added-value" class="w-3.5 h-3.5 bg-jet border-white/10 rounded accent-gold" onchange="toggleAddedValue()">
+          <span class="text-[0.65rem] text-smoke/60 uppercase tracking-widest">¿Valor Agregado?</span>
+        </label>
+        <div id="checkout-added-value-container" class="hidden grid grid-cols-2 gap-3 mt-2">
+          <div>
+            <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Valor</label>
+            <input type="number" id="checkout-added-value" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none" oninput="updateCheckoutTotal()">
+          </div>
+          <div>
+            <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Descripción</label>
+            <input type="text" id="checkout-added-value-desc" placeholder="Ej: Cejas, Lavado extra" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Propina</label>
@@ -417,7 +434,8 @@ function deleteAllBookings() {
 function openCheckout(id, clientName, price) {
   document.getElementById('checkout-booking-id').value = id;
   document.getElementById('checkout-client-name').textContent = clientName;
-  document.getElementById('checkout-base-price').textContent = '$' + price.toLocaleString('es-CO');
+  window._checkoutBasePrice = price;
+  updateCheckoutTotal();
   document.getElementById('checkout-modal').classList.remove('hidden');
   loadConsumables();
 }
@@ -425,8 +443,31 @@ function openCheckout(id, clientName, price) {
 function closeCheckout() {
   document.getElementById('checkout-modal').classList.add('hidden');
   document.getElementById('checkout-form').reset();
+  document.getElementById('checkout-has-added-value').checked = false;
+  document.getElementById('checkout-added-value-container').classList.add('hidden');
   document.getElementById('consumables-grid').innerHTML = '';
   document.getElementById('consumables-total').classList.add('hidden');
+}
+
+function toggleAddedValue() {
+  const isChecked = document.getElementById('checkout-has-added-value').checked;
+  const container = document.getElementById('checkout-added-value-container');
+  if (isChecked) {
+    container.classList.remove('hidden');
+  } else {
+    container.classList.add('hidden');
+    document.getElementById('checkout-added-value').value = 0;
+    document.getElementById('checkout-added-value-desc').value = '';
+    updateCheckoutTotal();
+  }
+}
+
+function updateCheckoutTotal() {
+  const basePrice = window._checkoutBasePrice || 0;
+  const isChecked = document.getElementById('checkout-has-added-value').checked;
+  const addedValue = isChecked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0;
+  const total = basePrice + addedValue;
+  document.getElementById('checkout-base-price').textContent = '$' + total.toLocaleString('es-CO');
 }
 
 // ─── CONSUMABLES ──────────────────────────────────────────────────
@@ -523,6 +564,8 @@ function submitCheckout(e) {
     tip_amount: parseFloat(document.getElementById('checkout-tip').value) || 0,
     discount_amount: parseFloat(document.getElementById('checkout-discount').value) || 0,
     discount_assumed_by: document.getElementById('checkout-assumed-by').value,
+    added_value_amount: document.getElementById('checkout-has-added-value').checked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0,
+    added_value_description: document.getElementById('checkout-has-added-value').checked ? document.getElementById('checkout-added-value-desc').value : '',
     notes: document.getElementById('checkout-notes').value
   };
 

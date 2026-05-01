@@ -39,6 +39,8 @@ def checkout_booking_view(request, booking_id):
             tip_amount=_safe_decimal(data.get('tip_amount'), 0),
             discount_amount=_safe_decimal(data.get('discount_amount'), 0),
             discount_assumed_by=data.get('discount_assumed_by', 'none'),
+            added_value_amount=_safe_decimal(data.get('added_value_amount'), 0),
+            added_value_description=data.get('added_value_description', ''),
             commission_percentage=_safe_decimal(data.get('commission_percentage'), 50),
             notes=data.get('notes', ''),
             request=request,
