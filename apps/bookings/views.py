@@ -98,10 +98,29 @@ def create_booking_view(request):
         for b in available_barbers:
             date_val = date
             time_val = time
-            # Conflicto con reservas existentes
-            conflicts = Booking.objects.filter(
-                barber=b, date=date_val, time=time_val, status__in=['pending', 'confirmed']
-            ).exists()
+            # Conflicto con reservas existentes (Overlap check)
+            try:
+                from datetime import datetime as _dt, timedelta
+                req_time = _dt.strptime(time_val, '%H:%M').time()
+                req_start = _dt.combine(_dt.strptime(date_val, '%Y-%m-%d').date(), req_time)
+                req_end = req_start + timedelta(minutes=service.duration_minutes)
+                
+                existing_bks = Booking.objects.filter(
+                    barber=b, date=date_val, status__in=['pending', 'confirmed']
+                ).values_list('time', 'duration_minutes')
+                
+                conflicts = False
+                for bk_time, bk_duration in existing_bks:
+                    bk_start = _dt.combine(_dt.strptime(date_val, '%Y-%m-%d').date(), bk_time)
+                    bk_end = bk_start + timedelta(minutes=bk_duration or 60)
+                    if req_start < bk_end and req_end > bk_start:
+                        conflicts = True
+                        break
+            except Exception:
+                conflicts = Booking.objects.filter(
+                    barber=b, date=date_val, time=time_val, status__in=['pending', 'confirmed']
+                ).exists()
+                
             if conflicts:
                 continue
             # Conflicto con inactividad temporal
@@ -150,22 +169,44 @@ def create_booking_view(request):
         except Barber.DoesNotExist:
             return Response({'error': 'Barbero no disponible'}, status=400)
 
-    # ── Nivel 2: Validación explícita de doble agendamiento ───────────────────
+    # ── Nivel 2: Validación explícita de doble agendamiento (Con overlaps) ───────────────────
     requested_date = data.get('date')
-    requested_time = data.get('time')
-    duplicate = Booking.objects.filter(
-        barber=barber,
-        date=requested_date,
-        time=requested_time,
-        status__in=['pending', 'confirmed'],
-    ).exists()
+    requested_time_str = data.get('time')
+    try:
+        from datetime import datetime as _dt, timedelta
+        req_time = _dt.strptime(requested_time_str, '%H:%M').time()
+        req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
+        req_end = req_start + timedelta(minutes=service.duration_minutes)
+        
+        existing_bookings = Booking.objects.filter(
+            barber=barber,
+            date=requested_date,
+            status__in=['pending', 'confirmed']
+        ).values_list('time', 'duration_minutes')
+        
+        duplicate = False
+        for bk_time, bk_duration in existing_bookings:
+            bk_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), bk_time)
+            bk_end = bk_start + timedelta(minutes=bk_duration or 60)
+            
+            if req_start < bk_end and req_end > bk_start:
+                duplicate = True
+                break
+    except Exception:
+        duplicate = Booking.objects.filter(
+            barber=barber,
+            date=requested_date,
+            time=requested_time_str,
+            status__in=['pending', 'confirmed'],
+        ).exists()
+
     if duplicate:
         return Response({
             'ok': False,
             'error': (
-                f'{barber.display_name} ya tiene una cita activa a las '
-                f'{requested_time} el {requested_date}. '
-                f'Por favor elige otro horario.'
+                f'{barber.display_name} ya tiene una cita activa que se cruza con las '
+                f'{requested_time_str} el {requested_date}. '
+                f'Por favor elige otro horario u otro barbero.'
             )
         }, status=409)
     # ─────────────────────────────────────────────────────────────────────────

@@ -60,19 +60,31 @@ class Booking(models.Model):
         ]
 
     def clean(self):
-        """Validación a nivel de modelo: impide el doble agendamiento de un barbero."""
+        """Validación a nivel de modelo: impide el doble agendamiento de un barbero mediante overlaps."""
         if self.barber and self.date and self.time:
+            from datetime import datetime, timedelta
+            req_start = datetime.combine(self.date, self.time)
+            req_end = req_start + timedelta(minutes=self.duration_minutes or 60)
+            
             conflict_qs = Booking.objects.filter(
                 barber=self.barber,
                 date=self.date,
-                time=self.time,
                 status__in=['pending', 'confirmed'],
             )
             if self.pk:  # Excluir la propia instancia en caso de edición
                 conflict_qs = conflict_qs.exclude(pk=self.pk)
-            if conflict_qs.exists():
+            
+            has_conflict = False
+            for bk in conflict_qs:
+                bk_start = datetime.combine(bk.date, bk.time)
+                bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+                if req_start < bk_end and req_end > bk_start:
+                    has_conflict = True
+                    break
+                    
+            if has_conflict:
                 raise ValidationError(
-                    f'{self.barber.display_name} ya tiene una cita activa a las '
+                    f'{self.barber.display_name} ya tiene una cita activa que se cruza con las '
                     f'{self.time.strftime("%H:%M")} el {self.date.strftime("%d/%m/%Y")}. '
                     f'Por favor elige otro horario.'
                 )
