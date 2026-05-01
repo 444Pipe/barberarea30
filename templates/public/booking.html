@@ -55,6 +55,17 @@
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
     }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .highlight-card {
+      border-color: #D4AF37 !important;
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.3) !important;
+      transform: scale(1.02);
+      z-index: 10;
+    }
   </style>
 </head>
 <body class="bg-jet text-smoke font-sans antialiased">
@@ -294,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const safeJson = JSON.stringify(s).replace(/'/g, "&#39;");
 
         return `
-          <div class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group ${theme.borderHover} ${theme.shadowHover} border border-white/5 bg-jet transition-all duration-500 shadow-2xl"
+          <div id="servicio-${s.id}" class="service-card p-8 rounded-sm cursor-pointer relative overflow-hidden group ${theme.borderHover} ${theme.shadowHover} border border-white/5 bg-jet transition-all duration-500 shadow-2xl"
                style="animation: fadeInUp 0.8s ease-out forwards; animation-delay: ${idx*100}ms; opacity: 0;"
                data-service='${safeJson}' onclick="selectService(this)">
             <div class="flex justify-between items-start mb-4 gap-2">
@@ -311,6 +322,22 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         `;
       }).join('');
+      
+      // Lógica de Scroll y Highlight
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#servicio-')) {
+        setTimeout(() => {
+          const targetCard = document.querySelector(hash);
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetCard.classList.add('highlight-card');
+            setTimeout(() => {
+              targetCard.classList.remove('highlight-card');
+              history.replaceState(null, null, ' ');
+            }, 2500);
+          }
+        }, 500); // 500ms para dejar que las animaciones de entrada finalicen
+      }
     });
 
   renderCustomCalendar();

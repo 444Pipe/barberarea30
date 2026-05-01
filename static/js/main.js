@@ -26,7 +26,7 @@ function cargarServicios() {
                             <span class="text-gold font-medium tracking-widest">$${formatPrice}</span>
                         </div>
                         <p class="text-smoke/60 font-light text-sm mb-10 leading-relaxed italic">Duración: ${servicio.duration_minutes} min</p>
-                        <a href="booking.html?service=${encodeURIComponent(servicio.name)}" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
+                        <a href="booking.html#servicio-${servicio.id}" class="text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3">Reserva VIP <span class="text-xl">→</span></a>
                     </div>
                 `;
             });
