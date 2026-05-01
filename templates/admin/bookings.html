@@ -588,7 +588,7 @@ function openWalkinModal() {
         const sel = document.getElementById('walkin-service');
         sel.innerHTML = '<option value="">Seleccione un servicio...</option>';
         data.servicios.forEach(s => {
-          sel.innerHTML += `<option value="${s.id}">${s.name} - $${parseInt(s.price).toLocaleString('es-CO')}</option>`;
+          sel.innerHTML += `<option value="${s.id}" data-price="${s.price}">${s.name} - $${parseInt(s.price).toLocaleString('es-CO')}</option>`;
         });
       });
   }
@@ -616,15 +616,20 @@ function submitWalkin(e) {
   const btn = e.target.querySelector('[type="submit"]');
   btn.disabled = true;
   btn.textContent = 'Agendando...';
-  
+
+  const serviceSelect = document.getElementById('walkin-service');
+  const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
+  const servicePrice = selectedServiceOption?.dataset?.price || 0;
+
   const payload = {
     client_name: document.getElementById('walkin-client').value,
     client_phone: document.getElementById('walkin-phone').value,
     client_email: document.getElementById('walkin-email').value,
-    service_id: document.getElementById('walkin-service').value,
+    service_id: serviceSelect.value,
     barber_id: document.getElementById('walkin-barber').value,
     date: document.getElementById('walkin-date').value,
     time: document.getElementById('walkin-time').value,
+    price: servicePrice,
     is_walk_in: true,
     privacy_accepted: true
   };
