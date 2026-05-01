@@ -175,3 +175,14 @@ try:
         print("Email de Samuel actualizado a samuelmedf@gmail.com")
 except Exception as e:
     print("Error actualizando email de Samuel:", e)
+
+# Actualizar email de Cristian para notificaciones exclusivas
+try:
+    from apps.barbers.models import Barber
+    cristian = Barber.objects.filter(display_name__icontains='cristian').first()
+    if cristian and cristian.user:
+        cristian.user.email = 'cristiangome930@gmail.com'
+        cristian.user.save()
+        print("Email de Cristian actualizado a cristiangome930@gmail.com")
+except Exception as e:
+    print("Error actualizando email de Cristian:", e)
