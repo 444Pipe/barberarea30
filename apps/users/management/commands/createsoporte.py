@@ -6,9 +6,9 @@ class Command(BaseCommand):
     help = 'Creates a soporte tecnico user with full superadmin privileges.'
 
     def handle(self, *args, **options):
-        username = 'soporte_tecnico'
+        username = 'soporte'
         email = 'soporte@area30.com'
-        password = 'Area30Soporte!' # It can be changed later
+        password = 'afweb' # It can be changed later
 
         # Delete existing if any, to ensure it gets recreated cleanly
         if User.objects.filter(username=username).exists():
