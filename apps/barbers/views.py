@@ -55,8 +55,8 @@ def barber_availability_view(request, barber_id):
         return Response({'error': 'Barbero no encontrado'},
                         status=status.HTTP_404_NOT_FOUND)
 
-    # ── Duración del servicio seleccionado (default 60 min) ──────────────────
-    SLOT_SIZE = 60  # cada bloque horario en el calendario = 60 min
+    # ── Duración del servicio seleccionado (default 30 min) ──────────────────
+    SLOT_SIZE = 30  # cada bloque horario en el calendario = 30 min
     service_duration = SLOT_SIZE  # duración a reservar
     service_id = request.query_params.get('service_id')
     if service_id:

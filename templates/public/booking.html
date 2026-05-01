@@ -443,7 +443,7 @@ function loadAllBarberSlots() {
       }
 
       const promises = validBarbers.map(b =>
-        fetch(`/api/barbers/${b.id}/availability/?date=${state.date}`)
+        fetch(`/api/barbers/${b.id}/availability/?date=${state.date}&service_id=${state.service.id}`)
           .then(r => r.json())
           .then(avail => ({ ...b, avail }))
       );
