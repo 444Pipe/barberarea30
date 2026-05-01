@@ -45,10 +45,13 @@ services_data = [
      'duration_minutes': 90, 'features': ['Trenzado completo', 'Styling profesional']},
 ]
 
+# Desactivar servicios que no están en la lista oficial
+Service.objects.update(is_active=False)
+
 for i, svc in enumerate(services_data):
     Service.objects.update_or_create(
         slug=svc['slug'],
-        defaults={**svc, 'display_order': i}
+        defaults={**svc, 'display_order': i, 'is_active': True}
     )
 
 # Limpiar barberos de prueba si existen
