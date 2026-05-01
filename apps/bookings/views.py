@@ -221,9 +221,10 @@ def create_booking_view(request):
         )
 
         try:
-            from .emails import send_booking_confirmation_email, send_admin_new_booking_notification
+            from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
             send_booking_confirmation_email(booking)
             send_admin_new_booking_notification(booking)
+            send_barber_new_booking_notification(booking)
         except Exception as e:
             print("Error enviando email:", e)
 

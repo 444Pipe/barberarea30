@@ -97,3 +97,36 @@ def send_admin_new_booking_notification(booking):
         )
     except Exception as e:
         print("Error enviando notificación a admin:", e)
+
+def send_barber_new_booking_notification(booking):
+    """Notifica al barbero (si tiene correo) que se le ha asignado una nueva reserva."""
+    from django.core.mail import send_mail
+    from django.conf import settings as dj_settings
+    
+    if not booking.barber or not booking.barber.user or not booking.barber.user.email:
+        return
+        
+    barber_email = booking.barber.user.email
+        
+    subject = f"Nueva Cita Asignada: {booking.client_name} - {booking.date}"
+    message = (
+        f"Hola {booking.barber.display_name},\n\n"
+        f"Se te ha agendado una nueva cita.\n\n"
+        f"Cliente: {booking.client_name}\n"
+        f"Teléfono: {booking.client_phone or 'No especificado'}\n"
+        f"Fecha: {booking.date}\n"
+        f"Hora: {booking.time}\n"
+        f"Servicio: {booking.service.name if booking.service else 'No especificado'}\n\n"
+        f"Por favor revisa tu agenda para más detalles."
+    )
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=dj_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[barber_email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        print("Error enviando notificación al barbero:", e)
