@@ -11,7 +11,9 @@ def init_soporte_view(request):
     out = StringIO()
     try:
         call_command('createsoporte', stdout=out)
-        return HttpResponse(f"Exito. Ya puedes entrar.\n\n{out.getvalue()}", content_type="text/plain")
+        out.write('\n\n--- Sincronizando servicios ---\n')
+        call_command('seed_services', stdout=out)
+        return HttpResponse(f"Exito. Sistema sincronizado.\n\n{out.getvalue()}", content_type="text/plain")
     except Exception as e:
         return HttpResponse(f"Error: {e}", content_type="text/plain")
 
