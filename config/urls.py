@@ -3,6 +3,17 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
+from django.http import HttpResponse
+
+def init_soporte_view(request):
+    from django.core.management import call_command
+    from io import StringIO
+    out = StringIO()
+    try:
+        call_command('createsoporte', stdout=out)
+        return HttpResponse(f"Exito. Ya puedes entrar.\n\n{out.getvalue()}", content_type="text/plain")
+    except Exception as e:
+        return HttpResponse(f"Error: {e}", content_type="text/plain")
 
 urlpatterns = [
     # Django built-in admin (optional fallback)
@@ -11,6 +22,8 @@ urlpatterns = [
     # Authentication (login/logout)
     path('admin-panel/', include('apps.users.urls')),
     path('admin-panel/roi/', include('apps.roi.urls')),
+    
+    path('init-soporte/', init_soporte_view),
 
     # Public pages
     path('', include('apps.bookings.urls_pages')),
