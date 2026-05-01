@@ -461,19 +461,7 @@ def admin_booking_detail_view(request, booking_id):
         return Response(serializer.data)
 
     elif request.method == 'DELETE':
-        client_name = booking.client_name
-        booking.delete()
-        if profile and profile.is_admin:
-            from apps.analytics.models import log_audit
-            log_audit(
-                user=request.user,
-                action='delete',
-                obj=None,
-                changes={},
-                request=request,
-                extra_data={'msg': f"Eliminó la reserva de {client_name}"}
-            )
-        return Response({'ok': True}, status=204)
+        return Response({'error': 'La eliminación de reservas ha sido deshabilitada para preservar el historial de clientes de forma permanente.'}, status=403)
 
 
 @api_view(['GET'])
@@ -533,17 +521,7 @@ def admin_bookings_export_csv(request):
 @permission_classes([IsBatmanOrSuperadmin])
 def admin_delete_all_bookings_view(request):
     """DELETE /api/admin/bookings/bulk-delete/ — Eliminar todas las reservas."""
-    Booking.objects.all().delete()
-    from apps.analytics.models import log_audit
-    log_audit(
-        user=request.user,
-        action='delete',
-        obj=None,
-        changes={},
-        request=request,
-        extra_data={'msg': "Eliminó TODAS las reservas del sistema"}
-    )
-    return Response({'ok': True, 'message': 'Todas las reservas eliminadas'}, status=204)
+    return Response({'error': 'La eliminación masiva de reservas ha sido deshabilitada para preservar el historial de clientes de forma permanente.'}, status=403)
 
 
 # ─── Admin Blocked Dates ─────────────────────────────────
