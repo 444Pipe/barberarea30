@@ -97,7 +97,7 @@ pm2, _ = PaymentMethod.objects.get_or_create(slug='transferencia', defaults={'na
 # Crear superusuarios automáticamente para Railway
 users_to_create = [
     {'username': 'camilorf', 'password': 'area30*', 'email': 'camilo@area30.co'},
-    {'username': 'Juandavid.castro', 'password': 'Liam2711*', 'email': 'juandavid@area30.co'},
+    {'username': 'juandavid.castro', 'password': 'Liam2711*', 'email': 'juandavid@area30.co'},
     {'username': 'soporte_tecnico', 'password': 'soporte_tecnico_pass', 'email': 'soporte@area30.co'}, # Assuming some pass or keeping existing
 ]
 
@@ -123,7 +123,7 @@ try:
     
     # 1. Obtener usuarios canónicos
     camilo_user = User.objects.filter(username='camilorf').first()
-    jd_user = User.objects.filter(username='Juandavid.castro').first()
+    jd_user = User.objects.filter(username='juandavid.castro').first()
     
     # 2. Eliminar socios duplicados o con alias (manteniendo solo los que tengan estos usuarios)
     valid_users = [u for u in [camilo_user, jd_user] if u]
