@@ -340,18 +340,37 @@ function renderCustomCalendar() {
     .then(blockedData => {
       if (!Array.isArray(blockedData)) blockedData = [];
       const blockedDates = blockedData.map(b => b.date);
-      const today = new Date();
+      
+      // Obtener hora local de Bogotá de forma segura para cualquier cliente
+      const todayBogotaStr = new Date().toLocaleString("en-US", { timeZone: "America/Bogota" });
+      const today = new Date(todayBogotaStr);
+      const currentHour = today.getHours();
+      
       let html = '';
+      const days = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+
       for (let i = 0; i < 14; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        const dayStr = d.toLocaleDateString('es-CO', { weekday: 'short', timeZone: 'America/Bogota' }).toUpperCase();
-        const isBlocked = blockedDates.includes(dateStr);
+        
+        // Evitar toISOString() que usa UTC y puede saltar de día.
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const dayStr = days[d.getDay()];
+        let isBlocked = blockedDates.includes(dateStr);
+
+        // Bloquear el día de hoy si ya pasó la última hora de agenda (ej. 7:00 PM -> 19:00)
+        if (i === 0 && currentHour >= 19) {
+          isBlocked = true;
+        }
+
         html += `
           <div onclick="${isBlocked ? '' : `selectDate('${dateStr}', this)`}"
                class="calendar-day shrink-0 w-16 h-20 rounded-xl border border-white/5 bg-jet flex flex-col items-center justify-center transition-all ${isBlocked ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:border-gold/50'}">
-            <span class="text-smoke/60 text-[10px] uppercase font-semibold tracking-widest">${dayStr.substring(0,3)}</span>
+            <span class="text-smoke/60 text-[10px] uppercase font-semibold tracking-widest">${dayStr}</span>
             <span class="text-white font-serif text-2xl mt-1">${d.getDate()}</span>
             ${isBlocked ? '<span class="text-[8px] text-gold/40 mt-1 uppercase font-bold">Bloqueado</span>' : ''}
           </div>`;

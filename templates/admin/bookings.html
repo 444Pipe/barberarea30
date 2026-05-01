@@ -29,9 +29,13 @@
   <!-- Filters -->
   <div class="bg-jet-card border border-white/5 rounded-xl p-4">
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {% if user_role == 'superadmin' or user_role == 'admin' or user_role == 'operational_admin' %}
       <select id="filter-barber" onchange="loadBookings()" class="admin-select">
         <option value="">Todos los barberos</option>
       </select>
+      {% else %}
+      <input type="hidden" id="filter-barber" value="">
+      {% endif %}
       <select id="filter-status" onchange="loadBookings()" class="admin-select">
         <option value="">Todos los estados</option>
         <option value="pending">Pendiente</option>
@@ -213,11 +217,13 @@ let searchTimeout = null;
 document.addEventListener('DOMContentLoaded', function() {
   fetch('/api/barbers/').then(r => r.json()).then(barbers => {
     const sel = document.getElementById('filter-barber');
-    barbers.forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b.id; opt.textContent = b.display_name;
-      sel.appendChild(opt);
-    });
+    if (sel && sel.tagName === 'SELECT') {
+      barbers.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id; opt.textContent = b.display_name;
+        sel.appendChild(opt);
+      });
+    }
   });
   loadBookings();
 });
