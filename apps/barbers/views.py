@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin, IsAdminOrAboveWithWriteBatman
 from apps.bookings.models import Booking, BlockedDate
+from apps.services.models import Service
 from .models import Barber, GalleryImage, Reel, BarberUnavailability
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
 
@@ -32,8 +33,10 @@ class BarberPublicListView(generics.ListAPIView):
 @permission_classes([AllowAny])
 def barber_availability_view(request, barber_id):
     """
-    GET /api/barbers/{id}/availability/?date=YYYY-MM-DD
+    GET /api/barbers/{id}/availability/?date=YYYY-MM-DD[&service_id=N]
     Devuelve los slots del día con su estado de disponibilidad.
+    Si se pasa service_id, tiene en cuenta la duración del servicio para
+    marcar como no disponibles los slots donde no cabe el servicio completo.
     """
     date_str = request.query_params.get('date')
     if not date_str:
@@ -51,6 +54,20 @@ def barber_availability_view(request, barber_id):
     except Barber.DoesNotExist:
         return Response({'error': 'Barbero no encontrado'},
                         status=status.HTTP_404_NOT_FOUND)
+
+    # ── Duración del servicio seleccionado (default 60 min) ──────────────────
+    SLOT_SIZE = 60  # cada bloque horario en el calendario = 60 min
+    service_duration = SLOT_SIZE  # duración a reservar
+    service_id = request.query_params.get('service_id')
+    if service_id:
+        try:
+            svc = Service.objects.get(pk=service_id)
+            service_duration = svc.duration_minutes or SLOT_SIZE
+        except Service.DoesNotExist:
+            pass  # si no existe el servicio, usamos 60 min por defecto
+
+    # Cuántos bloques de 60 min ocupa este servicio (mínimo 1)
+    slots_needed = max(1, -(-service_duration // SLOT_SIZE))  # ceil division
 
     # Map weekday number to schedule key
     day_names = ['monday', 'tuesday', 'wednesday', 'thursday',
@@ -93,7 +110,7 @@ def barber_availability_view(request, barber_id):
     booked_ranges = []
     for bk_time, bk_duration in booked:
         bk_start = datetime.combine(target_date, bk_time)
-        bk_end = bk_start + timedelta(minutes=bk_duration or 60)
+        bk_end = bk_start + timedelta(minutes=bk_duration or SLOT_SIZE)
         booked_ranges.append((bk_start, bk_end))
 
     # Get barber-specific unavailability blocks for this date
@@ -105,29 +122,42 @@ def barber_availability_view(request, barber_id):
         for s, e in unavail_blocks
     ]
 
-    # Generate 60-minute slots
+    # ── Generar slots de 60 min ──────────────────────────────────────────────
+    # Para cada slot verificamos que TODOS los bloques que necesita el servicio
+    # estén libres. Ejemplo: Diamond VIP (120 min) a las 11:00 necesita
+    # que tanto 11:00–12:00 como 12:00–13:00 estén disponibles.
     slots = []
     current = datetime.combine(target_date, start_time)
     end = datetime.combine(target_date, end_time)
+    now_local = timezone.localtime()
 
     while current < end:
-        slot_end = current + timedelta(minutes=60)
+        slot_end = current + timedelta(minutes=SLOT_SIZE)
+        # El servicio ocuparía desde current hasta current + service_duration
+        service_end = current + timedelta(minutes=service_duration)
+
         is_available = True
 
-        for br_start, br_end in booked_ranges:
-            if current < br_end and slot_end > br_start:
-                is_available = False
-                break
+        # 1. El servicio debe caber dentro del horario del barbero
+        if service_end > end:
+            is_available = False
 
+        # 2. Verificar conflicto con reservas existentes para TODA la ventana del servicio
         if is_available:
-            for ur_start, ur_end in unavail_ranges:
-                if current < ur_end and slot_end > ur_start:
+            for br_start, br_end in booked_ranges:
+                if current < br_end and service_end > br_start:
                     is_available = False
                     break
 
-        # If date is today, mark past times as unavailable
-        now_local = timezone.localtime()
-        if target_date == now_local.date() and current.time() <= now_local.time():
+        # 3. Verificar conflicto con bloqueos manuales para TODA la ventana
+        if is_available:
+            for ur_start, ur_end in unavail_ranges:
+                if current < ur_end and service_end > ur_start:
+                    is_available = False
+                    break
+
+        # 4. Si es hoy, marcar horas pasadas como no disponibles
+        if is_available and target_date == now_local.date() and current.time() <= now_local.time():
             is_available = False
 
         slots.append({
@@ -155,6 +185,8 @@ def barber_availability_view(request, barber_id):
         'available_count': available_count,
         'total_slots': total_slots,
         'slots': slots,
+        'service_duration': service_duration,
+        'slots_needed': slots_needed,
     })
 
 

@@ -9,19 +9,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (serviceSelect) serviceSelect.value = serviceParam;
   }
 
-  // Escuchar cambios en barbero y fecha para recargar horarios
-  const barberSelect = document.getElementById('barber-select');
-  const dateInput    = document.getElementById('selected-date-input');
+  // Escuchar cambios en barbero, fecha Y servicio para recargar horarios
+  const barberSelect  = document.getElementById('barber-select');
+  const dateInput     = document.getElementById('selected-date-input');
+  const serviceSelect = document.getElementById('service-select');
 
-  if (barberSelect) barberSelect.addEventListener('change', tryLoadSlots);
-  if (dateInput)    dateInput.addEventListener('change', tryLoadSlots);
+  if (barberSelect)  barberSelect.addEventListener('change', tryLoadSlots);
+  if (dateInput)     dateInput.addEventListener('change', tryLoadSlots);
+  if (serviceSelect) serviceSelect.addEventListener('change', tryLoadSlots);
 });
 
 function tryLoadSlots() {
-  const barberId = document.getElementById('barber-select')?.value;
-  const date     = document.getElementById('selected-date-input')?.value;
+  const barberId  = document.getElementById('barber-select')?.value;
+  const date      = document.getElementById('selected-date-input')?.value;
+  const serviceEl = document.getElementById('service-select');
+  const serviceId = serviceEl?.options[serviceEl.selectedIndex]?.dataset?.serviceId
+                    || serviceEl?.value
+                    || null;
   if (barberId && date) {
-    loadAvailableSlots(barberId, date);
+    loadAvailableSlots(barberId, date, serviceId);
   }
 }
 
@@ -33,22 +39,38 @@ const HOUR_LABELS = {
   '18:00': '06:00 PM', '19:00': '07:00 PM', '20:00': '08:00 PM',
 };
 
-async function loadAvailableSlots(barberId, date) {
+async function loadAvailableSlots(barberId, date, serviceId) {
   const timeSelect = document.getElementById('time-select');
   const hint       = document.getElementById('time-hint');
+  const durationBadge = document.getElementById('service-duration-badge');
   if (!timeSelect) return;
 
   timeSelect.innerHTML = '<option value="">Cargando horarios...</option>';
   timeSelect.disabled = true;
 
   try {
-    const res  = await fetch(`/api/barbers/${barberId}/availability/?date=${date}`);
+    let url = `/api/barbers/${barberId}/availability/?date=${date}`;
+    if (serviceId) url += `&service_id=${serviceId}`;
+
+    const res  = await fetch(url);
     const data = await res.json();
 
     if (data.day_off) {
       timeSelect.innerHTML = '<option value="">Sin horario este día</option>';
       if (hint) hint.classList.add('hidden');
+      if (durationBadge) durationBadge.classList.add('hidden');
       return;
+    }
+
+    // Mostrar badge de duración si el servicio dura más de 60 min
+    if (durationBadge) {
+      const dur = data.service_duration || 60;
+      if (dur > 60) {
+        durationBadge.textContent = `⏱ Este servicio dura ${dur} min y bloquea ${data.slots_needed} hora${data.slots_needed > 1 ? 's' : ''} consecutivas`;
+        durationBadge.classList.remove('hidden');
+      } else {
+        durationBadge.classList.add('hidden');
+      }
     }
 
     const slots = data.slots || [];
