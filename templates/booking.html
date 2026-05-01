@@ -112,23 +112,12 @@
 
       <div class="mb-8 relative z-10 col-span-full md:col-span-1">
         <label class="block text-xs uppercase tracking-widest font-semibold mb-3 text-smoke/70">Hora Preferida</label>
-        <select name="time" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
-          <option value="" class="bg-jet">Selecciona una hora</option>
-            <option value="09:00" class="bg-jet">09:00 AM</option>
-            <option value="10:00" class="bg-jet">10:00 AM</option>
-            <option value="11:00" class="bg-jet">11:00 AM</option>
-            <option value="12:00" class="bg-jet">12:00 PM</option>
-            <option value="13:00" class="bg-jet">01:00 PM</option>
-            <option value="14:00" class="bg-jet">02:00 PM</option>
-            <option value="15:00" class="bg-jet">03:00 PM</option>
-            <option value="16:00" class="bg-jet">04:00 PM</option>
-            <option value="17:00" class="bg-jet">05:00 PM</option>
-            <option value="18:00" class="bg-jet">06:00 PM</option>
-            <option value="19:00" class="bg-jet">07:00 PM</option>
-            <option value="20:00" class="bg-jet">08:00 PM</option>
-          </select>
-        </div>
+        <select id="time-select" name="time" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none cursor-pointer">
+          <option value="" class="bg-jet">Selecciona barbero y fecha primero</option>
+        </select>
+        <p id="time-hint" class="text-[0.6rem] text-smoke/30 mt-2 tracking-wider hidden">Los horarios en gris no están disponibles</p>
       </div>
+    </div>
 
       <button type="submit" class="w-full px-8 py-4 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm relative z-10 shadow-lg">
         Solicitar Reserva
@@ -266,7 +255,7 @@
           let optionsHtml = '<option value="" class="bg-jet">Selecciona un servicio premium</option>';
           data.servicios.forEach(servicio => {
             const precioFormat = parseFloat(servicio.price).toLocaleString('es-CO');
-            optionsHtml += `<option value="${servicio.name}" class="bg-jet">${servicio.name} - $${precioFormat}</option>`;
+            optionsHtml += `<option value="${servicio.name}" data-service-id="${servicio.id}" data-price="${servicio.price}" class="bg-jet">${servicio.name} - $${precioFormat}</option>`;
           });
           select.innerHTML = optionsHtml;
         })

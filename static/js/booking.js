@@ -1,157 +1,148 @@
-// Configuración de servicios manejados en el frontend
-const SERVICE_OPTIONS = {
-  'Corte Imperial': { slug: 'corte-basico', price: 30000 },
-  'Club Experience': { slug: 'asesoria-visajista', price: 60000 },
-  'Ritual de Barba': { slug: 'corte-barba', price: 25000 }
-};
+// ─── Booking Page JS ─────────────────────────────────────
 
-// Establecer fecha mínima (hoy), preparar labels de horas y
-// preseleccionar servicio si viene en la URL
 document.addEventListener('DOMContentLoaded', () => {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const todayStr = `${yyyy}-${mm}-${dd}`;
-
-  document.querySelectorAll('input[type="date"]').forEach(input => {
-    input.setAttribute('min', todayStr);
-  });
-
-  // Guardar label original de cada opción de hora para poder añadir "(Ocupado)"
-  const timeSelect = document.querySelector('select[name="time"]');
-  if (timeSelect) {
-    timeSelect.querySelectorAll('option').forEach(opt => {
-      if (!opt.dataset.label) {
-        opt.dataset.label = opt.textContent;
-      }
-    });
-  }
-
+  // Preseleccionar servicio desde URL
   const params = new URLSearchParams(window.location.search);
   const serviceParam = params.get('service');
   if (serviceParam) {
     const serviceSelect = document.querySelector('select[name="service"]');
-    if (serviceSelect) {
-      serviceSelect.value = serviceParam;
-    }
+    if (serviceSelect) serviceSelect.value = serviceParam;
   }
 
-  // Actualizar disponibilidad de horas cuando cambie la fecha
-  const dateInput = document.querySelector('input[name="date"]');
-  if (dateInput && timeSelect) {
-    dateInput.addEventListener('change', () => {
-      const value = dateInput.value;
-      if (value) {
-        updateTimeAvailability(value, timeSelect);
-      }
-    });
-  }
+  // Escuchar cambios en barbero y fecha para recargar horarios
+  const barberSelect = document.getElementById('barber-select');
+  const dateInput    = document.getElementById('selected-date-input');
+
+  if (barberSelect) barberSelect.addEventListener('change', tryLoadSlots);
+  if (dateInput)    dateInput.addEventListener('change', tryLoadSlots);
 });
 
-async function updateTimeAvailability(date, timeSelect) {
-  try {
-    const res = await fetch(`/api/availability?date=${encodeURIComponent(date)}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data.ok) return;
-
-    const taken = data.taken_times || [];
-
-    let availableCount = 0;
-    timeSelect.querySelectorAll('option').forEach(opt => {
-      if (!opt.value) return; // opción vacía
-
-      const baseLabel = opt.dataset.label || opt.textContent;
-      const isTaken = taken.includes(opt.value);
-      opt.disabled = isTaken;
-      opt.textContent = isTaken ? `${baseLabel} (Ocupado)` : baseLabel;
-      if (!isTaken) availableCount += 1;
-    });
-
-    // Si no hay horarios disponibles, mostrar mensaje en la primera opción
-    const placeholder = timeSelect.querySelector('option[value=""]');
-    if (placeholder) {
-      placeholder.textContent = availableCount > 0
-        ? 'Selecciona una hora'
-        : 'No hay horarios disponibles en esta fecha';
-    }
-
-    // Resetear selección si la hora actual quedó ocupada
-    if (timeSelect.value && taken.includes(timeSelect.value)) {
-      timeSelect.value = '';
-    }
-  } catch (err) {
-    console.error('Error obteniendo disponibilidad:', err);
+function tryLoadSlots() {
+  const barberId = document.getElementById('barber-select')?.value;
+  const date     = document.getElementById('selected-date-input')?.value;
+  if (barberId && date) {
+    loadAvailableSlots(barberId, date);
   }
 }
+
+// Etiquetas bonitas para cada hora
+const HOUR_LABELS = {
+  '09:00': '09:00 AM', '10:00': '10:00 AM', '11:00': '11:00 AM',
+  '12:00': '12:00 PM', '13:00': '01:00 PM', '14:00': '02:00 PM',
+  '15:00': '03:00 PM', '16:00': '04:00 PM', '17:00': '05:00 PM',
+  '18:00': '06:00 PM', '19:00': '07:00 PM', '20:00': '08:00 PM',
+};
+
+async function loadAvailableSlots(barberId, date) {
+  const timeSelect = document.getElementById('time-select');
+  const hint       = document.getElementById('time-hint');
+  if (!timeSelect) return;
+
+  timeSelect.innerHTML = '<option value="">Cargando horarios...</option>';
+  timeSelect.disabled = true;
+
+  try {
+    const res  = await fetch(`/api/barbers/${barberId}/availability/?date=${date}`);
+    const data = await res.json();
+
+    if (data.day_off) {
+      timeSelect.innerHTML = '<option value="">Sin horario este día</option>';
+      if (hint) hint.classList.add('hidden');
+      return;
+    }
+
+    const slots = data.slots || [];
+    if (!slots.length) {
+      timeSelect.innerHTML = '<option value="">No hay horarios disponibles</option>';
+      if (hint) hint.classList.add('hidden');
+      return;
+    }
+
+    let html = '<option value="" class="bg-jet">Selecciona una hora</option>';
+    let hasAvailable = false;
+    slots.forEach(slot => {
+      const label = HOUR_LABELS[slot.time] || slot.time;
+      if (slot.available) {
+        html += `<option value="${slot.time}" class="bg-jet">${label}</option>`;
+        hasAvailable = true;
+      } else {
+        html += `<option value="${slot.time}" disabled class="bg-jet text-smoke/30">${label} — No disponible</option>`;
+      }
+    });
+
+    timeSelect.innerHTML = html;
+    if (hint) hint.classList.toggle('hidden', !slots.some(s => !s.available));
+
+    if (!hasAvailable) {
+      timeSelect.innerHTML = '<option value="">Sin horarios libres este día</option>';
+    }
+  } catch (err) {
+    console.error('Error cargando slots:', err);
+    timeSelect.innerHTML = '<option value="">Error al cargar horarios</option>';
+  } finally {
+    timeSelect.disabled = false;
+  }
+}
+
+// ─── Envío del formulario ────────────────────────────────
 
 document.getElementById('booking-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const formData = new FormData(e.target);
-  const name = formData.get('name')?.trim();
-  const phone = formData.get('phone')?.trim();
-  const email = formData.get('email')?.trim();
+  const name    = formData.get('name')?.trim();
+  const phone   = formData.get('phone')?.trim();
+  const email   = formData.get('email')?.trim();
   const service = formData.get('service');
-  const date = formData.get('date');
-  const time = formData.get('time');
-  const notes = formData.get('notes')?.trim();
+  const barber  = formData.get('barber');
+  const date    = formData.get('date');
+  const time    = formData.get('time');
 
-  // Validar campos obligatorios
   if (!name || !phone || !email || !service || !date || !time) {
     showErrorMessage('Por favor completa todos los campos requeridos (Nombre, Celular, Email, Servicio, Fecha y Hora)');
     return;
   }
 
-  // Validar formato de email
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     showErrorMessage('Por favor ingresa un email válido');
     return;
   }
 
-  // Validar que la fecha no sea anterior a hoy
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  
-  if (date < todayStr) {
-    showErrorMessage('La fecha debe ser hoy o una fecha futura');
-    return;
-  }
+  // Obtener service_id y price del select de servicios
+  const serviceSelect = document.getElementById('service-select');
+  const selectedOption = serviceSelect?.options[serviceSelect.selectedIndex];
+  const serviceId    = selectedOption?.dataset.serviceId || selectedOption?.value;
+  const servicePrice = selectedOption?.dataset.price || 0;
 
-  const serviceInfo = SERVICE_OPTIONS[service];
-  if (!serviceInfo) {
-    showErrorMessage('Servicio seleccionado no es válido');
-    return;
-  }
-
-  const data = {
-    name,
-    phone,
-    email,
-    service_slug: serviceInfo.slug,
-    service,
-    price_num: serviceInfo.price,
+  const payload = {
+    client_name:      name,
+    client_phone:     phone,
+    client_email:     email,
+    service_id:       serviceId,
+    barber_id:        barber || 'any',
     date,
     time,
-    notes
+    price:            servicePrice,
+    privacy_accepted: 'true',
   };
 
   try {
-    const response = await fetch('/api/bookings', {
+    const response = await fetch('/api/bookings/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
-    if (response.ok) {
-      localStorage.setItem('lastBooking', JSON.stringify(data));
+    const result = await response.json();
+
+    if (response.ok && result.ok) {
       showSuccessMessage();
+      e.target.reset();
+      document.getElementById('time-select').innerHTML = '<option value="">Selecciona barbero y fecha primero</option>';
     } else {
-      showErrorMessage('Error al guardar la reserva. Intenta de nuevo.');
+      const errMsg = result.error || result.errors || 'Error al guardar la reserva. Intenta de nuevo.';
+      showErrorMessage(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
     }
   } catch (error) {
     console.error('Error al crear reserva:', error);
@@ -160,19 +151,19 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
 });
 
 function showSuccessMessage() {
-  const form = document.getElementById('booking-form');
   const message = document.createElement('div');
-  message.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-pulse';
+  message.className = 'fixed top-4 right-4 bg-emerald-600 text-white px-6 py-4 rounded-lg shadow-lg z-50';
   message.textContent = '✓ ¡Solicitud recibida! Te contactaremos pronto por WhatsApp';
   document.body.appendChild(message);
-  form.reset();
-  setTimeout(() => message.remove(), 5000);
+  setTimeout(() => message.remove(), 6000);
 }
 
 function showErrorMessage(customMessage) {
   const message = document.createElement('div');
-  message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg z-50';
+  message.className = 'fixed top-4 right-4 bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
   message.textContent = customMessage || '✗ Error al enviar. Por favor intenta de nuevo.';
   document.body.appendChild(message);
-  setTimeout(() => message.remove(), 5000);
+  setTimeout(() => message.remove(), 6000);
 }
+
+

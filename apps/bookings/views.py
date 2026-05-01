@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin
 from apps.users.decorators import staff_required
 from apps.barbers.models import Barber
+from apps.barbers.models import BarberUnavailability
 from apps.services.models import Service
 from .models import Booking, BlockedDate
 from .serializers import BookingCreateSerializer, BookingAdminSerializer, BlockedDateSerializer
@@ -93,15 +94,33 @@ def create_booking_view(request):
             if not available_barbers.exists():
                 return Response({'error': 'El barbero asignado para este servicio exclusivo no está disponible.'}, status=400)
 
-        # Buscar quién está libre
+        # Buscar quién está libre (sin reservas NI bloqueos de inactividad)
         for b in available_barbers:
-            # Check si b está libre en `date` y `time`
+            date_val = date
+            time_val = time
+            # Conflicto con reservas existentes
             conflicts = Booking.objects.filter(
-                barber=b, date=date, time=time, status__in=['pending', 'confirmed']
+                barber=b, date=date_val, time=time_val, status__in=['pending', 'confirmed']
             ).exists()
-            if not conflicts:
-                barber = b
-                break
+            if conflicts:
+                continue
+            # Conflicto con inactividad temporal
+            from datetime import datetime as _dt
+            try:
+                slot_time = _dt.strptime(time_val, '%H:%M').time()
+            except (ValueError, TypeError):
+                slot_time = None
+            if slot_time:
+                blocked_now = BarberUnavailability.objects.filter(
+                    barber=b,
+                    date=date_val,
+                    start_time__lte=slot_time,
+                    end_time__gt=slot_time,
+                ).exists()
+                if blocked_now:
+                    continue
+            barber = b
+            break
                 
         if not barber:
             return Response({'error': 'No hay barberos disponibles en la franja horaria seleccionada.'}, status=400)
@@ -111,6 +130,23 @@ def create_booking_view(request):
             # Validar servicio exclusivo
             if service.exclusive_barber and service.exclusive_barber.id != barber.id:
                 return Response({'error': 'Este servicio exclusivo solo puede ser realizado por otro barbero.'}, status=400)
+            # Validar inactividad temporal
+            date_val = data.get('date')
+            time_val = data.get('time')
+            from datetime import datetime as _dt
+            try:
+                slot_time = _dt.strptime(time_val, '%H:%M').time()
+            except (ValueError, TypeError):
+                slot_time = None
+            if slot_time and date_val:
+                is_blocked = BarberUnavailability.objects.filter(
+                    barber=barber,
+                    date=date_val,
+                    start_time__lte=slot_time,
+                    end_time__gt=slot_time,
+                ).exists()
+                if is_blocked:
+                    return Response({'error': f'{barber.display_name} no está disponible en ese horario por una emergencia. Por favor elige otra hora.'}, status=400)
         except Barber.DoesNotExist:
             return Response({'error': 'Barbero no disponible'}, status=400)
 
