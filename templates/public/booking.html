@@ -298,9 +298,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const isFemale = lowerName.includes('dama') || lowerName.includes('mujer');
-        const genderIcon = isFemale
-          ? `<span title="Servicio para Damas" class="inline-flex items-center justify-center bg-pink-500/10 rounded-full p-1 ml-2"><svg class="w-3.5 h-3.5 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="5"></circle><path d="M12 14v7"></path><path d="M9 18h6"></path></svg></span>`
-          : `<span title="Servicio para Caballeros" class="inline-flex items-center justify-center bg-blue-500/10 rounded-full p-1 ml-2"><svg class="w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="14" r="5"></circle><path d="M13.5 10.5L19 5"></path><path d="M19 5v4"></path><path d="M19 5h-4"></path></svg></span>`;
 
         const safeJson = JSON.stringify(s).replace(/'/g, "&#39;");
         const slug = lowerName.replace(/[\s\W-]+/g, '-');
@@ -311,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                data-service='${safeJson}' onclick="selectService(this)">
             <div class="flex justify-between items-start mb-4 gap-2">
               <h3 class="text-lg font-serif text-white ${theme.textHover} transition-colors duration-300 flex items-center flex-wrap">
-                ${s.name} ${genderIcon}
+                ${s.name}
               </h3>
               <span class="${theme.text} font-semibold tracking-widest shrink-0">$${parseFloat(s.price).toLocaleString('es-CO')}</span>
             </div>
