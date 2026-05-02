@@ -230,6 +230,7 @@
 
 <script>
 let searchTimeout = null;
+const userIsSuperAdmin = {% if user_role == 'superadmin' %}true{% else %}false{% endif %};
 
 document.addEventListener('DOMContentLoaded', function() {
   fetch('/api/barbers/').then(r => r.json()).then(barbers => {
@@ -344,12 +345,18 @@ function renderTable(bookings) {
               💰 COBRAR
             </button>
           ` : ''}
-          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1" ${b.status === 'completed' ? 'disabled title="Reserva pagada y bloqueada"' : ''}>
+          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1" ${ (b.status === 'completed' || !userIsSuperAdmin) ? 'disabled title="Solo soporte y superadministradores pueden cambiar el estado"' : ''}>
             <option value="">Cambiar...</option>
             <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pendiente</option>
             <option value="confirmed" ${b.status === 'confirmed' ? 'selected' : ''}>Confirmado</option>
             <option value="completed" ${b.status === 'completed' ? 'selected' : 'disabled title="Usa el botón COBRAR para completar"'}>Completado</option>
             <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
+          </select>
+          ${userIsSuperAdmin ? `
+          <button onclick="deleteBooking(${b.id})" class="w-full px-2 py-1 bg-red-600/20 text-red-400 border border-red-500/30 rounded text-[0.6rem] hover:bg-red-600/40 transition-colors mt-1 font-bold">
+            🗑️ BORRAR
+          </button>
+          ` : ''}
         </div>
       </td>
     </tr>

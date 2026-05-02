@@ -423,6 +423,10 @@ def admin_booking_detail_view(request, booking_id):
             if not (profile and profile.is_superadmin):
                 return Response({'error': 'Esta reserva ya está pagada y bloqueada. No se permiten cambios.'}, status=403)
 
+        if new_status != old_status:
+            if not (profile and profile.is_superadmin):
+                return Response({'error': 'Solo los super administradores y soporte técnico pueden cambiar el estado de la reserva.'}, status=403)
+
         if new_status == 'completed' and old_status != 'completed':
             booking.completed_at = timezone.now()
             # Update barber's total cuts
@@ -461,8 +465,10 @@ def admin_booking_detail_view(request, booking_id):
         return Response(serializer.data)
 
     elif request.method == 'DELETE':
-        return Response({'error': 'La eliminación de reservas ha sido deshabilitada para preservar el historial de clientes de forma permanente.'}, status=403)
-
+        if not (profile and profile.is_superadmin):
+            return Response({'error': 'Solo los super administradores pueden eliminar reservas permanentemente.'}, status=403)
+        booking.delete()
+        return Response({'ok': True}, status=204)
 
 @api_view(['GET'])
 @permission_classes([IsAdminOrAbove])

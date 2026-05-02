@@ -1,121 +1,7 @@
 {% extends 'admin/base_admin.html' %}
 
 {% block title %}Caja y Finanzas - Área 30
-<!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
-<div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
-    <div class="bg-jet-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
-        <h3 class="text-base font-serif text-white">Venta Rápida (Bebidas / Productos)</h3>
-        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="p-6 space-y-5">
-        <div>
-            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
-            <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none" onchange="updateInvPrice()">
-                <option value="" data-price="0">Selecciona un producto...</option>
-                {% for item in inventory_items %}
-                <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
-                    {{ item.name }} - ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
-                <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
-            </div>
-            <div>
-                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Total</label>
-                <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded-sm px-4 py-3 outline-none cursor-not-allowed">
-            </div>
-        </div>
-        <div>
-            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Método de Pago</label>
-            <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none">
-                {% for method in payment_methods %}
-                <option value="{{ method.id }}">{{ method.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-      </div>
-      <div class="px-6 py-4 border-t border-white/5 bg-jet/50 flex justify-end gap-3">
-        <button onclick="closeInventorySaleModal()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-white hover:bg-white/5 transition-colors">Cancelar</button>
-        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-jet bg-gold hover:bg-gold-light transition-colors">Confirmar Venta</button>
-      </div>
-    </div>
-  </div>
-</div>
 
-<script>
-function openInventorySaleModal() {
-    document.getElementById('modal-inventory-sale').classList.remove('hidden');
-    document.getElementById('inv-item-id').value = '';
-    document.getElementById('inv-qty').value = '1';
-    updateInvPrice();
-}
-
-function closeInventorySaleModal() {
-    document.getElementById('modal-inventory-sale').classList.add('hidden');
-}
-
-function updateInvPrice() {
-    const select = document.getElementById('inv-item-id');
-    const option = select.options[select.selectedIndex];
-    const price = parseFloat(option ? option.getAttribute('data-price') : 0);
-    const qty = parseInt(document.getElementById('inv-qty').value) || 1;
-    const total = price * qty;
-    document.getElementById('inv-total').value = '$' + total.toLocaleString('es-CO');
-}
-
-async function submitInventorySale() {
-    const btn = document.getElementById('btn-submit-inv-sale');
-    const itemId = document.getElementById('inv-item-id').value;
-    const qty = document.getElementById('inv-qty').value;
-    const methodId = document.getElementById('inv-payment-method').value;
-
-    if (!itemId) {
-        showToast('Selecciona un producto', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = 'PROCESANDO...';
-
-    try {
-        const response = await fetch('/api/admin/cashflow/inventory-sales/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                item_id: itemId,
-                quantity: qty,
-                payment_method_id: methodId
-            })
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            showToast(data.message, 'success');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            showToast(data.error || 'Error procesando venta', 'error');
-            btn.disabled = false;
-            btn.innerHTML = 'Confirmar Venta';
-        }
-    } catch (e) {
-        showToast('Error de conexión', 'error');
-        btn.disabled = false;
-        btn.innerHTML = 'Confirmar Venta';
-    }
-}
-</script>
 
 {% endblock %}
 
@@ -363,6 +249,11 @@ async function submitInventorySale() {
 </div>
 
 
+
+
+{% endblock %}
+
+
 <!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
 <div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
@@ -413,6 +304,8 @@ async function submitInventorySale() {
   </div>
 </div>
 
+{% block extra_js %}
+
 <script>
 function openInventorySaleModal() {
     document.getElementById('modal-inventory-sale').classList.remove('hidden');
@@ -441,7 +334,7 @@ async function submitInventorySale() {
     const methodId = document.getElementById('inv-payment-method').value;
 
     if (!itemId) {
-        showToast('Selecciona un producto', 'error');
+        alert('Selecciona un producto');
         return;
     }
 
@@ -453,7 +346,7 @@ async function submitInventorySale() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': '{{ csrf_token }}'
             },
             body: JSON.stringify({
                 item_id: itemId,
@@ -464,24 +357,21 @@ async function submitInventorySale() {
 
         const data = await response.json();
         if (response.ok) {
-            showToast(data.message, 'success');
-            setTimeout(() => window.location.reload(), 1500);
+            alert('Éxito: Venta de inventario registrada');
+            setTimeout(() => window.location.reload(), 500);
         } else {
-            showToast(data.error || 'Error procesando venta', 'error');
+            alert('Error: ' + (data.error || 'Error procesando venta'));
             btn.disabled = false;
             btn.innerHTML = 'Confirmar Venta';
         }
     } catch (e) {
-        showToast('Error de conexión', 'error');
+        alert('Error de conexión');
         btn.disabled = false;
         btn.innerHTML = 'Confirmar Venta';
     }
 }
 </script>
 
-{% endblock %}
-
-{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -999,120 +889,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
-<div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
-    <div class="bg-jet-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
-        <h3 class="text-base font-serif text-white">Venta Rápida (Bebidas / Productos)</h3>
-        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="p-6 space-y-5">
-        <div>
-            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
-            <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none" onchange="updateInvPrice()">
-                <option value="" data-price="0">Selecciona un producto...</option>
-                {% for item in inventory_items %}
-                <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
-                    {{ item.name }} - ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
-                <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
-            </div>
-            <div>
-                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Total</label>
-                <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded-sm px-4 py-3 outline-none cursor-not-allowed">
-            </div>
-        </div>
-        <div>
-            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Método de Pago</label>
-            <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none">
-                {% for method in payment_methods %}
-                <option value="{{ method.id }}">{{ method.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-      </div>
-      <div class="px-6 py-4 border-t border-white/5 bg-jet/50 flex justify-end gap-3">
-        <button onclick="closeInventorySaleModal()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-white hover:bg-white/5 transition-colors">Cancelar</button>
-        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-jet bg-gold hover:bg-gold-light transition-colors">Confirmar Venta</button>
-      </div>
-    </div>
-  </div>
-</div>
 
-<script>
-function openInventorySaleModal() {
-    document.getElementById('modal-inventory-sale').classList.remove('hidden');
-    document.getElementById('inv-item-id').value = '';
-    document.getElementById('inv-qty').value = '1';
-    updateInvPrice();
-}
-
-function closeInventorySaleModal() {
-    document.getElementById('modal-inventory-sale').classList.add('hidden');
-}
-
-function updateInvPrice() {
-    const select = document.getElementById('inv-item-id');
-    const option = select.options[select.selectedIndex];
-    const price = parseFloat(option ? option.getAttribute('data-price') : 0);
-    const qty = parseInt(document.getElementById('inv-qty').value) || 1;
-    const total = price * qty;
-    document.getElementById('inv-total').value = '$' + total.toLocaleString('es-CO');
-}
-
-async function submitInventorySale() {
-    const btn = document.getElementById('btn-submit-inv-sale');
-    const itemId = document.getElementById('inv-item-id').value;
-    const qty = document.getElementById('inv-qty').value;
-    const methodId = document.getElementById('inv-payment-method').value;
-
-    if (!itemId) {
-        showToast('Selecciona un producto', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = 'PROCESANDO...';
-
-    try {
-        const response = await fetch('/api/admin/cashflow/inventory-sales/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                item_id: itemId,
-                quantity: qty,
-                payment_method_id: methodId
-            })
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            showToast(data.message, 'success');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            showToast(data.error || 'Error procesando venta', 'error');
-            btn.disabled = false;
-            btn.innerHTML = 'Confirmar Venta';
-        }
-    } catch (e) {
-        showToast('Error de conexión', 'error');
-        btn.disabled = false;
-        btn.innerHTML = 'Confirmar Venta';
-    }
-}
-</script>
 
 {% endblock %}
