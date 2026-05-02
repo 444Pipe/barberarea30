@@ -597,10 +597,11 @@ def create_inventory_sale_view(request):
     payment_method_id = data.get('payment_method_id')
 
     try:
-        quantity = float(quantity)
+        from decimal import Decimal
+        quantity = Decimal(str(quantity))
         if quantity <= 0:
             return Response({'error': 'La cantidad debe ser mayor a 0'}, status=400)
-    except ValueError:
+    except Exception:
         return Response({'error': 'Cantidad inválida'}, status=400)
 
     try:
