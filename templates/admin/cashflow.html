@@ -727,9 +727,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/10 text-[0.6rem] tracking-widest uppercase text-smoke/40 font-bold bg-black/50">
                             <div class="col-span-3">Cliente / Hora</div>
                             <div class="col-span-3">Servicio</div>
-                            <div class="col-span-2 text-right">Método</div>
+                            <div class="col-span-3 text-center">Método</div>
                             <div class="col-span-2 text-right">Venta</div>
-                            <div class="col-span-2 text-right">Propina</div>
+                            <div class="col-span-1 text-right">Propina</div>
                         </div>`;
                     data.sales_detail.forEach(sale => {
                         html += `
@@ -742,13 +742,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="text-smoke/80 block truncate" title="${sale.service_name}">${sale.service_name}</span>
                                 <span class="text-[0.55rem] text-gold/60 tracking-widest uppercase">Por: ${sale.approved_by}</span>
                             </div>
-                            <div class="col-span-2 text-right text-smoke/60 text-[0.65rem] uppercase tracking-widest">
+                            <div class="col-span-3 text-center text-smoke/60 text-[0.55rem] uppercase tracking-widest break-words leading-tight">
                                 ${sale.payment_method}
                             </div>
                             <div class="col-span-2 text-right text-white font-medium">
                                 $${Number(sale.final_price).toLocaleString('es-CO')}
                             </div>
-                            <div class="col-span-2 text-right text-emerald-400 font-medium">
+                            <div class="col-span-1 text-right text-emerald-400 font-medium">
                                 ${sale.tip_amount > 0 ? '+$' + Number(sale.tip_amount).toLocaleString('es-CO') : '-'}
                             </div>
                         </div>`;
@@ -857,9 +857,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/10 text-[0.6rem] tracking-widest uppercase text-smoke/40 font-bold bg-black/50">
                             <div class="col-span-3">Cliente / Hora</div>
                             <div class="col-span-3">Servicio</div>
-                            <div class="col-span-2 text-right">Método</div>
+                            <div class="col-span-3 text-center">Método</div>
                             <div class="col-span-2 text-right">Venta</div>
-                            <div class="col-span-2 text-right">Propina</div>
+                            <div class="col-span-1 text-right">Propina</div>
                         </div>`;
                     data.sales_detail.forEach(sale => {
                         html += `
@@ -872,13 +872,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="text-smoke/80 block truncate" title="${sale.service_name}">${sale.service_name}</span>
                                 <span class="text-[0.55rem] text-gold/60 tracking-widest uppercase">Por: ${sale.approved_by}</span>
                             </div>
-                            <div class="col-span-2 text-right text-smoke/60 text-[0.65rem] uppercase tracking-widest">
+                            <div class="col-span-3 text-center text-smoke/60 text-[0.55rem] uppercase tracking-widest break-words leading-tight">
                                 ${sale.payment_method}
                             </div>
                             <div class="col-span-2 text-right text-white font-medium">
                                 $${Number(sale.final_price).toLocaleString('es-CO')}
                             </div>
-                            <div class="col-span-2 text-right text-emerald-400 font-medium">
+                            <div class="col-span-1 text-right text-emerald-400 font-medium">
                                 ${sale.tip_amount > 0 ? '+$' + Number(sale.tip_amount).toLocaleString('es-CO') : '-'}
                             </div>
                         </div>`;
