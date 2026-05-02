@@ -251,8 +251,6 @@
 
 
 
-{% endblock %}
-
 
 <!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
 <div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
@@ -303,19 +301,27 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
 
 {% block extra_js %}
 
 <script>
 function openInventorySaleModal() {
-    document.getElementById('modal-inventory-sale').classList.remove('hidden');
-    document.getElementById('inv-item-id').value = '';
-    document.getElementById('inv-qty').value = '1';
-    updateInvPrice();
+    const m = document.getElementById('modal-inventory-sale');
+    if (m) {
+        m.classList.remove('hidden');
+        document.getElementById('inv-item-id').value = '';
+        document.getElementById('inv-qty').value = '1';
+        updateInvPrice();
+    } else {
+        console.error('Modal not found');
+    }
 }
 
 function closeInventorySaleModal() {
-    document.getElementById('modal-inventory-sale').classList.add('hidden');
+    const m = document.getElementById('modal-inventory-sale');
+    if (m) m.classList.add('hidden');
 }
 
 function updateInvPrice() {
@@ -371,6 +377,7 @@ async function submitInventorySale() {
     }
 }
 </script>
+
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
