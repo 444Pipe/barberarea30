@@ -190,6 +190,7 @@ def daily_close_detail_view(request, close_id):
     # Desglose por barbero
     barbers_data = {}
     sales_detail = []
+    payment_methods_data = {}
     for sale in sales:
         barber_id = sale.barber.id if sale.barber else 'unassigned'
         barber_name = sale.barber.display_name if sale.barber else 'Sin Barbero'
@@ -207,6 +208,9 @@ def daily_close_detail_view(request, close_id):
         b_data['sales_count'] += 1
         b_data['total_sales'] += float(sale.final_price)
         b_data['total_tips'] += float(sale.tip_amount)
+        
+        pm_name = sale.payment_method.name if sale.payment_method else 'Efectivo/Sin Especificar'
+        payment_methods_data[pm_name] = payment_methods_data.get(pm_name, 0) + float(sale.final_price)
         
         if hasattr(sale, 'commission'):
             b_data['total_commissions'] += float(sale.commission.commission_amount)
@@ -226,6 +230,10 @@ def daily_close_detail_view(request, close_id):
         
     for inv_sale in inventory_sales:
         i_price = float(inv_sale.total_price)
+        
+        pm_name = inv_sale.payment_method.name if inv_sale.payment_method else 'Efectivo/Sin Especificar'
+        payment_methods_data[pm_name] = payment_methods_data.get(pm_name, 0) + i_price
+        
         sales_detail.append({
             'type': 'inventory',
             'client_name': 'Cliente Local',
@@ -260,6 +268,7 @@ def daily_close_detail_view(request, close_id):
         'total_expenses': float(daily_close.total_expenses),
         'net_income': float(daily_close.net_income),
         'barbers': list(barbers_data.values()),
+        'payment_methods': payment_methods_data,
         'expenses': expenses_data,
         'sales_detail': sorted(sales_detail, key=lambda x: x['time'], reverse=True),
     })
@@ -326,6 +335,7 @@ def live_cashflow_detail_view(request):
 
     barbers_data = {}
     sales_detail = []
+    payment_methods_data = {}
     
     total_sales_overall = 0
     total_tips_overall = 0
@@ -359,6 +369,9 @@ def live_cashflow_detail_view(request):
         total_tips_overall += t_tip
         total_commissions_overall += c_amount
 
+        pm_name = sale.payment_method.name if sale.payment_method else 'Efectivo/Sin Especificar'
+        payment_methods_data[pm_name] = payment_methods_data.get(pm_name, 0) + f_price
+
         sales_detail.append({
             'type': 'service',
             'client_name': sale.booking.client_name if sale.booking else 'N/A',
@@ -377,6 +390,10 @@ def live_cashflow_detail_view(request):
     for inv_sale in inventory_sales:
         i_price = float(inv_sale.total_price)
         total_inventory_sales_overall += i_price
+        
+        pm_name = inv_sale.payment_method.name if inv_sale.payment_method else 'Efectivo/Sin Especificar'
+        payment_methods_data[pm_name] = payment_methods_data.get(pm_name, 0) + i_price
+        
         sales_detail.append({
             'type': 'inventory',
             'client_name': 'Cliente Local',
@@ -413,6 +430,7 @@ def live_cashflow_detail_view(request):
         'net_income': net_income,
         'pending_approvals_count': pending_approvals_count,
         'barbers': list(barbers_data.values()),
+        'payment_methods': payment_methods_data,
         'expenses': expenses_data,
         'sales_detail': sorted(sales_detail, key=lambda x: x['time'], reverse=True),
     })

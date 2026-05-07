@@ -674,6 +674,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron egresos.</div>';
                 }
                 
+                // Payment Methods Breakdown
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Métodos de Cobro</h4>';
+                if (data.payment_methods && Object.keys(data.payment_methods).length > 0) {
+                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
+                    for (const [pm, total] of Object.entries(data.payment_methods)) {
+                        html += `
+                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
+                            <span class="text-smoke/80 uppercase tracking-widest">${pm}</span>
+                            <span class="text-white font-bold">$${Number(total).toLocaleString('es-CO')}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                } else {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron pagos.</div>';
+                }
+
                 // Totals summary
                 html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
                 html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
@@ -804,6 +820,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron egresos.</div>';
                 }
                 
+                // Payment Methods Breakdown
+                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Métodos de Cobro</h4>';
+                if (data.payment_methods && Object.keys(data.payment_methods).length > 0) {
+                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
+                    for (const [pm, total] of Object.entries(data.payment_methods)) {
+                        html += `
+                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
+                            <span class="text-smoke/80 uppercase tracking-widest">${pm}</span>
+                            <span class="text-white font-bold">$${Number(total).toLocaleString('es-CO')}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                } else {
+                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron pagos.</div>';
+                }
+
                 // Totals summary
                 html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
                 html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
