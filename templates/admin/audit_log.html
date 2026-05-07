@@ -95,20 +95,22 @@
     </div>
 
     <div id="log-container" class="hidden">
-      <table class="w-full text-xs">
-        <thead>
-          <tr class="border-b border-white/5 text-smoke/40 bg-jet-lighter">
-            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Fecha / Hora</th>
-            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Usuario</th>
-            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Acción</th>
-            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem] hidden md:table-cell">Objeto</th>
-            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem] hidden lg:table-cell">IP</th>
-            <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Detalle</th>
-          </tr>
-        </thead>
-        <tbody id="log-tbody" class="divide-y divide-white/[0.04]">
-        </tbody>
-      </table>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs min-w-[600px]">
+          <thead>
+            <tr class="border-b border-white/5 text-smoke/40 bg-jet-lighter">
+              <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Fecha / Hora</th>
+              <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Usuario</th>
+              <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Acción</th>
+              <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem] hidden md:table-cell">Objeto</th>
+              <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem] hidden lg:table-cell">IP</th>
+              <th class="text-left px-4 py-3 font-semibold tracking-widest uppercase text-[0.6rem]">Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="log-tbody" class="divide-y divide-white/[0.04]">
+          </tbody>
+        </table>
+      </div>
 
       <!-- Pagination -->
       <div class="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-jet-lighter">
