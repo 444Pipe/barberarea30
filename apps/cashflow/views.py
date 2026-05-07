@@ -30,6 +30,14 @@ def checkout_booking_view(request, booking_id):
         return Response({'error': 'Reserva no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data
+    
+    # Lógica de comisiones estipuladas
+    barber_name = booking.barber.display_name.lower() if booking.barber else ''
+    if 'frank' in barber_name:
+        default_comm = 50
+    else:
+        default_comm = 40
+
     try:
         sale = cashflow_services.process_checkout(
             booking=booking,
@@ -41,7 +49,7 @@ def checkout_booking_view(request, booking_id):
             discount_assumed_by=data.get('discount_assumed_by', 'none'),
             added_value_amount=_safe_decimal(data.get('added_value_amount'), 0),
             added_value_description=data.get('added_value_description', ''),
-            commission_percentage=_safe_decimal(data.get('commission_percentage'), booking.barber.commission_percentage if booking.barber else 40),
+            commission_percentage=default_comm,
             notes=data.get('notes', ''),
             request=request,
         )
