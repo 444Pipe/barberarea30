@@ -116,7 +116,27 @@ def daily_close_view(request):
         
         # Comisiones
         commissions = Commission.objects.filter(sale__in=pending_sales)
-        total_commissions = commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
+        
+        # Separar a Franko
+        frank_commissions = commissions.filter(barber__display_name__icontains='frank')
+        frank_total_comm = frank_commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
+        frank_total_tips = frank_commissions.aggregate(total=Sum('tip_amount'))['total'] or 0
+        frank_pay = frank_total_comm + frank_total_tips
+        
+        # Comisiones de los demás (40%)
+        other_commissions = commissions.exclude(barber__display_name__icontains='frank')
+        total_commissions = other_commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
+
+        if frank_pay > 0:
+            # Crear Egreso Diario para Franko
+            frank_expense = Expense.objects.create(
+                description="Pago Diario: Franko",
+                amount=frank_pay,
+                expense_type='variable',
+                registered_by=request.user
+            )
+            # Marcar automáticamente como pagado
+            frank_commissions.update(is_paid=True, is_paid_in_daily_close=True, paid_at=timezone.now())
 
         # Egresos variables del día (no asignados a un cierre)
         pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
@@ -340,6 +360,7 @@ def live_cashflow_detail_view(request):
     total_sales_overall = 0
     total_tips_overall = 0
     total_commissions_overall = 0
+    frank_pay_live = 0
 
     for sale in approved_sales:
         barber_id = sale.barber.id if sale.barber else 'unassigned'
@@ -367,7 +388,11 @@ def live_cashflow_detail_view(request):
         
         total_sales_overall += f_price
         total_tips_overall += t_tip
-        total_commissions_overall += c_amount
+        
+        if 'frank' in barber_name.lower():
+            frank_pay_live += c_amount + t_tip
+        else:
+            total_commissions_overall += c_amount
 
         pm_name = sale.payment_method.name if sale.payment_method else 'Efectivo/Sin Especificar'
         payment_methods_data[pm_name] = payment_methods_data.get(pm_name, 0) + f_price
@@ -417,6 +442,14 @@ def live_cashflow_detail_view(request):
             'amount': amt,
             'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
         })
+        
+    if frank_pay_live > 0:
+        expenses_data.append({
+            'description': 'Pago Diario: Franko (Comisiones + Propinas)',
+            'amount': frank_pay_live,
+            'type': 'Variable'
+        })
+        total_expenses_overall += frank_pay_live
 
     net_income = total_sales_overall + total_inventory_sales_overall - total_commissions_overall - total_expenses_overall
 
