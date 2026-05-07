@@ -741,16 +741,42 @@ def unpaid_commissions_view(request):
     
     barbers = Barber.objects.in_bulk()
     
+    from django.db.models.functions import TruncDate
+
     data = []
     for item in unpaid_commissions:
         barber = barbers.get(item['barber_id'])
         if barber:
+            # Desglose por día
+            daily_breakdown = Commission.objects.filter(
+                barber_id=barber.id,
+                is_paid=False,
+                sale__approval_status='approved'
+            ).annotate(
+                date=TruncDate('created_at')
+            ).values('date').annotate(
+                daily_total=Sum('total_earnings'),
+                daily_commissions=Sum('commission_amount'),
+                daily_tips=Sum('tip_amount')
+            ).order_by('-date')
+
+            history = []
+            for day in daily_breakdown:
+                if day['date']:
+                    history.append({
+                        'date': day['date'].strftime('%Y-%m-%d'),
+                        'total': float(day['daily_total'] or 0),
+                        'commissions': float(day['daily_commissions'] or 0),
+                        'tips': float(day['daily_tips'] or 0)
+                    })
+
             data.append({
                 'barber_id': barber.id,
                 'barber_name': barber.display_name,
                 'total_commissions': float(item['total_commissions'] or 0),
                 'total_tips': float(item['total_tips'] or 0),
-                'total_earnings': float(item['total_earnings'] or 0)
+                'total_earnings': float(item['total_earnings'] or 0),
+                'history': history
             })
             
     # Ordenar por nombre
