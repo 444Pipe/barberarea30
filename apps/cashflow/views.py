@@ -727,9 +727,12 @@ def unpaid_commissions_view(request):
     from django.db.models import Sum
     
     # Solo tomamos las comisiones de ventas que estén APROBADAS y no pagadas
+    # Excluimos a Frank porque su pago se automatiza en el cierre diario
     unpaid_commissions = Commission.objects.filter(
         is_paid=False,
         sale__approval_status='approved'
+    ).exclude(
+        barber__display_name__icontains='frank'
     ).values('barber_id').annotate(
         total_commissions=Sum('commission_amount'),
         total_tips=Sum('tip_amount'),
