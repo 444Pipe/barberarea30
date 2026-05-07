@@ -11,6 +11,8 @@ urlpatterns = [
     path('cashflow/expenses/<int:expense_id>/delete/', views.delete_expense_view, name='admin_delete_expense_api'),
 
     # ── Rutas con prefijo cashflow/ (usadas por el frontend) ──────────────
+    path('cashflow/barber-payments/', views.unpaid_commissions_view, name='cashflow_barber_payments_api'),
+    path('cashflow/barber-payments/<int:barber_id>/pay/', views.pay_barber_view, name='cashflow_pay_barber_api'),
     path('cashflow/inventory-sales/', views.create_inventory_sale_view, name='cashflow_inventory_sales_api'),
     path('cashflow/pending-approvals/', views.pending_approvals_view, name='cashflow_pending_approvals_api'),
     path('cashflow/sales/<int:sale_id>/approve/', views.approve_sale_view, name='cashflow_approve_sale_api'),

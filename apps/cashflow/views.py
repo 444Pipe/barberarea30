@@ -682,3 +682,87 @@ def create_inventory_sale_view(request):
         'sale_id': sale.id, 
         'message': f'Venta registrada correctamente: ${sale.total_price:,.0f}'
     }, status=201)
+
+# ─── GESTIÓN DE PAGOS A BARBEROS ──────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def unpaid_commissions_view(request):
+    """GET /api/admin/cashflow/barber-payments/ - Obtiene el saldo pendiente por pagar a cada barbero."""
+    from apps.cashflow.models import Commission
+    from apps.barbers.models import Barber
+    from django.db.models import Sum
+    
+    # Solo tomamos las comisiones de ventas que estén APROBADAS y no pagadas
+    unpaid_commissions = Commission.objects.filter(
+        is_paid=False,
+        sale__approval_status='approved'
+    ).values('barber_id').annotate(
+        total_commissions=Sum('commission_amount'),
+        total_tips=Sum('tip_amount'),
+        total_earnings=Sum('total_earnings')
+    )
+    
+    barbers = Barber.objects.in_bulk()
+    
+    data = []
+    for item in unpaid_commissions:
+        barber = barbers.get(item['barber_id'])
+        if barber:
+            data.append({
+                'barber_id': barber.id,
+                'barber_name': barber.display_name,
+                'total_commissions': float(item['total_commissions'] or 0),
+                'total_tips': float(item['total_tips'] or 0),
+                'total_earnings': float(item['total_earnings'] or 0)
+            })
+            
+    # Ordenar por nombre
+    data.sort(key=lambda x: x['barber_name'])
+    
+    return Response({'payments': data})
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def pay_barber_view(request, barber_id):
+    """POST /api/admin/cashflow/barber-payments/<id>/pay/ - Marca como pagado el saldo acumulado de un barbero."""
+    from apps.cashflow.models import Commission
+    from apps.barbers.models import Barber
+    from django.utils import timezone
+    from django.db import transaction
+    
+    try:
+        barber = Barber.objects.get(id=barber_id)
+    except Barber.DoesNotExist:
+        return Response({'error': 'Barbero no encontrado'}, status=404)
+        
+    with transaction.atomic():
+        unpaid = Commission.objects.filter(
+            barber_id=barber_id,
+            is_paid=False,
+            sale__approval_status='approved'
+        )
+        
+        # Calcular totales antes de actualizar
+        from django.db.models import Sum
+        totals = unpaid.aggregate(total=Sum('total_earnings'))
+        total_amount = float(totals['total'] or 0)
+        
+        if total_amount == 0:
+            return Response({'error': 'El barbero no tiene saldo pendiente por pagar.'}, status=400)
+            
+        unpaid.update(is_paid=True, paid_at=timezone.now())
+        
+        log_audit(
+            user=request.user,
+            action='update',
+            obj=None,
+            changes={'is_paid': True},
+            request=request,
+            extra_data={'msg': f"Pagó a {barber.display_name} un total de ${total_amount:,.0f} (Comisiones y Propinas)"}
+        )
+        
+    return Response({
+        'ok': True,
+        'message': f'Pago de ${total_amount:,.0f} registrado para {barber.display_name}.'
+    })

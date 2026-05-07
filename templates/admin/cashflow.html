@@ -201,6 +201,25 @@
         {% endif %}
     </div>
 
+    <!-- ═══ PAGOS A BARBEROS ═══ -->
+    <div class="mt-8 border-t border-white/5 pt-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-serif text-white">Pagos a Barberos</h2>
+                <p class="text-xs text-smoke/40 mt-1">Saldos pendientes de comisiones y propinas de ventas cerradas.</p>
+            </div>
+            <button onclick="fetchBarberPayments()" class="text-smoke/40 hover:text-gold transition-colors p-2 border border-white/5 rounded hover:border-gold/30 bg-jet" title="Actualizar">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+        </div>
+        
+        <div id="barber-payments-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div class="text-center py-8 text-smoke/40 text-sm border border-white/5 rounded-sm bg-jet col-span-full">
+                Cargando pagos pendientes...
+            </div>
+        </div>
+    </div>
+
 <!-- Modal Confirmación -->
 <div id="modal-daily-close" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
@@ -924,6 +943,90 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(err => alert('Error de conexión.'));
     };
     {% endif %}
+
+    // --- PAGOS A BARBEROS ---
+    window.fetchBarberPayments = function() {
+        const container = document.getElementById('barber-payments-container');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="text-center py-8 text-smoke/40 text-sm border border-white/5 rounded-sm bg-jet col-span-full">Cargando pagos pendientes...</div>';
+        
+        fetch('/api/admin/cashflow/barber-payments/')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.payments || data.payments.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full bg-jet border border-emerald-500/30 p-6 rounded-sm text-center flex flex-col items-center">
+                            <svg class="w-10 h-10 text-emerald-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <h3 class="text-white font-bold tracking-widest uppercase text-sm">Todo al día</h3>
+                            <p class="text-smoke/50 text-xs mt-1">No hay comisiones ni propinas pendientes de pago.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                data.payments.forEach(p => {
+                    html += `
+                    <div class="bg-jet-card border border-gold/20 p-5 rounded-sm hover:border-gold/50 transition-colors shadow-lg relative overflow-hidden flex flex-col justify-between">
+                        <div class="absolute inset-0 bg-gradient-to-br from-gold/5 to-transparent pointer-events-none"></div>
+                        <div class="relative z-10 mb-4">
+                            <h3 class="text-white font-serif text-lg tracking-wider">${p.barber_name}</h3>
+                            <div class="space-y-1 mt-3">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-smoke/50 uppercase tracking-widest">Comisiones</span>
+                                    <span class="text-white font-medium">$${Number(p.total_commissions).toLocaleString('es-CO')}</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-smoke/50 uppercase tracking-widest">Propinas</span>
+                                    <span class="text-emerald-400 font-medium">+$${Number(p.total_tips).toLocaleString('es-CO')}</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm border-t border-white/10 pt-2 mt-2">
+                                    <span class="text-gold font-bold tracking-widest uppercase">Total a Pagar</span>
+                                    <span class="text-gold font-bold">$${Number(p.total_earnings).toLocaleString('es-CO')}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="payBarber(${p.barber_id}, '${p.barber_name}', ${p.total_earnings})" class="relative z-10 w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-widest text-xs uppercase rounded-sm transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Marcar como Pagado
+                        </button>
+                    </div>`;
+                });
+                
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="col-span-full text-center py-8 text-red-400 text-sm border border-red-500/20 rounded-sm bg-red-500/10">Error al cargar la información. Inténtalo de nuevo.</div>';
+            });
+    };
+    
+    window.payBarber = function(barberId, barberName, amount) {
+        const formatted = '$' + Number(amount).toLocaleString('es-CO');
+        if (!confirm(`¿Estás 100% seguro de marcar como PAGADO el saldo de ${formatted} a ${barberName}?\n\nEsta acción dejará el saldo pendiente en $0 y se registrará en el Log de Auditoría.`)) {
+            return;
+        }
+        
+        fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert(data.message);
+                fetchBarberPayments(); // Reload section
+            } else {
+                alert(data.error || 'Error al procesar el pago.');
+            }
+        })
+        .catch(err => alert('Error de conexión.'));
+    };
+
+    // Load initial data
+    if (document.getElementById('barber-payments-container')) {
+        fetchBarberPayments();
+    }
 
 });
 </script>
