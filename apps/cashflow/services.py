@@ -25,31 +25,15 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                      payment_reference='', tip_amount=0,
                      discount_amount=0, discount_assumed_by='none',
                      added_value_amount=0, added_value_description='',
-                     commission_percentage=50, notes='', request=None):
+                     commission_percentage=50, notes='', 
+                     frank_materials_cost=0, frank_labor_cost=0,
+                     request=None):
     """
     Procesa el checkout completo de una reserva de forma atómica.
-
-    Parámetros
-    ----------
-    booking             : apps.bookings.models.Booking
-    confirmed_by        : django.contrib.auth.models.User
-    payment_method_id   : int | None
-    payment_reference   : str
-    tip_amount          : float | Decimal
-    discount_amount     : float | Decimal
-    discount_assumed_by : 'company' | 'barber' | 'none'
-    commission_percentage: float  (default 50 para todos los barberos)
-    notes               : str
-    request             : HttpRequest | None  (para capturar la IP en el log)
-
-    Retorna
-    -------
-    Sale  — el objeto de venta creado
-
-    Lanza
-    -----
-    ValueError  — si la reserva ya está completada o cancelada
     """
+    from decimal import Decimal
+    from apps.cashflow.models import Expense
+
     if booking.status in ('completed', 'cancelled'):
         raise ValueError(
             f'La reserva #{booking.id} ya está en estado "{booking.status}" '
@@ -63,18 +47,22 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
             payment_method = PaymentMethod.objects.filter(id=payment_method_id).first()
 
         # ── 2. Crear Venta ──────────────────────────────────────────────
-        # Determinar estado de aprobación
         user_profile = getattr(confirmed_by, 'profile', None)
         if user_profile and user_profile.role in ('operational_admin', 'superadmin', 'admin'):
             approval_status = Sale.STATUS_APPROVED
         else:
             approval_status = Sale.STATUS_PENDING
 
+        # Si viene con costos de materiales (Ej. servicio manual de Frank)
+        base_price = booking.price
+        if frank_materials_cost > 0 or frank_labor_cost > 0:
+            base_price = Decimal(str(frank_materials_cost)) + Decimal(str(frank_labor_cost))
+
         sale = Sale.objects.create(
             booking=booking,
             barber=booking.barber,
             service=booking.service,
-            base_price=booking.price,
+            base_price=base_price,
             added_value_amount=added_value_amount,
             added_value_description=added_value_description,
             discount_amount=discount_amount,
@@ -86,16 +74,36 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
             notes=notes,
             approval_status=approval_status,
         )
-        # Sale.save() calcula final_price y total_paid automáticamente
 
-        # ── 3. Comisión ────────────────────────────────────────────────
+        # ── 3. Comisión y Gastos Especiales ─────────────────────────────
         if booking.barber:
-            Commission.objects.create(
+            comm = Commission.objects.create(
                 sale=sale,
                 barber=booking.barber,
                 percentage=commission_percentage,
-                # Commission.save() calcula basis, commission_amount, total_earnings
             )
+            
+            # Si hay materiales separados, ajustamos la comisión y creamos el gasto
+            if frank_materials_cost > 0:
+                labor_val = Decimal(str(frank_labor_cost))
+                percentage_dec = Decimal(str(commission_percentage)) / Decimal('100.00')
+                new_comm_amt = labor_val * percentage_dec
+                new_total = new_comm_amt + sale.tip_amount
+                
+                # Actualizamos directo en la BD para saltarnos el método save()
+                Commission.objects.filter(id=comm.id).update(
+                    basis_amount=labor_val,
+                    commission_amount=new_comm_amt,
+                    total_earnings=new_total
+                )
+                
+                # Crear Egreso para los materiales
+                Expense.objects.create(
+                    description=f"Materiales Servicio: {booking.client_name}",
+                    amount=Decimal(str(frank_materials_cost)),
+                    expense_type='variable',
+                    registered_by=confirmed_by
+                )
 
         # ── 4. Descuento de Inventario ─────────────────────────────────
         if booking.service:

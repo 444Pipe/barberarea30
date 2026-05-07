@@ -205,6 +205,26 @@
         <textarea id="checkout-notes" rows="2" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"></textarea>
       </div>
 
+      <!-- MATERIALES FRANK -->
+      <div id="checkout-frank-materials-container" class="mt-2 p-2 bg-jet-lighter border border-gold/20 rounded">
+        <label class="flex items-center gap-2 cursor-pointer mb-2">
+          <input type="checkbox" id="checkout-has-frank-materials" class="w-3.5 h-3.5 bg-jet border-white/10 rounded accent-gold" onchange="toggleFrankMaterials()">
+          <span class="text-[0.65rem] text-gold uppercase tracking-widest font-bold">🛠️ Separar Materiales (Servicio Manual)</span>
+        </label>
+        <div id="checkout-frank-materials-fields" class="hidden grid grid-cols-2 gap-3 mt-2">
+          <div>
+            <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Valor Materiales</label>
+            <input type="number" id="checkout-materials-value" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none" oninput="updateCheckoutTotal()">
+            <span class="text-[0.55rem] text-smoke/30">Se registrará como Egreso</span>
+          </div>
+          <div>
+            <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Mano de Obra</label>
+            <input type="number" id="checkout-labor-value" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none" oninput="updateCheckoutTotal()">
+            <span class="text-[0.55rem] text-smoke/30">Se divide 50/50</span>
+          </div>
+        </div>
+      </div>
+
       <!-- CONSUMIBLES -->
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">🍺 Consumibles del Cliente <span class="text-smoke/30 normal-case font-normal">(opcional)</span></label>
@@ -444,8 +464,23 @@ function closeCheckout() {
   document.getElementById('checkout-form').reset();
   document.getElementById('checkout-has-added-value').checked = false;
   document.getElementById('checkout-added-value-container').classList.add('hidden');
+  document.getElementById('checkout-has-frank-materials').checked = false;
+  document.getElementById('checkout-frank-materials-fields').classList.add('hidden');
   document.getElementById('consumables-grid').innerHTML = '';
   document.getElementById('consumables-total').classList.add('hidden');
+}
+
+function toggleFrankMaterials() {
+  const isChecked = document.getElementById('checkout-has-frank-materials').checked;
+  const container = document.getElementById('checkout-frank-materials-fields');
+  if (isChecked) {
+    container.classList.remove('hidden');
+  } else {
+    container.classList.add('hidden');
+    document.getElementById('checkout-materials-value').value = 0;
+    document.getElementById('checkout-labor-value').value = 0;
+    updateCheckoutTotal();
+  }
 }
 
 function toggleAddedValue() {
@@ -462,7 +497,15 @@ function toggleAddedValue() {
 }
 
 function updateCheckoutTotal() {
-  const basePrice = window._checkoutBasePrice || 0;
+  let basePrice = window._checkoutBasePrice || 0;
+  
+  const hasFrankMaterials = document.getElementById('checkout-has-frank-materials').checked;
+  if (hasFrankMaterials) {
+    const matVal = parseFloat(document.getElementById('checkout-materials-value').value) || 0;
+    const labVal = parseFloat(document.getElementById('checkout-labor-value').value) || 0;
+    basePrice = matVal + labVal;
+  }
+
   const isChecked = document.getElementById('checkout-has-added-value').checked;
   const addedValue = isChecked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0;
   const total = basePrice + addedValue;
@@ -565,7 +608,9 @@ function submitCheckout(e) {
     discount_assumed_by: document.getElementById('checkout-assumed-by').value,
     added_value_amount: document.getElementById('checkout-has-added-value').checked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0,
     added_value_description: document.getElementById('checkout-has-added-value').checked ? document.getElementById('checkout-added-value-desc').value : '',
-    notes: document.getElementById('checkout-notes').value
+    notes: document.getElementById('checkout-notes').value,
+    frank_materials_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-materials-value').value) || 0) : 0,
+    frank_labor_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-labor-value').value) || 0) : 0
   };
 
   btn.disabled = true;

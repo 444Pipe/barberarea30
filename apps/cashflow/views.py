@@ -51,6 +51,8 @@ def checkout_booking_view(request, booking_id):
             added_value_description=data.get('added_value_description', ''),
             commission_percentage=default_comm,
             notes=data.get('notes', ''),
+            frank_materials_cost=_safe_decimal(data.get('frank_materials_cost'), 0),
+            frank_labor_cost=_safe_decimal(data.get('frank_labor_cost'), 0),
             request=request,
         )
     except ValueError as e:
