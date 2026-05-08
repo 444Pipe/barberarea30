@@ -33,7 +33,8 @@ class BookingAdminSerializer(serializers.ModelSerializer):
                   'barber', 'barber_name', 'barber_color',
                   'service', 'service_name', 'is_walk_in', 'privacy_accepted',
                   'date', 'time', 'duration_minutes', 'status',
-                  'notes', 'price', 'created_at', 'updated_at', 'completed_at', 'can_cancel']
+                  'notes', 'price', 'manual_labor_cost', 'manual_materials_cost', 
+                  'created_at', 'updated_at', 'completed_at', 'can_cancel']
 
 
 class ReviewSerializer(serializers.ModelSerializer):

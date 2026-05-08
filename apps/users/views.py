@@ -348,3 +348,62 @@ def admin_reviews_view(request):
         'reviews': reviews,
     }
     return render(request, 'admin/reviews.html', context)
+
+
+@operational_admin_required
+def admin_manual_service_view(request):
+    from apps.bookings.models import Booking
+    from apps.services.models import Service
+    from apps.barbers.models import Barber
+    import json
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            client_name = data.get('client_name', 'Cliente General')
+            date = data.get('date')
+            time = data.get('time')
+            duration_minutes = int(data.get('duration_minutes', 60))
+            manual_labor_cost = data.get('manual_labor_cost', 0)
+            manual_materials_cost = data.get('manual_materials_cost', 0)
+            
+            # Find Frank
+            frank = Barber.objects.filter(user__first_name__icontains='frank').first()
+            if not frank:
+                frank = Barber.objects.filter(display_name__icontains='frank').first()
+            if not frank:
+                # Fallback to the current user if no barber named frank is found
+                frank = getattr(request.user, 'barber_profile', None)
+
+            # Buscamos un servicio genérico o creamos el manual
+            service = Service.objects.filter(name__icontains='Servicio Manual').first()
+            if not service:
+                service = Service.objects.filter(name__icontains='Corte').first()
+
+            # The base price can just be labor + materials, but we also save the manual ones
+            total_price = float(manual_labor_cost) + float(manual_materials_cost)
+
+            booking = Booking.objects.create(
+                client_name=client_name,
+                barber=frank,
+                service=service,
+                date=date,
+                time=time,
+                duration_minutes=duration_minutes,
+                price=total_price,
+                manual_labor_cost=manual_labor_cost,
+                manual_materials_cost=manual_materials_cost,
+                status='confirmed',
+                is_walk_in=True,
+                notes='Servicio Manual creado por Frank'
+            )
+            return JsonResponse({'success': True, 'booking_id': booking.id})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+    context = {
+        'user_role': request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'manual_service',
+    }
+    return render(request, 'admin/manual_service.html', context)
