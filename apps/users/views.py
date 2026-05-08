@@ -434,7 +434,7 @@ def admin_manual_service_view(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 
-    barbers = Barber.objects.filter(is_active=True)
+    barbers = Barber.objects.filter(is_available=True)
     context = {
         'user_role': request.user.profile.role,
         'user_name': request.user.get_full_name() or request.user.username,
