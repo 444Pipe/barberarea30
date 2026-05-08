@@ -39,6 +39,12 @@
         </div>
       </div>
 
+      <!-- Work Description -->
+      <div>
+        <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Descripción del Trabajo</label>
+        <textarea id="ms-description" rows="3" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" placeholder="Ej. Decoloración completa, tinte fantasía y tratamiento capilar profundo..."></textarea>
+      </div>
+
       <div class="border-t border-white/5 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Labor Cost -->
         <div>
@@ -46,10 +52,22 @@
           <input type="number" id="ms-labor-cost" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" placeholder="Ej. 150000" min="0" required>
           <p class="text-[0.6rem] text-smoke/40 mt-1">Este valor será tu ganancia base a repartir 50/50.</p>
         </div>
-        <!-- Materials Cost -->
+        <!-- Dynamic Materials -->
         <div>
-          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Materiales ($)</label>
-          <input type="number" id="ms-materials-cost" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" placeholder="Ej. 35000" min="0" value="0" required>
+          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Materiales Utilizados</label>
+          <div id="materials-list" class="space-y-2 mb-3"></div>
+          
+          <div class="flex gap-2">
+            <input type="text" id="new-mat-name" class="flex-1 bg-jet border border-white/10 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-gold" placeholder="Ej. Tinte">
+            <input type="number" id="new-mat-price" class="w-24 bg-jet border border-white/10 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-gold" placeholder="$0" min="0">
+            <button type="button" onclick="addMaterial()" class="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs text-gold transition-colors">+</button>
+          </div>
+          
+          <div class="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
+            <span class="text-[0.65rem] text-smoke/60 uppercase tracking-widest">Total Materiales:</span>
+            <span id="total-materials-display" class="text-sm font-bold text-white">$0</span>
+            <input type="hidden" id="ms-materials-cost" value="0">
+          </div>
           <p class="text-[0.6rem] text-smoke/40 mt-1">Gasto que se descontará de la caja (asumido 50/50).</p>
         </div>
       </div>
@@ -67,6 +85,53 @@
 </div>
 
 <script>
+let materials = [];
+
+function addMaterial() {
+  const nameInput = document.getElementById('new-mat-name');
+  const priceInput = document.getElementById('new-mat-price');
+  
+  const name = nameInput.value.trim();
+  const price = parseFloat(priceInput.value) || 0;
+  
+  if (!name || price <= 0) return;
+  
+  materials.push({ name, price });
+  nameInput.value = '';
+  priceInput.value = '';
+  renderMaterials();
+}
+
+function removeMaterial(index) {
+  materials.splice(index, 1);
+  renderMaterials();
+}
+
+function renderMaterials() {
+  const list = document.getElementById('materials-list');
+  const totalDisplay = document.getElementById('total-materials-display');
+  const totalInput = document.getElementById('ms-materials-cost');
+  
+  list.innerHTML = '';
+  let total = 0;
+  
+  materials.forEach((m, i) => {
+    total += m.price;
+    list.innerHTML += `
+      <div class="flex justify-between items-center p-2 bg-white/5 rounded border border-white/5">
+        <span class="text-xs text-smoke/80">${m.name}</span>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-gold">$${m.price.toLocaleString('es-CO')}</span>
+          <button type="button" onclick="removeMaterial(${i})" class="text-red-400 hover:text-red-300 text-xs">✕</button>
+        </div>
+      </div>
+    `;
+  });
+  
+  totalDisplay.textContent = '$' + total.toLocaleString('es-CO');
+  totalInput.value = total;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Set today's date
   document.getElementById('ms-date').valueAsDate = new Date();
@@ -79,6 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const payload = {
       client_name: document.getElementById('ms-client-name').value || 'Cliente General',
+      description: document.getElementById('ms-description').value || '',
+      materials_list: materials,
       date: document.getElementById('ms-date').value,
       time: document.getElementById('ms-time').value,
       duration_minutes: parseInt(document.getElementById('ms-duration').value) || 60,

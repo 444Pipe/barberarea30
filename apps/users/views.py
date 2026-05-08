@@ -367,6 +367,9 @@ def admin_manual_service_view(request):
             manual_labor_cost = data.get('manual_labor_cost', 0)
             manual_materials_cost = data.get('manual_materials_cost', 0)
             
+            description = data.get('description', '')
+            materials_list = data.get('materials_list', [])
+            
             # Find Frank
             frank = Barber.objects.filter(user__first_name__icontains='frank').first()
             if not frank:
@@ -383,6 +386,16 @@ def admin_manual_service_view(request):
             # The base price can just be labor + materials, but we also save the manual ones
             total_price = float(manual_labor_cost) + float(manual_materials_cost)
 
+            notes = 'Servicio Manual creado por Frank.'
+            if description:
+                notes += f'\n\nDescripción del trabajo:\n{description}'
+            
+            if materials_list:
+                notes += '\n\nMateriales Utilizados:'
+                for mat in materials_list:
+                    mat_price = float(mat.get('price', 0))
+                    notes += f"\n- {mat.get('name', 'Material')}: ${mat_price:,.0f}".replace(',', '.')
+
             booking = Booking.objects.create(
                 client_name=client_name,
                 barber=frank,
@@ -395,7 +408,7 @@ def admin_manual_service_view(request):
                 manual_materials_cost=manual_materials_cost,
                 status='confirmed',
                 is_walk_in=True,
-                notes='Servicio Manual creado por Frank'
+                notes=notes.strip()
             )
             return JsonResponse({'success': True, 'booking_id': booking.id})
         except Exception as e:
