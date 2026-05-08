@@ -356,6 +356,8 @@ def admin_manual_service_view(request):
     from apps.services.models import Service
     from apps.barbers.models import Barber
     import json
+    import uuid
+    from django.utils.text import slugify
     
     if request.method == 'POST':
         try:
@@ -369,24 +371,42 @@ def admin_manual_service_view(request):
             
             description = data.get('description', '')
             materials_list = data.get('materials_list', [])
+            barber_id = data.get('barber_id')
+            custom_service_name = data.get('service_name', 'Servicio Manual').strip()
+            if not custom_service_name:
+                custom_service_name = 'Servicio Manual'
             
-            # Find Frank
-            frank = Barber.objects.filter(user__first_name__icontains='frank').first()
-            if not frank:
-                frank = Barber.objects.filter(display_name__icontains='frank').first()
-            if not frank:
-                # Fallback to the current user if no barber named frank is found
-                frank = getattr(request.user, 'barber_profile', None)
+            barber = None
+            if barber_id:
+                barber = Barber.objects.filter(id=barber_id).first()
+                
+            if not barber:
+                # Find Frank as fallback
+                barber = Barber.objects.filter(user__first_name__icontains='frank').first()
+                if not barber:
+                    barber = Barber.objects.filter(display_name__icontains='frank').first()
+                if not barber:
+                    barber = getattr(request.user, 'barber_profile', None)
 
-            # Buscamos un servicio genérico o creamos el manual
-            service = Service.objects.filter(name__icontains='Servicio Manual').first()
+            # Buscamos o creamos el servicio personalizado
+            service = Service.objects.filter(name__iexact=custom_service_name).first()
             if not service:
-                service = Service.objects.filter(name__icontains='Corte').first()
+                base_slug = slugify(custom_service_name) or 'servicio-manual'
+                unique_slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
+                is_frank = 'frank' in (barber.display_name.lower() if barber else '')
+                service = Service.objects.create(
+                    name=custom_service_name,
+                    slug=unique_slug,
+                    category='vip' if is_frank else 'individual',
+                    price=0,
+                    duration_minutes=duration_minutes,
+                    is_active=False  # Oculto del agendamiento público
+                )
 
             # The base price can just be labor + materials, but we also save the manual ones
             total_price = float(manual_labor_cost) + float(manual_materials_cost)
 
-            notes = 'Servicio Manual creado por Frank.'
+            notes = f'{custom_service_name} creado manualmente por admin.'
             if description:
                 notes += f'\n\nDescripción del trabajo:\n{description}'
             
@@ -398,7 +418,7 @@ def admin_manual_service_view(request):
 
             booking = Booking.objects.create(
                 client_name=client_name,
-                barber=frank,
+                barber=barber,
                 service=service,
                 date=date,
                 time=time,
@@ -414,9 +434,11 @@ def admin_manual_service_view(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 
+    barbers = Barber.objects.filter(is_active=True)
     context = {
         'user_role': request.user.profile.role,
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'manual_service',
+        'barbers': barbers,
     }
     return render(request, 'admin/manual_service.html', context)

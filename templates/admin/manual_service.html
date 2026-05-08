@@ -19,10 +19,16 @@
   <div class="bg-jet-card border border-white/5 rounded-xl p-6 lg:p-8">
     <form id="manual-service-form" class="space-y-6">
       
-      <!-- Client Name -->
-      <div>
-        <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Nombre del Cliente</label>
-        <input type="text" id="ms-client-name" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" placeholder="Ej. Cliente General" value="Cliente General">
+      <!-- Client Name & Service Name -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Nombre del Cliente</label>
+          <input type="text" id="ms-client-name" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" placeholder="Ej. Cliente General" value="Cliente General">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Nombre del Servicio</label>
+          <input type="text" id="ms-service-name" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" placeholder="Ej. Decoloración Completa" value="Servicio Manual">
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -38,12 +44,22 @@
         </div>
       </div>
 
-      <!-- Duration -->
-      <div>
-        <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Duración (minutos)</label>
-        <div class="flex items-center gap-3">
-          <input type="number" id="ms-duration" class="w-32 bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" value="60" min="15" step="15" required>
-          <span class="text-xs text-smoke/40">Este tiempo quedará bloqueado en tu agenda automáticamente.</span>
+      <!-- Duration and Barber -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Duración (minutos)</label>
+          <div class="flex items-center gap-3">
+            <input type="number" id="ms-duration" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors" value="60" min="15" step="15" required>
+          </div>
+          <p class="text-[0.6rem] text-smoke/40 mt-1">Este tiempo quedará bloqueado en la agenda automáticamente.</p>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Asignar a Barbero</label>
+          <select id="ms-barber" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors">
+            {% for barber in barbers %}
+              <option value="{{ barber.id }}" {% if 'frank' in barber.display_name|lower %}selected{% endif %}>{{ barber.display_name }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
 
@@ -152,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const payload = {
       client_name: document.getElementById('ms-client-name').value || 'Cliente General',
+      service_name: document.getElementById('ms-service-name').value || 'Servicio Manual',
+      barber_id: document.getElementById('ms-barber').value,
       description: document.getElementById('ms-description').value || '',
       materials_list: materials,
       date: document.getElementById('ms-date').value,
