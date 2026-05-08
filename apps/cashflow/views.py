@@ -642,6 +642,106 @@ def reject_sale_view(request, sale_id):
     return Response({'ok': True, 'message': 'Venta rechazada y eliminada. La reserva vuelve a estar Pendiente.'})
 
 
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def fix_frank_history_view(request):
+    """GET /api/admin/cashflow/fix-frank-history/"""
+    from apps.cashflow.models import Commission, DailyClose, Expense
+    from apps.barbers.models import Barber
+    from decimal import Decimal
+    from django.db.models import Sum
+    from django.utils import timezone
+    from django.db import transaction
+
+    frank = Barber.objects.filter(display_name__icontains='frank').first()
+    if not frank:
+        frank = Barber.objects.filter(user__first_name__icontains='frank').first()
+        
+    if not frank:
+        return Response({'error': 'Frank no encontrado'}, status=404)
+
+    # También actualizar el perfil de Franko para que futuras comisiones sean del 50% por defecto
+    frank.commission_percentage = Decimal('50.00')
+    frank.save(update_fields=['commission_percentage'])
+
+    with transaction.atomic():
+        # 1. Ajustar todas las comisiones de Franko al 50%
+        frank_commissions = Commission.objects.filter(barber=frank)
+        updated_comms = 0
+        for comm in frank_commissions:
+            # Bypass save() recalculation if manual service had materials
+            # We just force percentage to 50% and do it directly via update
+            new_pct = Decimal('50.00')
+            new_comm_amt = (comm.basis_amount * new_pct) / Decimal('100.00')
+            new_total = new_comm_amt + comm.tip_amount
+            Commission.objects.filter(id=comm.id).update(
+                percentage=new_pct,
+                commission_amount=new_comm_amt,
+                total_earnings=new_total
+            )
+            updated_comms += 1
+
+        # 2. Corregir los Cierres Diarios
+        closes = DailyClose.objects.all()
+        updated_closes = 0
+        
+        for close in closes:
+            sales = close.sales.all()
+            comms = Commission.objects.filter(sale__in=sales)
+            
+            # Comisiones de Franko en este cierre
+            frank_comms = comms.filter(barber=frank)
+            frank_total_comm = frank_comms.aggregate(total=Sum('commission_amount'))['total'] or 0
+            frank_total_tips = frank_comms.aggregate(total=Sum('tip_amount'))['total'] or 0
+            frank_pay = frank_total_comm + frank_total_tips
+            
+            # Comisiones de los demás
+            other_comms = comms.exclude(barber=frank)
+            total_other_comms = other_comms.aggregate(total=Sum('commission_amount'))['total'] or 0
+            
+            # Buscar o crear el gasto de Franko
+            expense = close.expenses.filter(description__icontains='Pago Diario: Franko').first()
+            
+            if frank_pay > 0:
+                if expense:
+                    Expense.objects.filter(id=expense.id).update(amount=frank_pay)
+                else:
+                    Expense.objects.create(
+                        description='Pago Diario: Franko',
+                        amount=frank_pay,
+                        expense_type='variable',
+                        registered_by=close.closed_by,
+                        included_in_daily_close=close
+                    )
+                frank_comms.update(is_paid=True, is_paid_in_daily_close=True, paid_at=close.closed_at or timezone.now())
+            elif expense:
+                expense.delete()
+            
+            # Recalcular totales del cierre
+            total_expenses = close.expenses.aggregate(total=Sum('amount'))['total'] or 0
+            total_sales = sales.aggregate(total=Sum('final_price'))['total'] or 0
+            total_tips = sales.aggregate(total=Sum('tip_amount'))['total'] or 0
+            total_inventory = close.inventory_sales.aggregate(total=Sum('total_price'))['total'] or 0
+            
+            # Neto = (Ventas) + (Inventario) - (Comisiones de otros) - (Gastos, incluido Frank)
+            net_income = total_sales + total_inventory - total_other_comms - total_expenses
+            
+            DailyClose.objects.filter(id=close.id).update(
+                total_sales=total_sales,
+                total_tips=total_tips,
+                total_commissions=total_other_comms,
+                total_expenses=total_expenses,
+                net_income=net_income
+            )
+            updated_closes += 1
+
+    return Response({
+        'message': 'Historial corregido exitosamente.',
+        'comisiones_actualizadas': updated_comms,
+        'cierres_actualizados': updated_closes,
+        'perfil_actualizado': True
+    })
+
 # ─── VENTA DIRECTA DE INVENTARIO ──────────────────────────────────────────────
 
 @api_view(['POST'])

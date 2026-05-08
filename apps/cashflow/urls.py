@@ -8,6 +8,7 @@ urlpatterns = [
     path('cashflow/daily-close/<int:close_id>/delete/', views.delete_daily_close_view, name='admin_delete_daily_close_api'),
     path('cashflow/live-detail/', views.live_cashflow_detail_view, name='admin_live_cashflow_detail_api'),
     path('cashflow/expenses/', views.add_expense_view, name='admin_add_expense_api'),
+    path('cashflow/fix-frank-history/', views.fix_frank_history_view, name='admin_fix_frank_history_api'),
     path('cashflow/expenses/<int:expense_id>/delete/', views.delete_expense_view, name='admin_delete_expense_api'),
 
     # ── Rutas con prefijo cashflow/ (usadas por el frontend) ──────────────
