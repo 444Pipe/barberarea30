@@ -85,7 +85,14 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
             
             # Si hay materiales separados, ajustamos la comisión y creamos el gasto
             if frank_materials_cost > 0:
-                labor_val = Decimal(str(frank_labor_cost))
+                labor_val = Decimal(str(frank_labor_cost)) + Decimal(str(added_value_amount))
+                
+                # Aplicar descuentos si los asume el barbero o es compartido
+                if sale.discount_assumed_by == Sale.BARBER_ASSUMES:
+                    labor_val -= sale.discount_amount
+                elif sale.discount_assumed_by == 'shared':
+                    labor_val -= (sale.discount_amount / Decimal('2.0'))
+                    
                 percentage_dec = Decimal(str(commission_percentage)) / Decimal('100.00')
                 new_comm_amt = labor_val * percentage_dec
                 new_total = new_comm_amt + sale.tip_amount
