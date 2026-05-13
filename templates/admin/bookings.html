@@ -460,46 +460,67 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price || 0).toLocaleString('es-CO')}</td>
       <td class="px-4 py-3">${statusBadge[b.status] || statusBadge.pending}</td>
       <td class="px-4 py-3">
-        <div class="flex flex-col gap-1">
+        <div class="flex flex-col gap-1.5 items-start">
           ${b.status !== 'completed' && b.status !== 'cancelled' ? `
-            <button onclick="openCheckout(${b.id}, '${b.client_name.replace(/'/g, "\\'")}', ${b.price}, '${(b.barber_name || '').replace(/'/g, "\\'")}', ${b.manual_labor_cost || 0}, ${b.manual_materials_cost || 0})" class="w-full px-2 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded text-[0.6rem] hover:bg-emerald-600/40 transition-colors mb-1 font-bold">
+            <button onclick="openCheckout(${b.id}, '${b.client_name.replace(/'/g, "\\'")}', ${b.price}, '${(b.barber_name || '').replace(/'/g, "\\'")}', ${b.manual_labor_cost || 0}, ${b.manual_materials_cost || 0})"
+              class="w-full px-3 py-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded text-[0.6rem] hover:bg-emerald-600/40 transition-colors font-bold tracking-wider">
               💰 COBRAR
             </button>
           ` : ''}
-          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1" ${(b.status === 'completed' || !userIsSuperAdmin) ? 'disabled title="Solo soporte y superadministradores pueden cambiar el estado"' : ''}>
-            <option value="">Cambiar...</option>
-            <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pendiente</option>
-            <option value="confirmed" ${b.status === 'confirmed' ? 'selected' : ''}>Confirmado</option>
-            <option value="completed" ${b.status === 'completed' ? 'selected' : 'disabled title="Usa el botón COBRAR para completar"'}>Completado</option>
-            <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
-          </select>
-          ${userCanEdit && b.status !== 'completed' ? `
-          <button
-            class="w-full px-2 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded text-[0.6rem] hover:bg-blue-600/40 transition-colors font-bold btn-edit-booking"
-            data-id="${b.id}"
-            data-name="${escAttr(b.client_name)}"
-            data-phone="${escAttr(b.client_phone||'')}"
-            data-email="${escAttr(b.client_email||'')}"
-            data-notes="${escAttr(b.notes||'')}"
-            data-price="${b.price||0}"
-            data-service="${b.service||''}"
-            data-barber="${b.barber||''}">
-            ✏️ EDITAR
-          </button>
-          <button
-            class="w-full px-2 py-1 bg-amber-600/20 text-amber-400 border border-amber-500/30 rounded text-[0.6rem] hover:bg-amber-600/40 transition-colors font-bold btn-reschedule-booking"
-            data-id="${b.id}"
-            data-name="${escAttr(b.client_name)}"
-            data-date="${b.date}"
-            data-time="${b.time}">
-            🗓️ REAGENDAR
-          </button>
-          ` : ''}
-          ${userIsSuperAdmin ? `
-          <button onclick="deleteBooking(${b.id})" class="w-full px-2 py-1 bg-red-600/20 text-red-400 border border-red-500/30 rounded text-[0.6rem] hover:bg-red-600/40 transition-colors mt-1 font-bold">
-            🗑️ BORRAR
-          </button>
-          ` : ''}
+          <!-- Dropdown de acciones secundarias -->
+          <div class="relative w-full">
+            <button onclick="toggleActionsMenu(this)"
+              class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-[0.6rem] text-smoke/60 hover:text-white hover:border-white/20 transition-all font-medium flex items-center justify-between gap-1">
+              <span>Acciones</span>
+              <svg class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="actions-menu hidden absolute right-0 top-full mt-1 w-44 bg-jet-card border border-white/10 rounded-lg shadow-2xl z-30 overflow-hidden py-1">
+              <!-- Cambiar estado -->
+              ${userIsSuperAdmin && b.status !== 'completed' ? `
+              <div class="px-2 py-1.5 border-b border-white/5">
+                <p class="text-[0.55rem] text-smoke/30 uppercase tracking-widest mb-1 px-1">Estado</p>
+                <select onchange="quickStatus(${b.id}, this.value); closeAllMenus();" class="quick-status-select w-full text-[0.6rem] rounded">
+                  <option value="">Cambiar...</option>
+                  <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pendiente</option>
+                  <option value="confirmed" ${b.status === 'confirmed' ? 'selected' : ''}>Confirmado</option>
+                  <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
+                </select>
+              </div>
+              ` : ''}
+              <!-- Editar -->
+              ${userCanEdit && b.status !== 'completed' ? `
+              <button
+                class="w-full text-left px-3 py-2 text-[0.65rem] text-blue-400 hover:bg-blue-500/10 transition-colors flex items-center gap-2 btn-edit-booking"
+                data-id="${b.id}"
+                data-name="${escAttr(b.client_name)}"
+                data-phone="${escAttr(b.client_phone||'')}"
+                data-email="${escAttr(b.client_email||'')}"
+                data-notes="${escAttr(b.notes||'')}"
+                data-price="${b.price||0}"
+                data-service="${b.service||''}"
+                data-barber="${b.barber||''}">
+                ✏️ Editar información
+              </button>
+              <button
+                class="w-full text-left px-3 py-2 text-[0.65rem] text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center gap-2 btn-reschedule-booking"
+                data-id="${b.id}"
+                data-name="${escAttr(b.client_name)}"
+                data-date="${b.date}"
+                data-time="${b.time}">
+                🗓️ Reagendar
+              </button>
+              ` : ''}
+              <!-- Borrar -->
+              ${userIsSuperAdmin ? `
+              <div class="border-t border-white/5 mt-1 pt-1">
+                <button onclick="deleteBooking(${b.id}); closeAllMenus();"
+                  class="w-full text-left px-3 py-2 text-[0.65rem] text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
+                  🗑️ Eliminar reserva
+                </button>
+              </div>
+              ` : ''}
+            </div>
+          </div>
         </div>
       </td>
     </tr>
@@ -882,6 +903,62 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
   }
 
 
+// ─── Helper: escapa atributos HTML para data-* ───────────────────────────────
+function escAttr(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// ─── Dropdown de acciones ────────────────────────────────────────────────────
+function toggleActionsMenu(btn) {
+  const menu = btn.nextElementSibling;
+  const arrow = btn.querySelector('svg');
+  const isOpen = !menu.classList.contains('hidden');
+
+  // Cerrar todos los demás primero
+  closeAllMenus();
+
+  if (!isOpen) {
+    menu.classList.remove('hidden');
+    arrow && arrow.classList.add('rotate-180');
+  }
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.actions-menu').forEach(m => {
+    m.classList.add('hidden');
+    const arrow = m.previousElementSibling?.querySelector('svg');
+    arrow && arrow.classList.remove('rotate-180');
+  });
+}
+
+// Cerrar al hacer click fuera de cualquier menú
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.relative')) {
+    closeAllMenus();
+  }
+
+  // Event delegation para botones dentro del dropdown
+  const editBtn = e.target.closest('.btn-edit-booking');
+  if (editBtn) {
+    closeAllMenus();
+    const d = editBtn.dataset;
+    openEditModal(d.id, d.name, d.phone, d.email, d.notes, d.price, d.service, d.barber);
+    return;
+  }
+  const reschedBtn = e.target.closest('.btn-reschedule-booking');
+  if (reschedBtn) {
+    closeAllMenus();
+    const d = reschedBtn.dataset;
+    openRescheduleModal(d.id, d.name, d.date, d.time);
+    return;
+  }
+});
+
 </script>
 
 <!-- ═══════════════════════════════════════════════════════ -->
@@ -978,34 +1055,6 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
   </div>
 </div>
 
-<script>
-// ─── Helper: escapa atributos HTML para data-* ────────────────────────────────
-function escAttr(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-// ─── Event Delegation para botones EDITAR y REAGENDAR ────────────────────────
-document.addEventListener('click', function(e) {
-  // Botón EDITAR
-  const editBtn = e.target.closest('.btn-edit-booking');
-  if (editBtn) {
-    const d = editBtn.dataset;
-    openEditModal(d.id, d.name, d.phone, d.email, d.notes, d.price, d.service, d.barber);
-    return;
-  }
-  // Botón REAGENDAR
-  const reschedBtn = e.target.closest('.btn-reschedule-booking');
-  if (reschedBtn) {
-    const d = reschedBtn.dataset;
-    openRescheduleModal(d.id, d.name, d.date, d.time);
-    return;
-  }
-});
 
 // ─── MODAL EDITAR RESERVA ─────────────────────────────────────────────────────
 function openEditModal(id, clientName, clientPhone, clientEmail, notes, price, serviceId, barberId) {
