@@ -358,6 +358,8 @@ def admin_manual_service_view(request):
     import json
     import uuid
     from django.utils.text import slugify
+    from apps.cashflow.services import process_checkout
+    from apps.cashflow.models import PaymentMethod
     
     if request.method == 'POST':
         try:
@@ -368,6 +370,7 @@ def admin_manual_service_view(request):
             duration_minutes = int(data.get('duration_minutes', 60))
             manual_labor_cost = data.get('manual_labor_cost', 0)
             manual_materials_cost = data.get('manual_materials_cost', 0)
+            payment_method_id = data.get('payment_method_id')
             
             description = data.get('description', '')
             materials_list = data.get('materials_list', [])
@@ -430,6 +433,18 @@ def admin_manual_service_view(request):
                 is_walk_in=True,
                 notes=notes.strip()
             )
+
+            # Producir el Checkout (Venta y Comisión) de inmediato
+            process_checkout(
+                booking=booking,
+                confirmed_by=request.user,
+                payment_method_id=payment_method_id,
+                frank_materials_cost=float(manual_materials_cost),
+                frank_labor_cost=float(manual_labor_cost),
+                notes=f'Servicio Manual procesado por {request.user.username}',
+                request=request
+            )
+
             return JsonResponse({'success': True, 'booking_id': booking.id})
         except Exception as e:
             import traceback
@@ -442,5 +457,6 @@ def admin_manual_service_view(request):
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'manual_service',
         'barbers': barbers,
+        'payment_methods': PaymentMethod.objects.filter(is_active=True),
     }
     return render(request, 'admin/manual_service.html', context)

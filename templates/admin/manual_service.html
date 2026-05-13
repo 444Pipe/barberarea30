@@ -63,6 +63,21 @@
         </div>
       </div>
 
+      <!-- Payment Method -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Método de Pago</label>
+          <select id="ms-payment-method" class="w-full bg-jet border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-gold transition-colors">
+            {% for method in payment_methods %}
+              <option value="{{ method.id }}">{{ method.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex items-center">
+          <p class="text-[0.6rem] text-smoke/40 mt-4 italic">El servicio se registrará como completado y pagado de inmediato.</p>
+        </div>
+      </div>
+
       <!-- Work Description -->
       <div>
         <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Descripción del Trabajo</label>
@@ -176,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
       time: document.getElementById('ms-time').value,
       duration_minutes: parseInt(document.getElementById('ms-duration').value) || 60,
       manual_labor_cost: parseFloat(document.getElementById('ms-labor-cost').value) || 0,
-      manual_materials_cost: parseFloat(document.getElementById('ms-materials-cost').value) || 0
+      manual_materials_cost: parseFloat(document.getElementById('ms-materials-cost').value) || 0,
+      payment_method_id: document.getElementById('ms-payment-method').value
     };
 
     fetch('/admin-panel/manual-service/', {

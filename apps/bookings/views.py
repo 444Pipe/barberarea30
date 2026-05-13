@@ -352,8 +352,8 @@ def admin_bookings_list_view(request):
     profile = getattr(request.user, 'profile', None)
     queryset = Booking.objects.select_related('barber', 'service').all()
 
-    # Barbers and operational_admin can only see their own bookings
-    if profile and profile.role not in ('admin', 'superadmin'):
+    # Barbers can only see their own bookings. Admins and operational_admins see all.
+    if profile and profile.role not in ('admin', 'superadmin', 'operational_admin'):
         barber_profile = getattr(request.user, 'barber_profile', None)
         if barber_profile:
             queryset = queryset.filter(barber=barber_profile)
@@ -401,9 +401,9 @@ def admin_booking_detail_view(request, booking_id):
     except Booking.DoesNotExist:
         return Response({'error': 'Reserva no encontrada'}, status=404)
 
-    # Barber and operational_admin can only modify their own bookings
+    # Barber can only modify their own bookings. Admins and operational_admins can modify all.
     profile = getattr(request.user, 'profile', None)
-    if profile and profile.role not in ('admin', 'superadmin'):
+    if profile and profile.role not in ('admin', 'superadmin', 'operational_admin'):
         barber_profile = getattr(request.user, 'barber_profile', None)
         if booking.barber != barber_profile:
             return Response({'error': 'Sin permisos'}, status=403)
