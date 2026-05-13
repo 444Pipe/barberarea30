@@ -528,7 +528,11 @@ def admin_reschedule_booking_view(request, booking_id):
             ).exclude(pk=booking.pk)
 
             for bk in conflict_qs:
-                bk_start = _dt.combine(bk.date, bk.time)
+                # SQLite puede devolver strings en lugar de objetos date/time
+                bk_d = bk.date if not isinstance(bk.date, str) else _dt.strptime(bk.date, '%Y-%m-%d').date()
+                bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
+                
+                bk_start = _dt.combine(bk_d, bk_t)
                 bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
                 if req_start < bk_end and req_end > bk_start:
                     return Response({
