@@ -432,6 +432,8 @@ def admin_manual_service_view(request):
             )
             return JsonResponse({'success': True, 'booking_id': booking.id})
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return JsonResponse({'error': str(e)}, status=400)
 
     barbers = Barber.objects.filter(is_available=True)

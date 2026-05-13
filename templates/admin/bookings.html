@@ -9,12 +9,19 @@
       <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Gestión de citas</p>
     </div>
     <div class="flex flex-wrap justify-end gap-2">
-      <button onclick="openWalkinModal()" class="px-4 py-2 rounded-md bg-gold/20 border border-gold/40 text-gold text-xs tracking-wider uppercase hover:bg-gold hover:text-jet transition-all flex items-center gap-2 font-bold">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      <button onclick="openWalkinModal()"
+        class="px-4 py-2 rounded-md bg-gold/20 border border-gold/40 text-gold text-xs tracking-wider uppercase hover:bg-gold hover:text-jet transition-all flex items-center gap-2 font-bold">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
         Walk-in
       </button>
-      <button onclick="exportCSV()" class="px-4 py-2 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase hover:text-gold hover:border-gold/30 transition-all flex items-center gap-2">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <button onclick="exportCSV()"
+        class="px-4 py-2 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase hover:text-gold hover:border-gold/30 transition-all flex items-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
         Exportar CSV
       </button>
     </div>
@@ -39,7 +46,8 @@
       </select>
       <input type="date" id="filter-date-from" onchange="loadBookings()" class="admin-select" placeholder="Desde">
       <input type="date" id="filter-date-to" onchange="loadBookings()" class="admin-select" placeholder="Hasta">
-      <input type="text" id="filter-search" oninput="debounceSearch()" class="admin-select" placeholder="Buscar cliente...">
+      <input type="text" id="filter-search" oninput="debounceSearch()" class="admin-select"
+        placeholder="Buscar cliente...">
     </div>
   </div>
 
@@ -63,17 +71,20 @@
         <tbody id="bookings-table" class="divide-y divide-white/5"></tbody>
       </table>
     </div>
-    </div>
-    <div id="empty-state" class="hidden text-center py-12 text-smoke/30 text-sm">No se encontraron reservas</div>
   </div>
+  <div id="empty-state" class="hidden text-center py-12 text-smoke/30 text-sm">No se encontraron reservas</div>
+</div>
 </div>
 
 <!-- Walk-in Modal Global -->
-<div id="walkin-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+<div id="walkin-modal"
+  class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
   <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
     <div class="p-4 border-b border-white/5 flex justify-between items-center bg-jet-lighter">
       <h3 class="text-lg font-bold text-gold flex items-center gap-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
         Nueva Reserva (Walk-in)
       </h3>
       <button onclick="closeWalkinModal()" class="text-smoke/40 hover:text-white">✕</button>
@@ -81,51 +92,62 @@
     <form id="walkin-form" class="p-6 space-y-4" onsubmit="submitWalkin(event)">
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Nombre del Cliente</label>
-        <input type="text" id="walkin-client" required placeholder="Ej: Cliente Físico" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        <input type="text" id="walkin-client" required placeholder="Ej: Cliente Físico"
+          class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
       </div>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Teléfono (Opcional)</label>
-          <input type="text" id="walkin-phone" placeholder="Ej: 3001234567" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <input type="text" id="walkin-phone" placeholder="Ej: 3001234567"
+            class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
         </div>
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Correo (Opcional)</label>
-          <input type="email" id="walkin-email" placeholder="Ej: correo@ejemplo.com" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <input type="email" id="walkin-email" placeholder="Ej: correo@ejemplo.com"
+            class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
         </div>
       </div>
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Servicio</label>
-        <select id="walkin-service" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        <select id="walkin-service" required
+          class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
           <option value="">Cargando servicios...</option>
         </select>
       </div>
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Barbero</label>
-        <select id="walkin-barber" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        <select id="walkin-barber"
+          class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
           <option value="any">Cualquier Barbero Disponible</option>
         </select>
       </div>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Fecha</label>
-          <input type="date" id="walkin-date" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <input type="date" id="walkin-date" required
+            class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
         </div>
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Hora</label>
-          <input type="time" id="walkin-time" required class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+          <input type="time" id="walkin-time" required
+            class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
         </div>
       </div>
       <div class="pt-4 border-t border-white/5 flex gap-3 justify-end">
-        <button type="button" onclick="closeWalkinModal()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
-        <button type="submit" class="px-6 py-2 bg-gold text-jet font-bold text-xs tracking-widest uppercase rounded hover:bg-white transition-colors">Agendar</button>
+        <button type="button" onclick="closeWalkinModal()"
+          class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
+        <button type="submit"
+          class="px-6 py-2 bg-gold text-jet font-bold text-xs tracking-widest uppercase rounded hover:bg-white transition-colors">Agendar</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- Checkout Modal -->
-<div id="checkout-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-3">
-  <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl flex flex-col" style="max-height: 92vh;">
+<div id="checkout-modal"
+  class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-3">
+  <div class="bg-jet-card border border-gold/30 rounded-xl w-full max-w-md shadow-2xl flex flex-col"
+    style="max-height: 92vh;">
     <!-- Header fijo -->
     <div class="px-4 py-3 border-b border-white/5 flex justify-between items-center flex-shrink-0">
       <h3 class="text-base font-bold text-gold">Checkout del Servicio</h3>
@@ -135,7 +157,7 @@
     <!-- Cuerpo scrollable -->
     <div class="overflow-y-auto flex-1 px-4 py-4 space-y-3">
       <input type="hidden" id="checkout-booking-id">
-      
+
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Cliente</label>
         <p id="checkout-client-name" class="text-white font-semibold text-sm"></p>
@@ -148,10 +170,11 @@
         </div>
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Método de pago</label>
-          <select id="checkout-payment-method" required class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+          <select id="checkout-payment-method" required
+            class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
             <option value="">Seleccione...</option>
             {% for method in payment_methods %}
-              <option value="{{ method.id }}">{{ method.name }}</option>
+            <option value="{{ method.id }}">{{ method.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -159,22 +182,27 @@
 
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Referencia (Opcional)</label>
-        <input type="text" id="checkout-reference" placeholder="Ej: Nequi 1234" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+        <input type="text" id="checkout-reference" placeholder="Ej: Nequi 1234"
+          class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
       </div>
 
       <div class="mt-2 p-2 bg-jet-lighter border border-white/5 rounded">
         <label class="flex items-center gap-2 cursor-pointer mb-2">
-          <input type="checkbox" id="checkout-has-added-value" class="w-3.5 h-3.5 bg-jet border-white/10 rounded accent-gold" onchange="toggleAddedValue()">
+          <input type="checkbox" id="checkout-has-added-value"
+            class="w-3.5 h-3.5 bg-jet border-white/10 rounded accent-gold" onchange="toggleAddedValue()">
           <span class="text-[0.65rem] text-smoke/60 uppercase tracking-widest">¿Valor Agregado?</span>
         </label>
         <div id="checkout-added-value-container" class="hidden grid grid-cols-2 gap-3 mt-2">
           <div>
             <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Valor</label>
-            <input type="number" id="checkout-added-value" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none" oninput="updateCheckoutTotal()">
+            <input type="number" id="checkout-added-value" min="0" value="0"
+              class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"
+              oninput="updateCheckoutTotal()">
           </div>
           <div>
             <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Descripción</label>
-            <input type="text" id="checkout-added-value-desc" placeholder="Ej: Cejas, Lavado extra" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+            <input type="text" id="checkout-added-value-desc" placeholder="Ej: Cejas, Lavado extra"
+              class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
           </div>
         </div>
       </div>
@@ -182,17 +210,21 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Propina</label>
-          <input type="number" id="checkout-tip" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+          <input type="number" id="checkout-tip" min="0" value="0"
+            class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
         </div>
         <div>
           <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Descuento</label>
-          <input type="number" id="checkout-discount" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+          <input type="number" id="checkout-discount" min="0" value="0"
+            class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
         </div>
       </div>
 
       <div>
-        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">¿Quién asume el descuento?</label>
-        <select id="checkout-assumed-by" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">¿Quién asume el
+          descuento?</label>
+        <select id="checkout-assumed-by"
+          class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
           <option value="none">No aplica</option>
           <option value="company">Empresa (Afecta caja general)</option>
           <option value="barber">Barbero (Afecta su comisión)</option>
@@ -202,24 +234,31 @@
 
       <div>
         <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-0.5">Observaciones</label>
-        <textarea id="checkout-notes" rows="2" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"></textarea>
+        <textarea id="checkout-notes" rows="2"
+          class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"></textarea>
       </div>
 
       <!-- MATERIALES FRANK -->
       <div id="checkout-frank-materials-container" class="mt-2 p-2 bg-jet-lighter border border-gold/20 rounded hidden">
         <label class="flex items-center gap-2 cursor-pointer mb-2">
-          <input type="checkbox" id="checkout-has-frank-materials" class="w-3.5 h-3.5 bg-jet border-white/10 rounded accent-gold" onchange="toggleFrankMaterials()">
-          <span class="text-[0.65rem] text-gold uppercase tracking-widest font-bold">🛠️ Separar Materiales (Servicio Manual)</span>
+          <input type="checkbox" id="checkout-has-frank-materials"
+            class="w-3.5 h-3.5 bg-jet border-white/10 rounded accent-gold" onchange="toggleFrankMaterials()">
+          <span class="text-[0.65rem] text-gold uppercase tracking-widest font-bold">🛠️ Separar Materiales (Servicio
+            Manual)</span>
         </label>
         <div id="checkout-frank-materials-fields" class="hidden grid grid-cols-2 gap-3 mt-2">
           <div>
             <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Valor Materiales</label>
-            <input type="number" id="checkout-materials-value" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none" oninput="updateCheckoutTotal()">
+            <input type="number" id="checkout-materials-value" min="0" value="0"
+              class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"
+              oninput="updateCheckoutTotal()">
             <span class="text-[0.55rem] text-smoke/30">Se registrará como Egreso</span>
           </div>
           <div>
             <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Mano de Obra</label>
-            <input type="number" id="checkout-labor-value" min="0" value="0" class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none" oninput="updateCheckoutTotal()">
+            <input type="number" id="checkout-labor-value" min="0" value="0"
+              class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none"
+              oninput="updateCheckoutTotal()">
             <span class="text-[0.55rem] text-smoke/30">Se divide 50/50</span>
           </div>
         </div>
@@ -227,11 +266,14 @@
 
       <!-- CONSUMIBLES -->
       <div>
-        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">🍺 Consumibles del Cliente <span class="text-smoke/30 normal-case font-normal">(opcional)</span></label>
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">🍺 Consumibles del Cliente
+          <span class="text-smoke/30 normal-case font-normal">(opcional)</span></label>
         <div id="consumables-loading" class="text-xs text-smoke/30 italic py-1">Cargando productos…</div>
         <div id="consumables-grid" class="hidden space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
-        <div id="consumables-empty" class="hidden text-xs text-smoke/30 italic py-1">No hay consumibles disponibles en inventario.</div>
-        <div id="consumables-total" class="hidden mt-1.5 pt-1.5 border-t border-white/10 flex justify-between items-center">
+        <div id="consumables-empty" class="hidden text-xs text-smoke/30 italic py-1">No hay consumibles disponibles en
+          inventario.</div>
+        <div id="consumables-total"
+          class="hidden mt-1.5 pt-1.5 border-t border-white/10 flex justify-between items-center">
           <span class="text-[0.65rem] text-smoke/50 uppercase tracking-widest">Total consumibles:</span>
           <span id="consumables-total-amount" class="text-sm text-gold font-bold">$0</span>
         </div>
@@ -241,106 +283,109 @@
     <!-- Footer fijo -->
     <form id="checkout-form" onsubmit="submitCheckout(event)">
       <div class="px-4 py-3 border-t border-white/5 flex gap-3 justify-end flex-shrink-0 bg-jet-card rounded-b-xl">
-        <button type="button" onclick="closeCheckout()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
-        <button type="submit" class="px-6 py-2 bg-gold text-jet font-bold text-sm rounded hover:bg-white transition-colors">Confirmar Pago</button>
+        <button type="button" onclick="closeCheckout()"
+          class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
+        <button type="submit"
+          class="px-6 py-2 bg-gold text-jet font-bold text-sm rounded hover:bg-white transition-colors">Confirmar
+          Pago</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
-let searchTimeout = null;
-const userIsSuperAdmin = {% if user_role == 'superadmin' %}true{% else %}false{% endif %};
+  let searchTimeout = null;
+  const userIsSuperAdmin = {% if user_role == 'superadmin' %}true{% else %} false{% endif %};
 
-document.addEventListener('DOMContentLoaded', function() {
-  fetch('/api/barbers/').then(r => r.json()).then(barbers => {
-    const sel = document.getElementById('filter-barber');
-    if (sel && sel.tagName === 'SELECT') {
-      barbers.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b.id; opt.textContent = b.display_name;
-        sel.appendChild(opt);
-      });
-    }
-  });
-  loadBookings();
-});
-
-function debounceSearch() {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(loadBookings, 400);
-}
-
-function loadBookings() {
-  const params = new URLSearchParams();
-  const barber = document.getElementById('filter-barber').value;
-  const status = document.getElementById('filter-status').value;
-  const dateFrom = document.getElementById('filter-date-from').value;
-  const dateTo = document.getElementById('filter-date-to').value;
-  const search = document.getElementById('filter-search').value;
-
-  if (barber) params.set('barber', barber);
-  if (status) params.set('status', status);
-  if (dateFrom) params.set('date_from', dateFrom);
-  if (dateTo) params.set('date_to', dateTo);
-  if (search) params.set('search', search);
-
-  fetch('/api/admin/bookings/?' + params.toString())
-    .then(r => r.json())
-    .then(renderTable)
-    .catch(() => {
-      document.getElementById('bookings-table').innerHTML = '';
-      document.getElementById('empty-state').classList.remove('hidden');
+  document.addEventListener('DOMContentLoaded', function () {
+    fetch('/api/barbers/').then(r => r.json()).then(barbers => {
+      const sel = document.getElementById('filter-barber');
+      if (sel && sel.tagName === 'SELECT') {
+        barbers.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.id; opt.textContent = b.display_name;
+          sel.appendChild(opt);
+        });
+      }
     });
-}
-
-function renderTable(bookings) {
-  const tbody = document.getElementById('bookings-table');
-  const empty = document.getElementById('empty-state');
-
-  if (!bookings.length) {
-    tbody.innerHTML = '';
-    empty.classList.remove('hidden');
-    return;
-  }
-  empty.classList.add('hidden');
-
-  const statusBadge = {
-    pending: '<span class="inline-flex px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[0.6rem]">Pendiente</span>',
-    confirmed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[0.6rem]">Confirmado</span>',
-    completed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[0.6rem]">Completado</span>',
-    cancelled: '<span class="inline-flex px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[0.6rem]">Cancelado</span>',
-  };
-
-  const pad = (n) => n.toString().padStart(2, '0');
-  const today = new Date();
-  const strToday = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const strTomorrow = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`;
-  
-  const dayAfter = new Date(today);
-  dayAfter.setDate(dayAfter.getDate() + 2);
-  const strDayAfter = `${dayAfter.getFullYear()}-${pad(dayAfter.getMonth() + 1)}-${pad(dayAfter.getDate())}`;
-
-  const groups = {
-    'Hoy': [],
-    'Mañana': [],
-    'Pasado mañana': [],
-    'Más adelantadas': [],
-    'Anteriores': []
-  };
-
-  bookings.forEach(b => {
-    if (b.date === strToday) groups['Hoy'].push(b);
-    else if (b.date === strTomorrow) groups['Mañana'].push(b);
-    else if (b.date === strDayAfter) groups['Pasado mañana'].push(b);
-    else if (b.date < strToday) groups['Anteriores'].push(b);
-    else groups['Más adelantadas'].push(b);
+    loadBookings();
   });
 
-  const renderRow = (b) => `
+  function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadBookings, 400);
+  }
+
+  function loadBookings() {
+    const params = new URLSearchParams();
+    const barber = document.getElementById('filter-barber').value;
+    const status = document.getElementById('filter-status').value;
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+    const search = document.getElementById('filter-search').value;
+
+    if (barber) params.set('barber', barber);
+    if (status) params.set('status', status);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    if (search) params.set('search', search);
+
+    fetch('/api/admin/bookings/?' + params.toString())
+      .then(r => r.json())
+      .then(renderTable)
+      .catch(() => {
+        document.getElementById('bookings-table').innerHTML = '';
+        document.getElementById('empty-state').classList.remove('hidden');
+      });
+  }
+
+  function renderTable(bookings) {
+    const tbody = document.getElementById('bookings-table');
+    const empty = document.getElementById('empty-state');
+
+    if (!bookings.length) {
+      tbody.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    const statusBadge = {
+      pending: '<span class="inline-flex px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[0.6rem]">Pendiente</span>',
+      confirmed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[0.6rem]">Confirmado</span>',
+      completed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[0.6rem]">Completado</span>',
+      cancelled: '<span class="inline-flex px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[0.6rem]">Cancelado</span>',
+    };
+
+    const pad = (n) => n.toString().padStart(2, '0');
+    const today = new Date();
+    const strToday = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const strTomorrow = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`;
+
+    const dayAfter = new Date(today);
+    dayAfter.setDate(dayAfter.getDate() + 2);
+    const strDayAfter = `${dayAfter.getFullYear()}-${pad(dayAfter.getMonth() + 1)}-${pad(dayAfter.getDate())}`;
+
+    const groups = {
+      'Hoy': [],
+      'Mañana': [],
+      'Pasado mañana': [],
+      'Más adelantadas': [],
+      'Anteriores': []
+    };
+
+    bookings.forEach(b => {
+      if (b.date === strToday) groups['Hoy'].push(b);
+      else if (b.date === strTomorrow) groups['Mañana'].push(b);
+      else if (b.date === strDayAfter) groups['Pasado mañana'].push(b);
+      else if (b.date < strToday) groups['Anteriores'].push(b);
+      else groups['Más adelantadas'].push(b);
+    });
+
+    const renderRow = (b) => `
     <tr class="hover:bg-white/[0.02] transition-colors">
       <td class="px-4 py-3">
         <div class="text-white font-medium">${b.client_name}</div>
@@ -356,7 +401,7 @@ function renderTable(bookings) {
       </td>
       <td class="px-4 py-3 text-smoke/60">${b.date}</td>
       <td class="px-4 py-3 text-smoke/60">${b.time}</td>
-      <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price||0).toLocaleString('es-CO')}</td>
+      <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price || 0).toLocaleString('es-CO')}</td>
       <td class="px-4 py-3">${statusBadge[b.status] || statusBadge.pending}</td>
       <td class="px-4 py-3">
         <div class="flex flex-col gap-1">
@@ -365,7 +410,7 @@ function renderTable(bookings) {
               💰 COBRAR
             </button>
           ` : ''}
-          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1" ${ (b.status === 'completed' || !userIsSuperAdmin) ? 'disabled title="Solo soporte y superadministradores pueden cambiar el estado"' : ''}>
+          <select onchange="quickStatus(${b.id}, this.value)" class="quick-status-select text-[0.6rem] mb-1" ${(b.status === 'completed' || !userIsSuperAdmin) ? 'disabled title="Solo soporte y superadministradores pueden cambiar el estado"' : ''}>
             <option value="">Cambiar...</option>
             <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pendiente</option>
             <option value="confirmed" ${b.status === 'confirmed' ? 'selected' : ''}>Confirmado</option>
@@ -382,175 +427,175 @@ function renderTable(bookings) {
     </tr>
   `;
 
-  let html = '';
-  const order = ['Hoy', 'Mañana', 'Pasado mañana', 'Más adelantadas', 'Anteriores'];
-  
-  order.forEach(groupName => {
-    const groupBookings = groups[groupName];
-    if (groupBookings.length > 0) {
-      html += `
+    let html = '';
+    const order = ['Hoy', 'Mañana', 'Pasado mañana', 'Más adelantadas', 'Anteriores'];
+
+    order.forEach(groupName => {
+      const groupBookings = groups[groupName];
+      if (groupBookings.length > 0) {
+        html += `
         <tr class="bg-jet border-y border-white/5">
           <td colspan="9" class="px-4 py-3 text-xs font-serif font-bold text-gold tracking-widest">
             ${groupName.toUpperCase()} <span class="text-smoke/50 text-[0.65rem] ml-2 normal-case font-sans">(${groupBookings.length} reservas)</span>
           </td>
         </tr>
       `;
-      html += groupBookings.map(renderRow).join('');
-    }
-  });
+        html += groupBookings.map(renderRow).join('');
+      }
+    });
 
-  tbody.innerHTML = html;
-}
+    tbody.innerHTML = html;
+  }
 
-function quickStatus(id, newStatus) {
-  if (!newStatus) return;
-  fetch(`/api/admin/bookings/${id}/`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
-    body: JSON.stringify({ status: newStatus })
-  }).then(() => loadBookings());
-}
+  function quickStatus(id, newStatus) {
+    if (!newStatus) return;
+    fetch(`/api/admin/bookings/${id}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body: JSON.stringify({ status: newStatus })
+    }).then(() => loadBookings());
+  }
 
-function exportCSV() {
-  const params = new URLSearchParams();
-  const barber = document.getElementById('filter-barber').value;
-  const status = document.getElementById('filter-status').value;
-  const dateFrom = document.getElementById('filter-date-from').value;
-  const dateTo = document.getElementById('filter-date-to').value;
-  if (barber) params.set('barber', barber);
-  if (status) params.set('status', status);
-  if (dateFrom) params.set('date_from', dateFrom);
-  if (dateTo) params.set('date_to', dateTo);
-  window.open('/api/admin/bookings/export/?' + params.toString());
-}
+  function exportCSV() {
+    const params = new URLSearchParams();
+    const barber = document.getElementById('filter-barber').value;
+    const status = document.getElementById('filter-status').value;
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+    if (barber) params.set('barber', barber);
+    if (status) params.set('status', status);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    window.open('/api/admin/bookings/export/?' + params.toString());
+  }
 
-function deleteBooking(id) {
-  if (!confirm("¿Seguro que deseas eliminar permanentemente esta reserva? Esta acción no se puede deshacer.")) return;
-  fetch(`/api/admin/bookings/${id}/`, {
-    method: 'DELETE',
-    headers: { 'X-CSRFToken': getCSRF() }
-  }).then(r => {
-    if (r.ok) loadBookings();
-    else alert('Error al eliminar la reserva');
-  });
-}
+  function deleteBooking(id) {
+    if (!confirm("¿Seguro que deseas eliminar permanentemente esta reserva? Esta acción no se puede deshacer.")) return;
+    fetch(`/api/admin/bookings/${id}/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': getCSRF() }
+    }).then(r => {
+      if (r.ok) loadBookings();
+      else alert('Error al eliminar la reserva');
+    });
+  }
 
-function deleteAllBookings() {
-  if (!confirm("⚠️ ¡ADVERTENCIA CRÍTICA!\n¿Estás SEGURO de que deseas ELIMINAR TODAS LAS RESERVAS del sistema? Esta acción destruirá el historial completo y NO SE PUEDE DESHACER.")) return;
-  fetch('/api/admin/bookings/bulk-delete/', {
-    method: 'DELETE',
-    headers: { 'X-CSRFToken': getCSRF() }
-  }).then(r => {
-    if (r.ok) {
-      alert('Todas las reservas han sido eliminadas exitosamente.');
-      loadBookings();
+  function deleteAllBookings() {
+    if (!confirm("⚠️ ¡ADVERTENCIA CRÍTICA!\n¿Estás SEGURO de que deseas ELIMINAR TODAS LAS RESERVAS del sistema? Esta acción destruirá el historial completo y NO SE PUEDE DESHACER.")) return;
+    fetch('/api/admin/bookings/bulk-delete/', {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': getCSRF() }
+    }).then(r => {
+      if (r.ok) {
+        alert('Todas las reservas han sido eliminadas exitosamente.');
+        loadBookings();
+      } else {
+        alert('Error al intentar eliminar las reservas.');
+      }
+    });
+  }
+
+  function openCheckout(id, clientName, price, barberName, manualLabor = 0, manualMaterials = 0) {
+    document.getElementById('checkout-booking-id').value = id;
+    document.getElementById('checkout-client-name').textContent = clientName;
+    window._checkoutBasePrice = price;
+    updateCheckoutTotal();
+
+    const frankContainer = document.getElementById('checkout-frank-materials-container');
+    if (barberName && barberName.toLowerCase().includes('frank')) {
+      frankContainer.classList.remove('hidden');
+      // Si viene con valores manuales (Ej: del Servicio Manual de Frank), preseleccionar
+      if (manualLabor > 0 || manualMaterials > 0) {
+        document.getElementById('checkout-has-frank-materials').checked = true;
+        document.getElementById('checkout-frank-materials-fields').classList.remove('hidden');
+        document.getElementById('checkout-labor-value').value = manualLabor;
+        document.getElementById('checkout-materials-value').value = manualMaterials;
+        updateCheckoutTotal();
+      }
     } else {
-      alert('Error al intentar eliminar las reservas.');
+      frankContainer.classList.add('hidden');
     }
-  });
-}
 
-function openCheckout(id, clientName, price, barberName, manualLabor = 0, manualMaterials = 0) {
-  document.getElementById('checkout-booking-id').value = id;
-  document.getElementById('checkout-client-name').textContent = clientName;
-  window._checkoutBasePrice = price;
-  updateCheckoutTotal();
-  
-  const frankContainer = document.getElementById('checkout-frank-materials-container');
-  if (barberName && barberName.toLowerCase().includes('frank')) {
-    frankContainer.classList.remove('hidden');
-    // Si viene con valores manuales (Ej: del Servicio Manual de Frank), preseleccionar
-    if (manualLabor > 0 || manualMaterials > 0) {
-      document.getElementById('checkout-has-frank-materials').checked = true;
-      document.getElementById('checkout-frank-materials-fields').classList.remove('hidden');
-      document.getElementById('checkout-labor-value').value = manualLabor;
-      document.getElementById('checkout-materials-value').value = manualMaterials;
+    document.getElementById('checkout-modal').classList.remove('hidden');
+    loadConsumables();
+  }
+
+  function closeCheckout() {
+    document.getElementById('checkout-modal').classList.add('hidden');
+    document.getElementById('checkout-form').reset();
+    document.getElementById('checkout-has-added-value').checked = false;
+    document.getElementById('checkout-added-value-container').classList.add('hidden');
+    document.getElementById('checkout-has-frank-materials').checked = false;
+    document.getElementById('checkout-frank-materials-fields').classList.add('hidden');
+    document.getElementById('consumables-grid').innerHTML = '';
+    document.getElementById('consumables-total').classList.add('hidden');
+  }
+
+  function toggleFrankMaterials() {
+    const isChecked = document.getElementById('checkout-has-frank-materials').checked;
+    const container = document.getElementById('checkout-frank-materials-fields');
+    if (isChecked) {
+      container.classList.remove('hidden');
+    } else {
+      container.classList.add('hidden');
+      document.getElementById('checkout-materials-value').value = 0;
+      document.getElementById('checkout-labor-value').value = 0;
       updateCheckoutTotal();
     }
-  } else {
-    frankContainer.classList.add('hidden');
-  }
-  
-  document.getElementById('checkout-modal').classList.remove('hidden');
-  loadConsumables();
-}
-
-function closeCheckout() {
-  document.getElementById('checkout-modal').classList.add('hidden');
-  document.getElementById('checkout-form').reset();
-  document.getElementById('checkout-has-added-value').checked = false;
-  document.getElementById('checkout-added-value-container').classList.add('hidden');
-  document.getElementById('checkout-has-frank-materials').checked = false;
-  document.getElementById('checkout-frank-materials-fields').classList.add('hidden');
-  document.getElementById('consumables-grid').innerHTML = '';
-  document.getElementById('consumables-total').classList.add('hidden');
-}
-
-function toggleFrankMaterials() {
-  const isChecked = document.getElementById('checkout-has-frank-materials').checked;
-  const container = document.getElementById('checkout-frank-materials-fields');
-  if (isChecked) {
-    container.classList.remove('hidden');
-  } else {
-    container.classList.add('hidden');
-    document.getElementById('checkout-materials-value').value = 0;
-    document.getElementById('checkout-labor-value').value = 0;
-    updateCheckoutTotal();
-  }
-}
-
-function toggleAddedValue() {
-  const isChecked = document.getElementById('checkout-has-added-value').checked;
-  const container = document.getElementById('checkout-added-value-container');
-  if (isChecked) {
-    container.classList.remove('hidden');
-  } else {
-    container.classList.add('hidden');
-    document.getElementById('checkout-added-value').value = 0;
-    document.getElementById('checkout-added-value-desc').value = '';
-    updateCheckoutTotal();
-  }
-}
-
-function updateCheckoutTotal() {
-  let basePrice = window._checkoutBasePrice || 0;
-  
-  const hasFrankMaterials = document.getElementById('checkout-has-frank-materials').checked;
-  if (hasFrankMaterials) {
-    const matVal = parseFloat(document.getElementById('checkout-materials-value').value) || 0;
-    const labVal = parseFloat(document.getElementById('checkout-labor-value').value) || 0;
-    basePrice = matVal + labVal;
   }
 
-  const isChecked = document.getElementById('checkout-has-added-value').checked;
-  const addedValue = isChecked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0;
-  const total = basePrice + addedValue;
-  document.getElementById('checkout-base-price').textContent = '$' + total.toLocaleString('es-CO');
-}
+  function toggleAddedValue() {
+    const isChecked = document.getElementById('checkout-has-added-value').checked;
+    const container = document.getElementById('checkout-added-value-container');
+    if (isChecked) {
+      container.classList.remove('hidden');
+    } else {
+      container.classList.add('hidden');
+      document.getElementById('checkout-added-value').value = 0;
+      document.getElementById('checkout-added-value-desc').value = '';
+      updateCheckoutTotal();
+    }
+  }
 
-// ─── CONSUMABLES ──────────────────────────────────────────────────
-function loadConsumables() {
-  const grid    = document.getElementById('consumables-grid');
-  const loading = document.getElementById('consumables-loading');
-  const empty   = document.getElementById('consumables-empty');
-  const total   = document.getElementById('consumables-total');
+  function updateCheckoutTotal() {
+    let basePrice = window._checkoutBasePrice || 0;
 
-  loading.classList.remove('hidden');
-  grid.classList.add('hidden');
-  empty.classList.add('hidden');
-  total.classList.add('hidden');
+    const hasFrankMaterials = document.getElementById('checkout-has-frank-materials').checked;
+    if (hasFrankMaterials) {
+      const matVal = parseFloat(document.getElementById('checkout-materials-value').value) || 0;
+      const labVal = parseFloat(document.getElementById('checkout-labor-value').value) || 0;
+      basePrice = matVal + labVal;
+    }
 
-  fetch('/api/admin/inventory/consumables/')
-    .then(r => r.json())
-    .then(items => {
-      loading.classList.add('hidden');
-      if (!items.length) { empty.classList.remove('hidden'); return; }
+    const isChecked = document.getElementById('checkout-has-added-value').checked;
+    const addedValue = isChecked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0;
+    const total = basePrice + addedValue;
+    document.getElementById('checkout-base-price').textContent = '$' + total.toLocaleString('es-CO');
+  }
 
-      grid.innerHTML = items.map(item => {
-        const imgHtml = item.image
-          ? `<img src="${item.image}" class="w-8 h-8 rounded object-cover flex-shrink-0">`
-          : `<div class="w-8 h-8 rounded bg-white/5 flex items-center justify-center text-smoke/20 flex-shrink-0">📦</div>`;
-        return `
+  // ─── CONSUMABLES ──────────────────────────────────────────────────
+  function loadConsumables() {
+    const grid = document.getElementById('consumables-grid');
+    const loading = document.getElementById('consumables-loading');
+    const empty = document.getElementById('consumables-empty');
+    const total = document.getElementById('consumables-total');
+
+    loading.classList.remove('hidden');
+    grid.classList.add('hidden');
+    empty.classList.add('hidden');
+    total.classList.add('hidden');
+
+    fetch('/api/admin/inventory/consumables/')
+      .then(r => r.json())
+      .then(items => {
+        loading.classList.add('hidden');
+        if (!items.length) { empty.classList.remove('hidden'); return; }
+
+        grid.innerHTML = items.map(item => {
+          const imgHtml = item.image
+            ? `<img src="${item.image}" class="w-8 h-8 rounded object-cover flex-shrink-0">`
+            : `<div class="w-8 h-8 rounded bg-white/5 flex items-center justify-center text-smoke/20 flex-shrink-0">📦</div>`;
+          return `
           <div class="flex items-center justify-between p-2.5 bg-jet rounded-lg border border-white/5 group hover:border-gold/20 transition-all">
             <div class="flex items-center gap-2.5">
               ${imgHtml}
@@ -568,195 +613,195 @@ function loadConsumables() {
               </div>
             </div>
           </div>`;
-      }).join('');
+        }).join('');
 
-      grid.classList.remove('hidden');
+        grid.classList.remove('hidden');
 
-      // Store prices for total calculation
-      window._consumablePrices = {};
-      items.forEach(i => window._consumablePrices[i.id] = i.sale_price);
+        // Store prices for total calculation
+        window._consumablePrices = {};
+        items.forEach(i => window._consumablePrices[i.id] = i.sale_price);
+      })
+      .catch(() => { loading.textContent = 'Error al cargar consumibles.'; });
+  }
+
+  function changeQty(itemId, delta) {
+    const el = document.getElementById('qty-' + itemId);
+    const current = parseInt(el.textContent) || 0;
+    const next = Math.max(0, current + delta);
+    el.textContent = next;
+    updateConsumableTotal();
+  }
+
+  function updateConsumableTotal() {
+    let total = 0;
+    const prices = window._consumablePrices || {};
+    for (const [id, price] of Object.entries(prices)) {
+      const qty = parseInt(document.getElementById('qty-' + id)?.textContent || '0');
+      total += qty * price;
+    }
+    const totalDiv = document.getElementById('consumables-total');
+    const totalAmt = document.getElementById('consumables-total-amount');
+    totalAmt.textContent = '$' + total.toLocaleString('es-CO');
+    if (total > 0) totalDiv.classList.remove('hidden');
+    else totalDiv.classList.add('hidden');
+  }
+
+  function getSelectedConsumables() {
+    const prices = window._consumablePrices || {};
+    const result = [];
+    for (const id of Object.keys(prices)) {
+      const qty = parseInt(document.getElementById('qty-' + id)?.textContent || '0');
+      if (qty > 0) result.push({ id: parseInt(id), qty });
+    }
+    return result;
+  }
+
+  function submitCheckout(e) {
+    e.preventDefault();
+    const id = document.getElementById('checkout-booking-id').value;
+    const btn = document.querySelector('#checkout-form [type="submit"]');
+
+    const payload = {
+      payment_method_id: document.getElementById('checkout-payment-method').value,
+      payment_reference: document.getElementById('checkout-reference').value,
+      tip_amount: parseFloat(document.getElementById('checkout-tip').value) || 0,
+      discount_amount: parseFloat(document.getElementById('checkout-discount').value) || 0,
+      discount_assumed_by: document.getElementById('checkout-assumed-by').value,
+      added_value_amount: document.getElementById('checkout-has-added-value').checked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0,
+      added_value_description: document.getElementById('checkout-has-added-value').checked ? document.getElementById('checkout-added-value-desc').value : '',
+      notes: document.getElementById('checkout-notes').value,
+      frank_materials_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-materials-value').value) || 0) : 0,
+      frank_labor_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-labor-value').value) || 0) : 0
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+
+    fetch('/api/admin/checkout/' + id + '/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body: JSON.stringify(payload)
     })
-    .catch(() => { loading.textContent = 'Error al cargar consumibles.'; });
-}
-
-function changeQty(itemId, delta) {
-  const el = document.getElementById('qty-' + itemId);
-  const current = parseInt(el.textContent) || 0;
-  const next = Math.max(0, current + delta);
-  el.textContent = next;
-  updateConsumableTotal();
-}
-
-function updateConsumableTotal() {
-  let total = 0;
-  const prices = window._consumablePrices || {};
-  for (const [id, price] of Object.entries(prices)) {
-    const qty = parseInt(document.getElementById('qty-' + id)?.textContent || '0');
-    total += qty * price;
+      .then(res => res.json().then(data => ({ ok: res.ok, status: res.status, data })))
+      .then(({ ok, status, data }) => {
+        if (!ok) {
+          const msg = data.error || data.detail || `Error ${status}`;
+          alert('Error: ' + msg);
+          btn.disabled = false;
+          btn.textContent = 'Confirmar Pago';
+        } else {
+          // Registrar consumibles seleccionados si hay alguno
+          const consumables = getSelectedConsumables();
+          if (consumables.length > 0) {
+            return fetch('/api/admin/inventory/consumables/' + id + '/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+              body: JSON.stringify({ items: consumables })
+            }).then(() => {
+              closeCheckout();
+              loadBookings();
+            });
+          } else {
+            closeCheckout();
+            loadBookings();
+          }
+        }
+      })
+      .catch(err => alert('Error en la conexión: ' + err))
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Pago';
+      });
   }
-  const totalDiv = document.getElementById('consumables-total');
-  const totalAmt = document.getElementById('consumables-total-amount');
-  totalAmt.textContent = '$' + total.toLocaleString('es-CO');
-  if (total > 0) totalDiv.classList.remove('hidden');
-  else totalDiv.classList.add('hidden');
-}
 
-function getSelectedConsumables() {
-  const prices = window._consumablePrices || {};
-  const result = [];
-  for (const id of Object.keys(prices)) {
-    const qty = parseInt(document.getElementById('qty-' + id)?.textContent || '0');
-    if (qty > 0) result.push({ id: parseInt(id), qty });
+  function getCSRF() {
+    const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1] : '';
   }
-  return result;
-}
 
-function submitCheckout(e) {
-  e.preventDefault();
-  const id = document.getElementById('checkout-booking-id').value;
-  const btn = document.querySelector('#checkout-form [type="submit"]');
+  // ─── WALK-IN ──────────────────────────────────────────────────────
+  function openWalkinModal() {
+    document.getElementById('walkin-modal').classList.remove('hidden');
+    const d = new Date();
+    const offset = d.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(d - offset)).toISOString().slice(0, -1);
 
-  const payload = {
-    payment_method_id: document.getElementById('checkout-payment-method').value,
-    payment_reference: document.getElementById('checkout-reference').value,
-    tip_amount: parseFloat(document.getElementById('checkout-tip').value) || 0,
-    discount_amount: parseFloat(document.getElementById('checkout-discount').value) || 0,
-    discount_assumed_by: document.getElementById('checkout-assumed-by').value,
-    added_value_amount: document.getElementById('checkout-has-added-value').checked ? (parseFloat(document.getElementById('checkout-added-value').value) || 0) : 0,
-    added_value_description: document.getElementById('checkout-has-added-value').checked ? document.getElementById('checkout-added-value-desc').value : '',
-    notes: document.getElementById('checkout-notes').value,
-    frank_materials_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-materials-value').value) || 0) : 0,
-    frank_labor_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-labor-value').value) || 0) : 0
-  };
+    document.getElementById('walkin-date').value = localISOTime.split('T')[0];
+    document.getElementById('walkin-time').value = localISOTime.split('T')[1].substring(0, 5);
 
-  btn.disabled = true;
-  btn.textContent = 'Procesando...';
+    if (document.getElementById('walkin-service').options.length <= 1) {
+      fetch('/api/servicios-nativos/')
+        .then(r => r.json())
+        .then(data => {
+          const sel = document.getElementById('walkin-service');
+          sel.innerHTML = '<option value="">Seleccione un servicio...</option>';
+          data.servicios.forEach(s => {
+            sel.innerHTML += `<option value="${s.id}" data-price="${s.price}">${s.name} - $${parseInt(s.price).toLocaleString('es-CO')}</option>`;
+          });
+        });
+    }
 
-  fetch('/api/admin/checkout/' + id + '/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
-    body: JSON.stringify(payload)
-  })
-  .then(res => res.json().then(data => ({ ok: res.ok, status: res.status, data })))
-  .then(({ ok, status, data }) => {
-    if (!ok) {
-      const msg = data.error || data.detail || `Error ${status}`;
-      alert('Error: ' + msg);
-      btn.disabled = false;
-      btn.textContent = 'Confirmar Pago';
-    } else {
-      // Registrar consumibles seleccionados si hay alguno
-      const consumables = getSelectedConsumables();
-      if (consumables.length > 0) {
-        return fetch('/api/admin/inventory/consumables/' + id + '/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
-          body: JSON.stringify({ items: consumables })
-        }).then(() => {
-          closeCheckout();
+    if (document.getElementById('walkin-barber').options.length <= 1) {
+      fetch('/api/barbers/')
+        .then(r => r.json())
+        .then(barbers => {
+          const sel = document.getElementById('walkin-barber');
+          sel.innerHTML = '<option value="any">Cualquier Barbero Disponible</option>';
+          barbers.forEach(b => {
+            sel.innerHTML += `<option value="${b.id}">${b.display_name || b.nombre}</option>`;
+          });
+        });
+    }
+  }
+
+  function closeWalkinModal() {
+    document.getElementById('walkin-modal').classList.add('hidden');
+    document.getElementById('walkin-form').reset();
+  }
+
+  function submitWalkin(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Agendando...';
+
+    const serviceSelect = document.getElementById('walkin-service');
+    const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
+    const servicePrice = selectedServiceOption?.dataset?.price || 0;
+
+    const payload = {
+      client_name: document.getElementById('walkin-client').value,
+      client_phone: document.getElementById('walkin-phone').value,
+      client_email: document.getElementById('walkin-email').value,
+      service_id: serviceSelect.value,
+      barber_id: document.getElementById('walkin-barber').value,
+      date: document.getElementById('walkin-date').value,
+      time: document.getElementById('walkin-time').value,
+      price: servicePrice,
+      is_walk_in: true,
+      privacy_accepted: true
+    };
+
+    fetch('/api/bookings/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          alert('Error: ' + (data.error || JSON.stringify(data.errors) || 'Error al agendar'));
+        } else {
+          closeWalkinModal();
           loadBookings();
-        });
-      } else {
-        closeCheckout();
-        loadBookings();
-      }
-    }
-  })
-  .catch(err => alert('Error en la conexión: ' + err))
-  .finally(() => {
-    btn.disabled = false;
-    btn.textContent = 'Confirmar Pago';
-  });
-}
-
-function getCSRF() {
-  const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
-  return cookie ? cookie.split('=')[1] : '';
-}
-
-// ─── WALK-IN ──────────────────────────────────────────────────────
-function openWalkinModal() {
-  document.getElementById('walkin-modal').classList.remove('hidden');
-  const d = new Date();
-  const offset = d.getTimezoneOffset() * 60000;
-  const localISOTime = (new Date(d - offset)).toISOString().slice(0, -1);
-  
-  document.getElementById('walkin-date').value = localISOTime.split('T')[0];
-  document.getElementById('walkin-time').value = localISOTime.split('T')[1].substring(0,5);
-  
-  if (document.getElementById('walkin-service').options.length <= 1) {
-    fetch('/api/servicios-nativos/')
-      .then(r => r.json())
-      .then(data => {
-        const sel = document.getElementById('walkin-service');
-        sel.innerHTML = '<option value="">Seleccione un servicio...</option>';
-        data.servicios.forEach(s => {
-          sel.innerHTML += `<option value="${s.id}" data-price="${s.price}">${s.name} - $${parseInt(s.price).toLocaleString('es-CO')}</option>`;
-        });
+        }
+      })
+      .catch(err => alert('Error: ' + err))
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Agendar';
       });
   }
-  
-  if (document.getElementById('walkin-barber').options.length <= 1) {
-    fetch('/api/barbers/')
-      .then(r => r.json())
-      .then(barbers => {
-        const sel = document.getElementById('walkin-barber');
-        sel.innerHTML = '<option value="any">Cualquier Barbero Disponible</option>';
-        barbers.forEach(b => {
-          sel.innerHTML += `<option value="${b.id}">${b.display_name || b.nombre}</option>`;
-        });
-      });
-  }
-}
-
-function closeWalkinModal() {
-  document.getElementById('walkin-modal').classList.add('hidden');
-  document.getElementById('walkin-form').reset();
-}
-
-function submitWalkin(e) {
-  e.preventDefault();
-  const btn = e.target.querySelector('[type="submit"]');
-  btn.disabled = true;
-  btn.textContent = 'Agendando...';
-
-  const serviceSelect = document.getElementById('walkin-service');
-  const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
-  const servicePrice = selectedServiceOption?.dataset?.price || 0;
-
-  const payload = {
-    client_name: document.getElementById('walkin-client').value,
-    client_phone: document.getElementById('walkin-phone').value,
-    client_email: document.getElementById('walkin-email').value,
-    service_id: serviceSelect.value,
-    barber_id: document.getElementById('walkin-barber').value,
-    date: document.getElementById('walkin-date').value,
-    time: document.getElementById('walkin-time').value,
-    price: servicePrice,
-    is_walk_in: true,
-    privacy_accepted: true
-  };
-
-  fetch('/api/bookings/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(res => res.json().then(data => ({ ok: res.ok, data })))
-  .then(({ ok, data }) => {
-    if (!ok) {
-      alert('Error: ' + (data.error || JSON.stringify(data.errors) || 'Error al agendar'));
-    } else {
-      closeWalkinModal();
-      loadBookings();
-    }
-  })
-  .catch(err => alert('Error: ' + err))
-  .finally(() => {
-    btn.disabled = false;
-    btn.textContent = 'Agendar';
-  });
-}
 
 </script>
 {% endblock %}
