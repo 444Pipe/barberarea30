@@ -239,6 +239,7 @@ def daily_close_detail_view(request, close_id):
 
         sales_detail.append({
             'type': 'service',
+            'id': sale.id,
             'client_name': sale.booking.client_name if sale.booking else 'N/A',
             'service_name': sale.service.name if sale.service else 'General',
             'time': timezone.localtime(sale.created_at).strftime('%I:%M %p'),
@@ -258,6 +259,7 @@ def daily_close_detail_view(request, close_id):
         
         sales_detail.append({
             'type': 'inventory',
+            'id': inv_sale.id,
             'client_name': 'Cliente Local',
             'service_name': f"{inv_sale.quantity}x {inv_sale.item.name}" if inv_sale.item else 'Producto',
             'time': timezone.localtime(inv_sale.created_at).strftime('%I:%M %p'),
@@ -401,6 +403,7 @@ def live_cashflow_detail_view(request):
 
         sales_detail.append({
             'type': 'service',
+            'id': sale.id,
             'client_name': sale.booking.client_name if sale.booking else 'N/A',
             'service_name': sale.service.name if sale.service else 'General',
             'time': timezone.localtime(sale.created_at).strftime('%I:%M %p'),
@@ -423,6 +426,7 @@ def live_cashflow_detail_view(request):
         
         sales_detail.append({
             'type': 'inventory',
+            'id': inv_sale.id,
             'client_name': 'Cliente Local',
             'service_name': f"{inv_sale.quantity}x {inv_sale.item.name}" if inv_sale.item else 'Producto',
             'time': timezone.localtime(inv_sale.created_at).strftime('%I:%M %p'),
@@ -930,3 +934,65 @@ def pay_barber_view(request, barber_id):
         'ok': True,
         'message': f'Pago de ${total_amount:,.0f} registrado para {barber.display_name}.'
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def edit_sale_payment_method_view(request, sale_id):
+    """POST /api/admin/cashflow/sales/<id>/edit-payment/"""
+    from apps.cashflow.models import Sale, PaymentMethod
+    try:
+        sale = Sale.objects.get(pk=sale_id)
+        pm_id = request.data.get('payment_method_id')
+        if not pm_id:
+            return Response({'error': 'El método de pago es obligatorio.'}, status=400)
+            
+        pm = PaymentMethod.objects.get(pk=pm_id)
+        old_pm_name = sale.payment_method.name if sale.payment_method else 'Ninguno'
+        sale.payment_method = pm
+        sale.save(update_fields=['payment_method'])
+        
+        log_audit(
+            user=request.user,
+            action='update',
+            obj=sale,
+            changes={'payment_method': [old_pm_name, pm.name]},
+            request=request,
+            extra_data={'msg': f"Cambió método de pago de venta #{sale.id} ({old_pm_name} -> {pm.name})"}
+        )
+        return Response({'ok': True, 'message': 'Método de pago actualizado.'})
+    except Sale.DoesNotExist:
+        return Response({'error': 'Venta no encontrada.'}, status=404)
+    except PaymentMethod.DoesNotExist:
+        return Response({'error': 'Método de pago no encontrado.'}, status=404)
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def edit_inventory_sale_payment_method_view(request, sale_id):
+    """POST /api/admin/cashflow/inventory-sales/<id>/edit-payment/"""
+    from apps.cashflow.models import InventorySale, PaymentMethod
+    try:
+        sale = InventorySale.objects.get(pk=sale_id)
+        pm_id = request.data.get('payment_method_id')
+        if not pm_id:
+            return Response({'error': 'El método de pago es obligatorio.'}, status=400)
+            
+        pm = PaymentMethod.objects.get(pk=pm_id)
+        old_pm_name = sale.payment_method.name if sale.payment_method else 'Ninguno'
+        sale.payment_method = pm
+        sale.save(update_fields=['payment_method'])
+        
+        log_audit(
+            user=request.user,
+            action='update',
+            obj=sale,
+            changes={'payment_method': [old_pm_name, pm.name]},
+            request=request,
+            extra_data={'msg': f"Cambió método de pago de venta de inventario #{sale.id} ({old_pm_name} -> {pm.name})"}
+        )
+        return Response({'ok': True, 'message': 'Método de pago actualizado.'})
+    except InventorySale.DoesNotExist:
+        return Response({'error': 'Venta de inventario no encontrada.'}, status=404)
+    except PaymentMethod.DoesNotExist:
+        return Response({'error': 'Método de pago no encontrado.'}, status=404)

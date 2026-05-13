@@ -18,6 +18,8 @@ urlpatterns = [
     path('cashflow/pending-approvals/', views.pending_approvals_view, name='cashflow_pending_approvals_api'),
     path('cashflow/sales/<int:sale_id>/approve/', views.approve_sale_view, name='cashflow_approve_sale_api'),
     path('cashflow/sales/<int:sale_id>/reject/', views.reject_sale_view, name='cashflow_reject_sale_api'),
+    path('cashflow/sales/<int:sale_id>/edit-payment/', views.edit_sale_payment_method_view, name='cashflow_edit_sale_payment_api'),
+    path('cashflow/inventory-sales/<int:sale_id>/edit-payment/', views.edit_inventory_sale_payment_method_view, name='cashflow_edit_inv_sale_payment_api'),
 
     # ── Alias sin prefijo (compatibilidad hacia atrás) ────────────────────
     path('sales/pending/', views.pending_approvals_view, name='pending_sales_list_api'),
