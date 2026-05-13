@@ -546,7 +546,7 @@ def admin_reschedule_booking_view(request, booking_id):
 
     booking.date = new_date
     booking.time = new_time
-    booking.save(update_fields=['date', 'time', 'updated_at'])
+    booking.save(update_fields=['date', 'time'])
 
     # Registrar en auditoría
     if profile and profile.is_admin:
