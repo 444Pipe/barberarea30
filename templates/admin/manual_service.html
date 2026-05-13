@@ -63,6 +63,7 @@
         </div>
       </div>
 
+
       <!-- Work Description -->
       <div>
         <label class="block text-[0.65rem] font-bold text-gold uppercase tracking-widest mb-2">Descripción del Trabajo</label>
@@ -190,16 +191,16 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.json())
     .then(data => {
       if(data.success) {
-        showGlobalMessage('Servicio manual creado. Agenda bloqueada.', 'success');
-        setTimeout(() => window.location.href = '/admin-panel/bookings/', 1000);
+        alert('✅ Servicio manual creado. Agenda bloqueada.');
+        window.location.href = '/admin-panel/bookings/';
       } else {
-        showGlobalMessage(data.error || 'Error al crear', 'error');
+        alert('❌ Error: ' + (data.error || 'Error desconocido'));
         btn.disabled = false;
         btn.innerHTML = 'Bloquear Agenda';
       }
     })
     .catch(err => {
-      showGlobalMessage('Error de red', 'error');
+      alert('❌ Error de red: ' + err);
       btn.disabled = false;
       btn.innerHTML = 'Bloquear Agenda';
     });
