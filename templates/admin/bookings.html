@@ -1156,11 +1156,13 @@ function submitEditModal() {
 
 // ─── MODAL REAGENDAR ──────────────────────────────────────────────────────────
 function openRescheduleModal(id, clientName, currentDate, currentTime) {
+  // Recortar a HH:MM (Django puede devolver HH:MM:SS)
+  const timeHHMM = (currentTime || '').substring(0, 5);
   document.getElementById('reschedule-booking-id').value = id;
   document.getElementById('reschedule-client-name').textContent = clientName;
-  document.getElementById('reschedule-current-datetime').textContent = `${currentDate} a las ${currentTime}`;
+  document.getElementById('reschedule-current-datetime').textContent = `${currentDate} a las ${timeHHMM}`;
   document.getElementById('reschedule-date').value = currentDate;
-  document.getElementById('reschedule-time').value = currentTime;
+  document.getElementById('reschedule-time').value = timeHHMM;
   document.getElementById('reschedule-error').classList.add('hidden');
   document.getElementById('reschedule-modal').classList.remove('hidden');
 }

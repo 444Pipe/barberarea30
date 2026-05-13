@@ -508,7 +508,15 @@ def admin_reschedule_booking_view(request, booking_id):
     if booking.barber:
         from datetime import datetime as _dt, timedelta
         try:
-            req_time = _dt.strptime(new_time, '%H:%M').time()
+            # Aceptar HH:MM o HH:MM:SS (Django ORM puede devolver con segundos)
+            for fmt in ('%H:%M:%S', '%H:%M'):
+                try:
+                    req_time = _dt.strptime(new_time, fmt).time()
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError(f'Hora inválida: {new_time}')
             req_date = _dt.strptime(new_date, '%Y-%m-%d').date()
             req_start = _dt.combine(req_date, req_time)
             req_end = req_start + timedelta(minutes=booking.duration_minutes or 60)
