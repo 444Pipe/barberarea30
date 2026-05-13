@@ -504,52 +504,52 @@ def admin_reschedule_booking_view(request, booking_id):
     new_date = request.data.get('date', str(booking.date))
     new_time = request.data.get('time', booking.time.strftime('%H:%M'))
 
+    from datetime import datetime as _dt, timedelta
+    try:
+        # Aceptar HH:MM o HH:MM:SS
+        for fmt in ('%H:%M:%S', '%H:%M'):
+            try:
+                req_time = _dt.strptime(new_time, fmt).time()
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f'Hora inválida: {new_time}')
+        req_date = _dt.strptime(new_date, '%Y-%m-%d').date()
+        req_start = _dt.combine(req_date, req_time)
+        req_end = req_start + timedelta(minutes=booking.duration_minutes or 60)
+    except (ValueError, TypeError) as e:
+        return Response({'error': f'Formato de fecha u hora inválido: {e}'}, status=400)
+
     # Validar conflictos de horario (overlap)
     if booking.barber:
-        from datetime import datetime as _dt, timedelta
-        try:
-            # Aceptar HH:MM o HH:MM:SS (Django ORM puede devolver con segundos)
-            for fmt in ('%H:%M:%S', '%H:%M'):
-                try:
-                    req_time = _dt.strptime(new_time, fmt).time()
-                    break
-                except ValueError:
-                    continue
-            else:
-                raise ValueError(f'Hora inválida: {new_time}')
-            req_date = _dt.strptime(new_date, '%Y-%m-%d').date()
-            req_start = _dt.combine(req_date, req_time)
-            req_end = req_start + timedelta(minutes=booking.duration_minutes or 60)
+        conflict_qs = Booking.objects.filter(
+            barber=booking.barber,
+            date=req_date,
+            status__in=['pending', 'confirmed'],
+        ).exclude(pk=booking.pk)
 
-            conflict_qs = Booking.objects.filter(
-                barber=booking.barber,
-                date=req_date,
-                status__in=['pending', 'confirmed'],
-            ).exclude(pk=booking.pk)
-
-            for bk in conflict_qs:
-                # SQLite puede devolver strings en lugar de objetos date/time
-                bk_d = bk.date if not isinstance(bk.date, str) else _dt.strptime(bk.date, '%Y-%m-%d').date()
-                bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
-                
-                bk_start = _dt.combine(bk_d, bk_t)
-                bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
-                if req_start < bk_end and req_end > bk_start:
-                    return Response({
-                        'ok': False,
-                        'error': (
-                            f'{booking.barber.display_name} ya tiene una cita que se cruza con las '
-                            f'{new_time} el {new_date}. Por favor elige otra hora.'
-                        )
-                    }, status=409)
-        except (ValueError, TypeError) as e:
-            return Response({'error': f'Formato de fecha u hora inválido: {e}'}, status=400)
+        for bk in conflict_qs:
+            # SQLite puede devolver strings en lugar de objetos date/time
+            bk_d = bk.date if not isinstance(bk.date, str) else _dt.strptime(bk.date, '%Y-%m-%d').date()
+            bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
+            
+            bk_start = _dt.combine(bk_d, bk_t)
+            bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+            if req_start < bk_end and req_end > bk_start:
+                return Response({
+                    'ok': False,
+                    'error': (
+                        f'{booking.barber.display_name} ya tiene una cita que se cruza con las '
+                        f'{new_time} el {new_date}. Por favor elige otra hora.'
+                    )
+                }, status=409)
 
     old_date = str(booking.date)
     old_time = booking.time.strftime('%H:%M')
 
-    booking.date = new_date
-    booking.time = new_time
+    booking.date = req_date
+    booking.time = req_time
     booking.save(update_fields=['date', 'time'])
 
     # Registrar en auditoría
