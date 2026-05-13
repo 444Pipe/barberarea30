@@ -251,6 +251,7 @@
 <script>
 let searchTimeout = null;
 const userIsSuperAdmin = {% if user_role == 'superadmin' %}true{% else %}false{% endif %};
+const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational_admin' %}true{% else %}false{% endif %};
 
 document.addEventListener('DOMContentLoaded', function() {
   fetch('/api/barbers/').then(r => r.json()).then(barbers => {
@@ -372,6 +373,28 @@ function renderTable(bookings) {
             <option value="completed" ${b.status === 'completed' ? 'selected' : 'disabled title="Usa el botón COBRAR para completar"'}>Completado</option>
             <option value="cancelled" ${b.status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
           </select>
+          ${userCanEdit && b.status !== 'completed' ? `
+          <button
+            class="w-full px-2 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded text-[0.6rem] hover:bg-blue-600/40 transition-colors font-bold btn-edit-booking"
+            data-id="${b.id}"
+            data-name="${escAttr(b.client_name)}"
+            data-phone="${escAttr(b.client_phone||'')}"
+            data-email="${escAttr(b.client_email||'')}"
+            data-notes="${escAttr(b.notes||'')}"
+            data-price="${b.price||0}"
+            data-service="${b.service||''}"
+            data-barber="${b.barber||''}">
+            ✏️ EDITAR
+          </button>
+          <button
+            class="w-full px-2 py-1 bg-amber-600/20 text-amber-400 border border-amber-500/30 rounded text-[0.6rem] hover:bg-amber-600/40 transition-colors font-bold btn-reschedule-booking"
+            data-id="${b.id}"
+            data-name="${escAttr(b.client_name)}"
+            data-date="${b.date}"
+            data-time="${b.time}">
+            🗓️ REAGENDAR
+          </button>
+          ` : ''}
           ${userIsSuperAdmin ? `
           <button onclick="deleteBooking(${b.id})" class="w-full px-2 py-1 bg-red-600/20 text-red-400 border border-red-500/30 rounded text-[0.6rem] hover:bg-red-600/40 transition-colors mt-1 font-bold">
             🗑️ BORRAR
@@ -758,5 +781,285 @@ function submitWalkin(e) {
   });
 }
 
+
+</script>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MODAL EDITAR RESERVA -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="edit-booking-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+  <div class="bg-jet-card border border-blue-500/30 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div class="px-5 py-4 border-b border-white/5 flex justify-between items-center bg-jet-lighter">
+      <h3 class="text-base font-bold text-blue-400 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        Editar Reserva
+      </h3>
+      <button onclick="closeEditModal()" class="text-smoke/40 hover:text-white text-lg leading-none">✕</button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="edit-booking-id">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Nombre del Cliente</label>
+          <input type="text" id="edit-client-name" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none transition-colors">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Teléfono</label>
+          <input type="text" id="edit-client-phone" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none transition-colors">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Correo Electrónico</label>
+        <input type="email" id="edit-client-email" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none transition-colors">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Barbero</label>
+          <select id="edit-barber" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none transition-colors">
+            <option value="">Cargando...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Precio ($)</label>
+          <input type="number" id="edit-price" min="0" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none transition-colors">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Notas / Observaciones</label>
+        <textarea id="edit-notes" rows="3" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none transition-colors resize-none"></textarea>
+      </div>
+      <div id="edit-error" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2"></div>
+    </div>
+    <div class="px-5 py-3 border-t border-white/5 flex gap-3 justify-end bg-jet-lighter">
+      <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
+      <button type="button" onclick="submitEditModal()" id="edit-submit-btn" class="px-6 py-2 bg-blue-600 text-white font-bold text-xs tracking-widest uppercase rounded hover:bg-blue-500 transition-colors">Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MODAL REAGENDAR RESERVA -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="reschedule-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+  <div class="bg-jet-card border border-amber-500/30 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div class="px-5 py-4 border-b border-white/5 flex justify-between items-center bg-jet-lighter">
+      <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Reagendar Cita
+      </h3>
+      <button onclick="closeRescheduleModal()" class="text-smoke/40 hover:text-white text-lg leading-none">✕</button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="reschedule-booking-id">
+      <div class="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+        <p class="text-[0.65rem] text-amber-400/70 uppercase tracking-widest mb-1">Cliente</p>
+        <p id="reschedule-client-name" class="text-white font-semibold text-sm"></p>
+        <p class="text-[0.65rem] text-smoke/40 mt-1">Hora actual: <span id="reschedule-current-datetime" class="text-smoke/60"></span></p>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Nueva Fecha</label>
+          <input type="date" id="reschedule-date" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-amber-400 outline-none transition-colors">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] text-smoke/60 uppercase tracking-widest mb-1">Nueva Hora</label>
+          <input type="time" id="reschedule-time" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-amber-400 outline-none transition-colors">
+        </div>
+      </div>
+      <div class="p-2 bg-jet-lighter rounded text-[0.65rem] text-smoke/40">
+        ⚠️ Solo se cambia la fecha y/u hora. El resto de la información se mantiene igual.
+      </div>
+      <div id="reschedule-error" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2"></div>
+    </div>
+    <div class="px-5 py-3 border-t border-white/5 flex gap-3 justify-end bg-jet-lighter">
+      <button type="button" onclick="closeRescheduleModal()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
+      <button type="button" onclick="submitReschedule()" id="reschedule-submit-btn" class="px-6 py-2 bg-amber-600 text-white font-bold text-xs tracking-widest uppercase rounded hover:bg-amber-500 transition-colors">Confirmar Reagendo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Helper: escapa atributos HTML para data-* ────────────────────────────────
+function escAttr(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// ─── Event Delegation para botones EDITAR y REAGENDAR ────────────────────────
+document.addEventListener('click', function(e) {
+  // Botón EDITAR
+  const editBtn = e.target.closest('.btn-edit-booking');
+  if (editBtn) {
+    const d = editBtn.dataset;
+    openEditModal(d.id, d.name, d.phone, d.email, d.notes, d.price, d.service, d.barber);
+    return;
+  }
+  // Botón REAGENDAR
+  const reschedBtn = e.target.closest('.btn-reschedule-booking');
+  if (reschedBtn) {
+    const d = reschedBtn.dataset;
+    openRescheduleModal(d.id, d.name, d.date, d.time);
+    return;
+  }
+});
+
+// ─── MODAL EDITAR RESERVA ─────────────────────────────────────────────────────
+function openEditModal(id, clientName, clientPhone, clientEmail, notes, price, serviceId, barberId) {
+  document.getElementById('edit-booking-id').value = id;
+  document.getElementById('edit-client-name').value = clientName || '';
+  document.getElementById('edit-client-phone').value = clientPhone || '';
+  document.getElementById('edit-client-email').value = clientEmail || '';
+  document.getElementById('edit-notes').value = notes || '';
+  document.getElementById('edit-price').value = price || 0;
+
+  // Prellenar barbero si el select ya existe
+  const barberSel = document.getElementById('edit-barber');
+  if (barberSel && barberId) barberSel.value = barberId;
+
+  document.getElementById('edit-error').classList.add('hidden');
+  document.getElementById('edit-booking-modal').classList.remove('hidden');
+
+  // Cargar barberos si no están cargados
+  _loadEditBarbers(barberId);
+}
+
+function _loadEditBarbers(currentBarberId) {
+  const sel = document.getElementById('edit-barber');
+  if (!sel) return;
+  if (sel.options.length > 1) {
+    if (currentBarberId) sel.value = currentBarberId;
+    return;
+  }
+  fetch('/api/barbers/')
+    .then(r => r.json())
+    .then(barbers => {
+      sel.innerHTML = '<option value="">Sin asignar</option>';
+      barbers.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.display_name;
+        if (String(b.id) === String(currentBarberId)) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+}
+
+function closeEditModal() {
+  document.getElementById('edit-booking-modal').classList.add('hidden');
+}
+
+function submitEditModal() {
+  const id = document.getElementById('edit-booking-id').value;
+  const btn = document.getElementById('edit-submit-btn');
+  const errEl = document.getElementById('edit-error');
+  errEl.classList.add('hidden');
+
+  const barberEl = document.getElementById('edit-barber');
+
+  const payload = {
+    client_name: document.getElementById('edit-client-name').value.trim(),
+    client_phone: document.getElementById('edit-client-phone').value.trim(),
+    client_email: document.getElementById('edit-client-email').value.trim(),
+    notes: document.getElementById('edit-notes').value.trim(),
+    price: parseFloat(document.getElementById('edit-price').value) || 0,
+  };
+
+  if (barberEl && barberEl.value) payload.barber = parseInt(barberEl.value);
+
+  if (!payload.client_name) {
+    errEl.textContent = 'El nombre del cliente es obligatorio.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  fetch(`/api/admin/bookings/${id}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json().then(data => ({ ok: res.ok, data })))
+  .then(({ ok, data }) => {
+    if (!ok) {
+      errEl.textContent = data.error || 'Error al guardar los cambios.';
+      errEl.classList.remove('hidden');
+    } else {
+      closeEditModal();
+      loadBookings();
+    }
+  })
+  .catch(err => {
+    errEl.textContent = 'Error de conexión: ' + err;
+    errEl.classList.remove('hidden');
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Guardar Cambios';
+  });
+}
+
+// ─── MODAL REAGENDAR ──────────────────────────────────────────────────────────
+function openRescheduleModal(id, clientName, currentDate, currentTime) {
+  document.getElementById('reschedule-booking-id').value = id;
+  document.getElementById('reschedule-client-name').textContent = clientName;
+  document.getElementById('reschedule-current-datetime').textContent = `${currentDate} a las ${currentTime}`;
+  document.getElementById('reschedule-date').value = currentDate;
+  document.getElementById('reschedule-time').value = currentTime;
+  document.getElementById('reschedule-error').classList.add('hidden');
+  document.getElementById('reschedule-modal').classList.remove('hidden');
+}
+
+function closeRescheduleModal() {
+  document.getElementById('reschedule-modal').classList.add('hidden');
+}
+
+function submitReschedule() {
+  const id = document.getElementById('reschedule-booking-id').value;
+  const btn = document.getElementById('reschedule-submit-btn');
+  const errEl = document.getElementById('reschedule-error');
+  errEl.classList.add('hidden');
+
+  const newDate = document.getElementById('reschedule-date').value;
+  const newTime = document.getElementById('reschedule-time').value;
+
+  if (!newDate || !newTime) {
+    errEl.textContent = 'Debes seleccionar una fecha y hora.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Reagendando...';
+
+  fetch(`/api/admin/bookings/${id}/reschedule/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify({ date: newDate, time: newTime })
+  })
+  .then(res => res.json().then(data => ({ ok: res.ok, data })))
+  .then(({ ok, data }) => {
+    if (!ok) {
+      errEl.textContent = data.error || 'No se pudo reagendar. Verifica que no haya conflicto de horario.';
+      errEl.classList.remove('hidden');
+    } else {
+      closeRescheduleModal();
+      loadBookings();
+    }
+  })
+  .catch(err => {
+    errEl.textContent = 'Error de conexión: ' + err;
+    errEl.classList.remove('hidden');
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Confirmar Reagendo';
+  });
+}
 </script>
 {% endblock %}

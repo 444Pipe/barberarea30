@@ -434,17 +434,29 @@ def admin_booking_detail_view(request, booking_id):
                 booking.barber.total_cuts += 1
                 booking.barber.save(update_fields=['total_cuts'])
 
-        # Allow updating status, barber, notes
+        # Edición de campos básicos: permitida a superadmin y operational_admin (Frank)
+        is_operational_or_super = profile and profile.role in ('superadmin', 'operational_admin')
+
         if 'status' in data:
             booking.status = data['status']
-        if 'barber' in data:
+        if 'barber' in data and is_operational_or_super:
             booking.barber_id = data['barber']
         if 'notes' in data:
             booking.notes = data['notes']
-        if 'date' in data:
+        if 'date' in data and is_operational_or_super:
             booking.date = data['date']
-        if 'time' in data:
+        if 'time' in data and is_operational_or_super:
             booking.time = data['time']
+        if 'client_name' in data and is_operational_or_super:
+            booking.client_name = data['client_name']
+        if 'client_phone' in data and is_operational_or_super:
+            booking.client_phone = data['client_phone']
+        if 'client_email' in data and is_operational_or_super:
+            booking.client_email = data['client_email']
+        if 'service' in data and is_operational_or_super:
+            booking.service_id = data['service']
+        if 'price' in data and is_operational_or_super:
+            booking.price = data['price']
 
         booking.save()
         
@@ -469,6 +481,83 @@ def admin_booking_detail_view(request, booking_id):
             return Response({'error': 'Solo los super administradores pueden eliminar reservas permanentemente.'}, status=403)
         booking.delete()
         return Response({'ok': True}, status=204)
+
+@api_view(['POST'])
+@permission_classes([IsBarberOrAbove])
+def admin_reschedule_booking_view(request, booking_id):
+    """POST /api/admin/bookings/{id}/reschedule/ — Reagendar fecha y/u hora de una reserva."""
+    profile = getattr(request.user, 'profile', None)
+    is_operational_or_super = profile and profile.role in ('superadmin', 'operational_admin')
+    if not is_operational_or_super:
+        return Response({'error': 'Solo Franko y los super administradores pueden reagendar reservas.'}, status=403)
+
+    try:
+        booking = Booking.objects.select_related('barber', 'service').get(pk=booking_id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Reserva no encontrada'}, status=404)
+
+    if booking.status == 'completed':
+        return Response({'error': 'No se puede reagendar una reserva ya completada.'}, status=400)
+    if booking.status == 'cancelled':
+        return Response({'error': 'No se puede reagendar una reserva cancelada.'}, status=400)
+
+    new_date = request.data.get('date', str(booking.date))
+    new_time = request.data.get('time', booking.time.strftime('%H:%M'))
+
+    # Validar conflictos de horario (overlap)
+    if booking.barber:
+        from datetime import datetime as _dt, timedelta
+        try:
+            req_time = _dt.strptime(new_time, '%H:%M').time()
+            req_date = _dt.strptime(new_date, '%Y-%m-%d').date()
+            req_start = _dt.combine(req_date, req_time)
+            req_end = req_start + timedelta(minutes=booking.duration_minutes or 60)
+
+            conflict_qs = Booking.objects.filter(
+                barber=booking.barber,
+                date=req_date,
+                status__in=['pending', 'confirmed'],
+            ).exclude(pk=booking.pk)
+
+            for bk in conflict_qs:
+                bk_start = _dt.combine(bk.date, bk.time)
+                bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+                if req_start < bk_end and req_end > bk_start:
+                    return Response({
+                        'ok': False,
+                        'error': (
+                            f'{booking.barber.display_name} ya tiene una cita que se cruza con las '
+                            f'{new_time} el {new_date}. Por favor elige otra hora.'
+                        )
+                    }, status=409)
+        except (ValueError, TypeError) as e:
+            return Response({'error': f'Formato de fecha u hora inválido: {e}'}, status=400)
+
+    old_date = str(booking.date)
+    old_time = booking.time.strftime('%H:%M')
+
+    booking.date = new_date
+    booking.time = new_time
+    booking.save(update_fields=['date', 'time', 'updated_at'])
+
+    # Registrar en auditoría
+    if profile and profile.is_admin:
+        try:
+            from apps.analytics.models import log_audit
+            log_audit(
+                user=request.user,
+                action='update',
+                obj=booking,
+                changes={'date': [old_date, new_date], 'time': [old_time, new_time]},
+                request=request,
+                extra_data={'msg': f'Reagendó la cita de {booking.client_name} de {old_date} {old_time} → {new_date} {new_time}'}
+            )
+        except Exception:
+            pass
+
+    serializer = BookingAdminSerializer(booking)
+    return Response({'ok': True, 'booking': serializer.data})
+
 
 @api_view(['GET'])
 @permission_classes([IsAdminOrAbove])
