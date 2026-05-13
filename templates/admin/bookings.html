@@ -1194,10 +1194,20 @@ function submitReschedule() {
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
     body: JSON.stringify({ date: newDate, time: newTime })
   })
-  .then(res => res.json().then(data => ({ ok: res.ok, data })))
-  .then(({ ok, data }) => {
+  .then(res => {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      // El servidor devolvió HTML (error 500 de Django)
+      return res.text().then(html => {
+        throw new Error(`Error del servidor (${res.status}). Contacta soporte.`);
+      });
+    }
+    return res.json().then(data => ({ ok: res.ok, status: res.status, data }));
+  })
+  .then(({ ok, status, data }) => {
     if (!ok) {
-      errEl.textContent = data.error || 'No se pudo reagendar. Verifica que no haya conflicto de horario.';
+      const msg = data.error || data.detail || data.message || `Error ${status}: no se pudo reagendar.`;
+      errEl.textContent = msg;
       errEl.classList.remove('hidden');
     } else {
       closeRescheduleModal();
@@ -1205,7 +1215,7 @@ function submitReschedule() {
     }
   })
   .catch(err => {
-    errEl.textContent = 'Error de conexión: ' + err;
+    errEl.textContent = String(err);
     errEl.classList.remove('hidden');
   })
   .finally(() => {
