@@ -185,9 +185,10 @@ function filterCalendar() {
   const active = [...document.querySelectorAll('.barber-filter-chip.active')].map(c => c.dataset.barber);
   const showAll = active.includes('all');
 
-  calendar.removeAllEvents();
   const filtered = showAll ? allEvents : allEvents.filter(e => active.includes(String(e.extendedProps.barber)));
-  filtered.forEach(e => calendar.addEvent(e));
+  
+  calendar.removeAllEventSources();
+  calendar.addEventSource(filtered);
 }
 
 function openModal(data) {
