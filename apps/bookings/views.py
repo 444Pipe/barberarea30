@@ -226,8 +226,8 @@ def create_booking_view(request):
                 from django.db import connection
                 from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
                 send_booking_confirmation_email(booking)
-                # Deshabilitamos la notificación global de admin porque Hostinger la reenvía a todos los barberos
-                # send_admin_new_booking_notification(booking)
+                # Enviar notificación al admin local directamente para evitar el reenviador de Hostinger
+                send_admin_new_booking_notification(booking)
                 send_barber_new_booking_notification(booking)
             except Exception as e:
                 print("Error enviando email:", e)
@@ -726,10 +726,9 @@ def client_booking_detail_view(request, signed_id):
                         from django.conf import settings
                         send_barber_cancellation_notification(bk)
                         
-                        # Deshabilitado: Evita notificar a todos por los reenviadores de Hostinger
-                        # from django.contrib.auth.models import User
-                        # admin_emails = list(...)
-                        # if admin_emails: ...
+                        # Usar directamente el correo del local para evitar reenvíos masivos de Hostinger
+                        admin_emails = ['localarea30barberclub@gmail.com']
+                        if admin_emails:
                     except Exception as e:
                         print("Error enviando correos de cancelación:", e)
                     finally:

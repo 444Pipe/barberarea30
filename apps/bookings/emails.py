@@ -71,9 +71,8 @@ def send_admin_new_booking_notification(booking):
     from django.core.mail import send_mail
     from django.conf import settings as dj_settings
     
-    admin_email = getattr(dj_settings, 'EMAIL_ADMIN', '')
-    if not admin_email:
-        return
+    # Enviar solo al correo del local para evitar que Hostinger lo reenvíe a todos
+    admin_email = 'localarea30barberclub@gmail.com'
         
     subject = f"Nueva Reserva: {booking.client_name} - {booking.date}"
     message = (
