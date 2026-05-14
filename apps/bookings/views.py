@@ -226,7 +226,8 @@ def create_booking_view(request):
                 from django.db import connection
                 from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
                 send_booking_confirmation_email(booking)
-                send_admin_new_booking_notification(booking)
+                # Deshabilitamos la notificación global de admin porque Hostinger la reenvía a todos los barberos
+                # send_admin_new_booking_notification(booking)
                 send_barber_new_booking_notification(booking)
             except Exception as e:
                 print("Error enviando email:", e)
@@ -725,37 +726,10 @@ def client_booking_detail_view(request, signed_id):
                         from django.conf import settings
                         send_barber_cancellation_notification(bk)
                         
-                        from django.contrib.auth.models import User
-                        admin_emails = list(
-                            User.objects.filter(
-                                profile__role__in=['admin', 'operational_admin', 'superadmin'],
-                                email__isnull=False
-                            ).exclude(email='').values_list('email', flat=True)
-                        )
-                        admin_email_setting = getattr(settings, 'EMAIL_ADMIN', '')
-                        if admin_email_setting and admin_email_setting not in admin_emails:
-                            admin_emails.append(admin_email_setting)
-                            
-                        if admin_emails:
-                            from django.core.mail import send_mail
-                            from django.conf import settings as dj_settings
-                            try:
-                                send_mail(
-                                    subject=f'⚠️ Cliente canceló cita — {bk.client_name}',
-                                    message=(
-                                        f'{bk.client_name} ha cancelado su reserva.\n'
-                                        f'Fecha: {bk.date}\n'
-                                        f'Hora: {bk.time}\n'
-                                        f'Servicio: {bk.service.name if bk.service else "-"}\n'
-                                        f'Barbero: {bk.barber.display_name if bk.barber else "-"}\n\n'
-                                        f'Ingresa al panel para verificar.'
-                                    ),
-                                    from_email=dj_settings.DEFAULT_FROM_EMAIL,
-                                    recipient_list=admin_emails,
-                                    fail_silently=True,
-                                )
-                            except Exception:
-                                pass
+                        # Deshabilitado: Evita notificar a todos por los reenviadores de Hostinger
+                        # from django.contrib.auth.models import User
+                        # admin_emails = list(...)
+                        # if admin_emails: ...
                     except Exception as e:
                         print("Error enviando correos de cancelación:", e)
                     finally:
