@@ -729,6 +729,25 @@ def client_booking_detail_view(request, signed_id):
                         # Usar directamente el correo del local para evitar reenvíos masivos de Hostinger
                         admin_emails = ['localarea30barberclub@gmail.com']
                         if admin_emails:
+                            from django.core.mail import send_mail
+                            from django.conf import settings as dj_settings
+                            try:
+                                send_mail(
+                                    subject=f'⚠️ Cliente canceló cita — {bk.client_name}',
+                                    message=(
+                                        f'{bk.client_name} ha cancelado su reserva.\n'
+                                        f'Fecha: {bk.date}\n'
+                                        f'Hora: {bk.time}\n'
+                                        f'Servicio: {bk.service.name if bk.service else "-"}\n'
+                                        f'Barbero: {bk.barber.display_name if bk.barber else "-"}\n\n'
+                                        f'Ingresa al panel para verificar.'
+                                    ),
+                                    from_email=dj_settings.DEFAULT_FROM_EMAIL,
+                                    recipient_list=admin_emails,
+                                    fail_silently=True,
+                                )
+                            except Exception:
+                                pass
                     except Exception as e:
                         print("Error enviando correos de cancelación:", e)
                     finally:
