@@ -38,15 +38,22 @@ DATABASES = {
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Estos deben ser False localmente (si no usas HTTPS)
 SESSION_COOKIE_SECURE = not (IS_LOCAL or DEBUG)
 CSRF_COOKIE_SECURE = not (IS_LOCAL or DEBUG)
 
-CSRF_TRUSTED_ORIGINS = _split_env(os.environ.get(
+_raw_csrf = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
     'https://www.area30barberclub.com,https://area30barberclub.com,https://barberarea30-production.up.railway.app,http://127.0.0.1:8000,http://localhost:8000'
-))
+)
+CSRF_TRUSTED_ORIGINS = []
+for origin in _split_env(_raw_csrf):
+    if not origin.startswith('http://') and not origin.startswith('https://'):
+        CSRF_TRUSTED_ORIGINS.append(f'https://{origin}')
+    else:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 
 # ── Static files (WhiteNoise) ───────────────────────────────────
 # STATIC_ROOT y STATICFILES_STORAGE ya vienen de base.py
