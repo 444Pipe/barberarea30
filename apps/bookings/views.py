@@ -220,13 +220,24 @@ def create_booking_view(request):
             duration_minutes=service.duration_minutes,
         )
 
-        try:
-            from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
-            send_booking_confirmation_email(booking)
-            send_admin_new_booking_notification(booking)
-            send_barber_new_booking_notification(booking)
-        except Exception as e:
-            print("Error enviando email:", e)
+        import threading
+        def send_emails_async():
+            try:
+                from django.db import connection
+                from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
+                send_booking_confirmation_email(booking)
+                send_admin_new_booking_notification(booking)
+                send_barber_new_booking_notification(booking)
+            except Exception as e:
+                print("Error enviando email:", e)
+            finally:
+                try:
+                    from django.db import connection
+                    connection.close()
+                except Exception:
+                    pass
+
+        threading.Thread(target=send_emails_async).start()
 
         return Response({
             'ok': True,
@@ -703,43 +714,58 @@ def client_booking_detail_view(request, signed_id):
                     }
                 )
                 
-                # Notificar al barbero por email
-                from apps.bookings.emails import send_barber_cancellation_notification, _send_html_email
-                from django.conf import settings
-                send_barber_cancellation_notification(booking)
-                
-                # Notificar también a todos los admins/operational_admins por email
-                from django.contrib.auth.models import User
-                admin_emails = list(
-                    User.objects.filter(
-                        profile__role__in=['admin', 'operational_admin', 'superadmin'],
-                        email__isnull=False
-                    ).exclude(email='').values_list('email', flat=True)
-                )
-                admin_email_setting = getattr(settings, 'EMAIL_ADMIN', '')
-                if admin_email_setting and admin_email_setting not in admin_emails:
-                    admin_emails.append(admin_email_setting)
-                    
-                if admin_emails:
-                    from django.core.mail import send_mail
-                    from django.conf import settings as dj_settings
+                import threading
+                def send_cancellation_emails_async(bk_id):
                     try:
-                        send_mail(
-                            subject=f'⚠️ Cliente canceló cita — {booking.client_name}',
-                            message=(
-                                f'{booking.client_name} ha cancelado su reserva.\n'
-                                f'Fecha: {booking.date}\n'
-                                f'Hora: {booking.time}\n'
-                                f'Servicio: {booking.service.name if booking.service else "-"}\n'
-                                f'Barbero: {booking.barber.display_name if booking.barber else "-"}\n\n'
-                                f'Ingresa al panel para verificar.'
-                            ),
-                            from_email=dj_settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=admin_emails,
-                            fail_silently=True,
+                        from django.db import connection
+                        from apps.bookings.models import Booking
+                        bk = Booking.objects.get(pk=bk_id)
+                        
+                        from apps.bookings.emails import send_barber_cancellation_notification, _send_html_email
+                        from django.conf import settings
+                        send_barber_cancellation_notification(bk)
+                        
+                        from django.contrib.auth.models import User
+                        admin_emails = list(
+                            User.objects.filter(
+                                profile__role__in=['admin', 'operational_admin', 'superadmin'],
+                                email__isnull=False
+                            ).exclude(email='').values_list('email', flat=True)
                         )
-                    except Exception:
-                        pass
+                        admin_email_setting = getattr(settings, 'EMAIL_ADMIN', '')
+                        if admin_email_setting and admin_email_setting not in admin_emails:
+                            admin_emails.append(admin_email_setting)
+                            
+                        if admin_emails:
+                            from django.core.mail import send_mail
+                            from django.conf import settings as dj_settings
+                            try:
+                                send_mail(
+                                    subject=f'⚠️ Cliente canceló cita — {bk.client_name}',
+                                    message=(
+                                        f'{bk.client_name} ha cancelado su reserva.\n'
+                                        f'Fecha: {bk.date}\n'
+                                        f'Hora: {bk.time}\n'
+                                        f'Servicio: {bk.service.name if bk.service else "-"}\n'
+                                        f'Barbero: {bk.barber.display_name if bk.barber else "-"}\n\n'
+                                        f'Ingresa al panel para verificar.'
+                                    ),
+                                    from_email=dj_settings.DEFAULT_FROM_EMAIL,
+                                    recipient_list=admin_emails,
+                                    fail_silently=True,
+                                )
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        print("Error enviando correos de cancelación:", e)
+                    finally:
+                        try:
+                            from django.db import connection
+                            connection.close()
+                        except Exception:
+                            pass
+                            
+                threading.Thread(target=send_cancellation_emails_async, args=(booking.id,)).start()
                 
                 messages.success(request, "Tu reserva ha sido cancelada correctamente. Ya notificamos a tu barbero.")
             else:
