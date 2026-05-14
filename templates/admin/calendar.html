@@ -70,19 +70,56 @@ let currentBookingId = null;
 document.addEventListener('DOMContentLoaded', function() {
   // Load barbers for filter if container exists
   if (document.getElementById('barber-filters')) {
+    const container = document.getElementById('barber-filters');
+    const allChip = container.querySelector('[data-barber="all"]');
+
+    // Listener for "Todos"
+    if (allChip) {
+      allChip.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Activate "Todos", deactivate all others
+        allChip.classList.add('active');
+        allChip.querySelector('input').checked = true;
+        
+        container.querySelectorAll('.barber-filter-chip:not([data-barber="all"])').forEach(c => {
+          c.classList.remove('active');
+          c.querySelector('input').checked = false;
+        });
+        filterCalendar();
+      });
+    }
+
     fetch('/api/barbers/')
       .then(r => r.json())
       .then(barbers => {
-        const container = document.getElementById('barber-filters');
         barbers.forEach(b => {
           const label = document.createElement('label');
-          label.className = 'barber-filter-chip active';
+          label.className = 'barber-filter-chip'; // Start inactive if "Todos" is active
           label.dataset.barber = b.id;
           label.style.setProperty('--chip-color', b.color_tag);
-          label.innerHTML = `<input type="checkbox" checked class="hidden">
+          label.innerHTML = `<input type="checkbox" class="hidden">
             <span class="w-2 h-2 rounded-full inline-block mr-1" style="background: ${b.color_tag}"></span>${b.display_name}`;
-          label.addEventListener('click', () => {
+          
+          label.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Deactivate "Todos"
+            if (allChip) {
+              allChip.classList.remove('active');
+              allChip.querySelector('input').checked = false;
+            }
+            
+            // Toggle current chip
             label.classList.toggle('active');
+            const checkbox = label.querySelector('input');
+            checkbox.checked = label.classList.contains('active');
+
+            // If no chips are active, reactivate "Todos"
+            const anyActive = container.querySelectorAll('.barber-filter-chip.active').length > 0;
+            if (!anyActive && allChip) {
+              allChip.classList.add('active');
+              allChip.querySelector('input').checked = true;
+            }
+            
             filterCalendar();
           });
           container.appendChild(label);
