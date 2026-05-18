@@ -50,6 +50,64 @@
   <link rel="stylesheet" href="{% static 'css/animations.css' %}">
 
   <style>
+    /* ───── Splash Screen (pantalla de carga inicial) ───── */
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at center, #0d2a4d 0%, #061427 70%, #03101f 100%);
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+
+    #splash-screen.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    #splash-screen .splash-logo {
+      width: clamp(160px, 28vw, 280px);
+      height: auto;
+      animation: splashPulse 1.8s ease-in-out infinite;
+      filter: drop-shadow(0 0 24px rgba(212, 175, 55, 0.35));
+    }
+
+    #splash-screen .splash-bar {
+      position: absolute;
+      bottom: 18%;
+      width: clamp(120px, 18vw, 200px);
+      height: 2px;
+      background: rgba(212, 175, 55, 0.18);
+      overflow: hidden;
+      border-radius: 2px;
+    }
+
+    #splash-screen .splash-bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, #D4AF37, transparent);
+      animation: splashSlide 1.4s ease-in-out infinite;
+    }
+
+    @keyframes splashPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.85; }
+    }
+
+    @keyframes splashSlide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
+    body.splash-active {
+      overflow: hidden;
+    }
+
     /* ───── Marquee (banda de valores con movimiento lento) ───── */
     .marquee {
       overflow: hidden;
@@ -192,7 +250,37 @@
   </style>
 </head>
 
-<body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
+<body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet splash-active">
+
+  <!-- Splash Screen / Pantalla de Carga -->
+  <div id="splash-screen" role="status" aria-label="Cargando Área 30 Barber Club">
+    <img src="{% static 'images/AREA 30.png' %}" alt="Área 30 Barber Club" class="splash-logo">
+    <div class="splash-bar" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    (function () {
+      var splash = document.getElementById('splash-screen');
+      if (!splash) return;
+
+      var hidden = false;
+      function hideSplash() {
+        if (hidden) return;
+        hidden = true;
+        splash.classList.add('is-hidden');
+        document.body.classList.remove('splash-active');
+        setTimeout(function () { splash.remove(); }, 700);
+      }
+
+      if (document.readyState === 'complete') {
+        setTimeout(hideSplash, 300);
+      } else {
+        window.addEventListener('load', function () { setTimeout(hideSplash, 300); });
+      }
+      // Safety net: never block the user more than 5s
+      setTimeout(hideSplash, 5000);
+    })();
+  </script>
 
   <!-- Navegación -->
   <nav class="fixed w-full top-0 z-50 bg-jet/80 backdrop-blur-md border-b border-gold/10 transition-all duration-500"
