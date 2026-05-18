@@ -1,0 +1,534 @@
+/* ============================================================
+   Área 30 — Sistema de animaciones sutiles y elegantes
+   Usar: enlazar este archivo y añadir clases utility al markup.
+   ============================================================ */
+
+:root {
+  --a30-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --a30-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --a30-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --a30-dur-fast: 200ms;
+  --a30-dur-base: 350ms;
+  --a30-dur-slow: 700ms;
+  --a30-dur-slower: 900ms;
+  --a30-gold: #D4AF37;
+  --a30-gold-soft: rgba(212, 175, 55, 0.35);
+  --a30-shadow-gold: 0 12px 32px -12px rgba(212, 175, 55, 0.35);
+}
+
+/* ============================================================
+   1 · Base globals — smooth scroll + accesibilidad
+   ============================================================ */
+
+html { scroll-behavior: smooth; }
+
+*:focus-visible {
+  outline: 2px solid var(--a30-gold);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+a, button, input, select, textarea {
+  transition: color var(--a30-dur-fast) var(--a30-ease-out),
+              background-color var(--a30-dur-fast) var(--a30-ease-out),
+              border-color var(--a30-dur-fast) var(--a30-ease-out),
+              opacity var(--a30-dur-fast) var(--a30-ease-out);
+}
+
+/* Selección de texto consistente */
+::selection { background: var(--a30-gold); color: #0A0A0A; }
+
+/* ============================================================
+   2 · Page enter — fade suave al cargar
+   ============================================================ */
+
+@keyframes a30PageIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+body { animation: a30PageIn 600ms var(--a30-ease-out) both; }
+
+/* ============================================================
+   3 · Scroll-reveal utilities
+   Necesitan animations.js (IntersectionObserver) → añade .is-visible
+   ============================================================ */
+
+.reveal-up,
+.reveal-fade,
+.reveal-stagger > *,
+.reveal-scale {
+  will-change: opacity, transform;
+}
+
+.reveal-up {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition: opacity var(--a30-dur-slow) var(--a30-ease-out),
+              transform var(--a30-dur-slow) var(--a30-ease-out);
+}
+.reveal-up.is-visible { opacity: 1; transform: translate3d(0, 0, 0); }
+
+.reveal-fade {
+  opacity: 0;
+  transition: opacity var(--a30-dur-slow) var(--a30-ease-out);
+}
+.reveal-fade.is-visible { opacity: 1; }
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity var(--a30-dur-slow) var(--a30-ease-out),
+              transform var(--a30-dur-slow) var(--a30-ease-out);
+}
+.reveal-scale.is-visible { opacity: 1; transform: scale(1); }
+
+/* Stagger — hijos aparecen escalonados (50ms entre cada uno) */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition: opacity 650ms var(--a30-ease-out),
+              transform 650ms var(--a30-ease-out);
+}
+.reveal-stagger.is-visible > *      { opacity: 1; transform: translate3d(0, 0, 0); }
+.reveal-stagger.is-visible > *:nth-child(1)  { transition-delay: 0ms;   }
+.reveal-stagger.is-visible > *:nth-child(2)  { transition-delay: 60ms;  }
+.reveal-stagger.is-visible > *:nth-child(3)  { transition-delay: 120ms; }
+.reveal-stagger.is-visible > *:nth-child(4)  { transition-delay: 180ms; }
+.reveal-stagger.is-visible > *:nth-child(5)  { transition-delay: 240ms; }
+.reveal-stagger.is-visible > *:nth-child(6)  { transition-delay: 300ms; }
+.reveal-stagger.is-visible > *:nth-child(7)  { transition-delay: 360ms; }
+.reveal-stagger.is-visible > *:nth-child(8)  { transition-delay: 420ms; }
+.reveal-stagger.is-visible > *:nth-child(9)  { transition-delay: 480ms; }
+.reveal-stagger.is-visible > *:nth-child(10) { transition-delay: 540ms; }
+.reveal-stagger.is-visible > *:nth-child(11) { transition-delay: 600ms; }
+.reveal-stagger.is-visible > *:nth-child(12) { transition-delay: 660ms; }
+
+/* Text reveal por línea — máscara que sube */
+.text-reveal-line {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  line-height: 1;
+}
+.text-reveal-line > span {
+  display: inline-block;
+  transform: translateY(110%);
+  transition: transform var(--a30-dur-slower) var(--a30-ease-out);
+}
+.text-reveal-line.is-visible > span { transform: translateY(0); }
+
+/* ============================================================
+   4 · Hover lifts + glows (cards, contenedores)
+   ============================================================ */
+
+.lift-on-hover {
+  transition: transform var(--a30-dur-base) var(--a30-ease-out),
+              box-shadow var(--a30-dur-base) var(--a30-ease-out),
+              border-color var(--a30-dur-base) var(--a30-ease-out);
+  will-change: transform;
+}
+.lift-on-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.55),
+              0 0 0 1px var(--a30-gold-soft);
+}
+
+.glow-on-hover {
+  transition: box-shadow var(--a30-dur-base) var(--a30-ease-out),
+              border-color var(--a30-dur-base) var(--a30-ease-out);
+}
+.glow-on-hover:hover {
+  box-shadow: var(--a30-shadow-gold), 0 0 0 1px var(--a30-gold-soft);
+}
+
+/* Card-lift: combo lift + glow + gold border */
+.card-lift {
+  transition: transform var(--a30-dur-base) var(--a30-ease-out),
+              box-shadow var(--a30-dur-base) var(--a30-ease-out),
+              border-color var(--a30-dur-base) var(--a30-ease-out);
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.6),
+              0 8px 25px -10px rgba(212, 175, 55, 0.18);
+}
+
+/* ============================================================
+   5 · Shine sweep en botones
+   Se aplica automáticamente a .gold-btn (que ya existe en el sitio)
+   y a cualquier botón con .shine-btn
+   ============================================================ */
+
+.gold-btn,
+.shine-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.gold-btn::after,
+.shine-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  transition: left 800ms var(--a30-ease-out);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gold-btn:hover::after,
+.shine-btn:hover::after {
+  left: 125%;
+}
+
+/* Ensure original .gold-btn content stays above shine */
+.gold-btn > * { position: relative; z-index: 2; }
+
+/* ============================================================
+   6 · Image / video zoom on hover
+   Wrap con .zoom-img y dentro <img> o <video>
+   ============================================================ */
+
+.zoom-img { overflow: hidden; }
+
+.zoom-img > img,
+.zoom-img > video,
+.zoom-img > picture > img {
+  transition: transform 800ms var(--a30-ease-out);
+  will-change: transform;
+}
+
+.zoom-img:hover > img,
+.zoom-img:hover > video,
+.zoom-img:hover > picture > img {
+  transform: scale(1.03);
+}
+
+/* ============================================================
+   7 · Underline animado (links elegantes)
+   ============================================================ */
+
+.link-underline {
+  position: relative;
+  display: inline-block;
+  text-decoration: none;
+}
+.link-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--a30-dur-base) var(--a30-ease-out);
+}
+.link-underline:hover::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+/* ============================================================
+   8 · Pulse / loading utilities
+   ============================================================ */
+
+@keyframes a30Pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+.a30-pulse { animation: a30Pulse 1.8s var(--a30-ease-in-out) infinite; }
+
+@keyframes a30Spin {
+  to { transform: rotate(360deg); }
+}
+.a30-spin { animation: a30Spin 800ms linear infinite; }
+
+@keyframes a30Shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.a30-skeleton {
+  background: linear-gradient(90deg, #131313 0%, #1f1f1f 50%, #131313 100%);
+  background-size: 200% 100%;
+  animation: a30Shimmer 1.6s linear infinite;
+}
+
+/* ============================================================
+   9 · Error shake (para feedback de formularios)
+   ============================================================ */
+
+@keyframes a30Shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  40%      { transform: translateX(6px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+.a30-shake { animation: a30Shake 420ms var(--a30-ease-out); }
+
+/* ============================================================
+   10 · Float — decorativo, para íconos / ornamentos
+   ============================================================ */
+
+@keyframes a30Float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.a30-float { animation: a30Float 4s var(--a30-ease-in-out) infinite; }
+
+/* ============================================================
+   12 · Button press feedback — spring scale
+   Aplica a botones marcados. JS añade .is-pressed on pointerdown
+   y .a30-spring-release on pointerup → overshoot natural.
+   ============================================================ */
+
+.gold-btn,
+.ripple-btn,
+.filter-btn,
+.like-btn,
+.star-btn {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.gold-btn.is-pressed,
+.ripple-btn.is-pressed,
+.filter-btn.is-pressed {
+  transform: scale(0.96);
+  transition: transform 80ms var(--a30-ease-out);
+}
+
+@keyframes a30SpringRelease {
+  0%   { transform: scale(0.96); }
+  55%  { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+.gold-btn.a30-spring-release,
+.ripple-btn.a30-spring-release,
+.filter-btn.a30-spring-release {
+  animation: a30SpringRelease 420ms var(--a30-ease-spring);
+}
+
+/* Like-btn (corazón / huella en reviews) — heartbeat al pasar a .liked */
+.like-btn { transition: transform 180ms var(--a30-ease-spring); }
+.like-btn:active { transform: scale(0.88); }
+@keyframes a30Heartbeat {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.28); }
+  60%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.like-btn.liked { animation: a30Heartbeat 620ms var(--a30-ease-spring); }
+
+/* Star-btn (rate.html) — pop con torsión al activarse */
+.star-btn { transition: transform 180ms var(--a30-ease-spring); }
+.star-btn:active { transform: scale(0.9); }
+@keyframes a30StarPop {
+  0%   { transform: scale(1) rotate(0deg); }
+  45%  { transform: scale(1.35) rotate(8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.star-btn.active { animation: a30StarPop 520ms var(--a30-ease-spring); }
+
+/* ============================================================
+   13 · Ripple ink — Material-style energético
+   Inyectado por animations.js como <span class="a30-ripple-ink">.
+   El botón ya debe ser position relative + overflow hidden
+   (gold-btn ya lo es). Para otros usar .ripple-btn.
+   ============================================================ */
+
+.ripple-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.a30-ripple-ink {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+  transform: scale(0);
+  opacity: 0.55;
+  z-index: 1;
+  animation: a30Ripple 620ms var(--a30-ease-out) forwards;
+}
+
+/* Variante para botones oscuros sobre fondo dorado (poco frecuente) */
+.gold-btn .a30-ripple-ink { background: rgba(10, 10, 10, 0.22); }
+
+@keyframes a30Ripple {
+  to { transform: scale(1); opacity: 0; }
+}
+
+/* ============================================================
+   14 · Magnetic CTA — opt-in con .magnetic-btn
+   JS escribe --magx / --magy en pointermove (max ±8px).
+   Usa la propiedad `translate` (separada de transform) para
+   no chocar con la animación de spring release.
+   ============================================================ */
+
+.magnetic-btn {
+  translate: var(--magx, 0) var(--magy, 0);
+  transition: translate 220ms var(--a30-ease-out);
+}
+
+/* Ícono interno que se desliza al hover (opt-in con .icon-slide).
+   Coloca el ícono dentro de un <span class="btn-icon">. */
+.icon-slide .btn-icon {
+  display: inline-block;
+  transition: transform var(--a30-dur-base) var(--a30-ease-spring);
+  will-change: transform;
+}
+.icon-slide:hover .btn-icon { transform: translateX(6px); }
+.icon-slide:active .btn-icon { transform: translateX(2px); }
+
+/* ============================================================
+   15 · Time-slot — pop-in escalonado + selección energética
+   Selectores ya existentes en booking.html (no requiere HTML new).
+   ============================================================ */
+
+@keyframes a30PopIn {
+  from { opacity: 0; transform: scale(0.85) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.time-slot {
+  animation: a30PopIn 380ms var(--a30-ease-spring) both;
+  transition: transform 220ms var(--a30-ease-spring),
+              background-color 220ms var(--a30-ease-out),
+              border-color 220ms var(--a30-ease-out),
+              box-shadow 220ms var(--a30-ease-out);
+  will-change: transform;
+}
+
+/* Stagger automático por orden de aparición (hasta 24 slots) */
+.time-slot:nth-child(1)  { animation-delay: 0ms; }
+.time-slot:nth-child(2)  { animation-delay: 22ms; }
+.time-slot:nth-child(3)  { animation-delay: 44ms; }
+.time-slot:nth-child(4)  { animation-delay: 66ms; }
+.time-slot:nth-child(5)  { animation-delay: 88ms; }
+.time-slot:nth-child(6)  { animation-delay: 110ms; }
+.time-slot:nth-child(7)  { animation-delay: 132ms; }
+.time-slot:nth-child(8)  { animation-delay: 154ms; }
+.time-slot:nth-child(9)  { animation-delay: 176ms; }
+.time-slot:nth-child(10) { animation-delay: 198ms; }
+.time-slot:nth-child(11) { animation-delay: 220ms; }
+.time-slot:nth-child(12) { animation-delay: 242ms; }
+.time-slot:nth-child(13) { animation-delay: 264ms; }
+.time-slot:nth-child(14) { animation-delay: 286ms; }
+.time-slot:nth-child(15) { animation-delay: 308ms; }
+.time-slot:nth-child(16) { animation-delay: 330ms; }
+.time-slot:nth-child(17) { animation-delay: 352ms; }
+.time-slot:nth-child(18) { animation-delay: 374ms; }
+.time-slot:nth-child(19) { animation-delay: 396ms; }
+.time-slot:nth-child(20) { animation-delay: 418ms; }
+.time-slot:nth-child(n + 21) { animation-delay: 440ms; }
+
+.time-slot.available:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 10px 22px -10px rgba(34, 197, 94, 0.4);
+}
+.time-slot.available:active { transform: translateY(-1px) scale(0.98); }
+
+@keyframes a30SlotSelect {
+  0%   { transform: scale(1);     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  50%  { transform: scale(1.08);  box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.16); }
+  100% { transform: scale(1);     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+.time-slot.available.selected {
+  animation: a30SlotSelect 520ms var(--a30-ease-spring);
+}
+
+/* ============================================================
+   16 · Barber-card — selección con bounce y halo dorado
+   ============================================================ */
+
+@keyframes a30CardSelect {
+  0%   { transform: translateY(0)    scale(1);    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5); }
+  45%  { transform: translateY(-4px) scale(1.035); box-shadow: 0 0 0 10px rgba(212, 175, 55, 0.14); }
+  100% { transform: translateY(0)    scale(1);    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+}
+.barber-card.selected {
+  animation: a30CardSelect 560ms var(--a30-ease-spring);
+}
+
+/* Press feedback en cualquier tarjeta de barbero */
+.barber-card:active { transform: translateY(0) scale(0.985); }
+
+/* ============================================================
+   17 · Stepper — dots con pulse activo + bounce al completar
+   step-line con flash de relleno al completarse
+   ============================================================ */
+
+@keyframes a30DotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+  50%      { box-shadow: 0 0 0 7px rgba(212, 175, 55, 0.18); }
+}
+.step-dot.active {
+  animation: a30DotPulse 2.1s var(--a30-ease-in-out) infinite;
+}
+
+@keyframes a30DotComplete {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+.step-dot.completed {
+  animation: a30DotComplete 480ms var(--a30-ease-spring);
+}
+
+@keyframes a30LineFill {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);   filter: brightness(0.6); }
+  60%  { box-shadow: 0 0 6px 1px rgba(34, 197, 94, 0.55); filter: brightness(1.1); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);   filter: brightness(1); }
+}
+.step-line.completed {
+  animation: a30LineFill 620ms var(--a30-ease-out);
+}
+
+/* ============================================================
+   18 · Reduced motion — accesibilidad
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal-up,
+  .reveal-fade,
+  .reveal-scale,
+  .reveal-stagger > *,
+  .text-reveal-line > span,
+  .time-slot {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .gold-btn::after,
+  .shine-btn::after,
+  .a30-ripple-ink {
+    display: none !important;
+  }
+
+  .magnetic-btn { translate: 0 0 !important; }
+}

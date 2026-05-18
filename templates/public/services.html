@@ -33,6 +33,7 @@
     }
   </script>
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/animations.css' %}">
 </head>
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
   
@@ -161,5 +162,6 @@
     fabMain.addEventListener('click', () => { fabList.classList.toggle('active'); });
     document.addEventListener('click', (e) => { if (!e.target.closest('.fab-container')) fabList.classList.remove('active'); });
   </script>
+  <script src="{% static 'js/animations.js' %}"></script>
 </body>
 </html>

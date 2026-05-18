@@ -47,6 +47,149 @@
   </script>
 
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/animations.css' %}">
+
+  <style>
+    /* ───── Marquee (banda de valores con movimiento lento) ───── */
+    .marquee {
+      overflow: hidden;
+      background: #111;
+      border-top: 1px solid rgba(212, 175, 55, 0.15);
+      border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+      padding: 1rem 0;
+      position: relative;
+    }
+    .marquee::before,
+    .marquee::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 80px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .marquee::before { left: 0; background: linear-gradient(to right, #111, transparent); }
+    .marquee::after { right: 0; background: linear-gradient(to left, #111, transparent); }
+    .marquee-track {
+      display: flex;
+      gap: 3rem;
+      width: max-content;
+      animation: marqueeScroll 60s linear infinite;
+    }
+    .marquee-track > div {
+      display: flex;
+      align-items: center;
+      gap: 3rem;
+      white-space: nowrap;
+    }
+    .marquee-track span.word {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 1.4rem;
+      color: #F5F5F5;
+      letter-spacing: 0.02em;
+    }
+    .marquee-track span.dot {
+      width: 5px;
+      height: 5px;
+      background: #D4AF37;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    @keyframes marqueeScroll {
+      to { transform: translateX(-50%); }
+    }
+    @media (max-width: 768px) {
+      .marquee-track { gap: 2rem; }
+      .marquee-track > div { gap: 2rem; }
+      .marquee-track span.word { font-size: 1.1rem; }
+    }
+
+    /* ───── Menú compacto de servicios ───── */
+    .services-menu {
+      max-width: 780px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .menu-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: baseline;
+      gap: 1rem;
+      padding: 1.1rem 0;
+      border-bottom: 1px solid rgba(245, 245, 245, 0.06);
+      position: relative;
+      transition: padding 0.4s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s;
+      text-decoration: none;
+      color: inherit;
+    }
+    .menu-row::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 2px;
+      height: 0%;
+      background: #D4AF37;
+      transform: translateY(-50%);
+      transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .menu-row:hover {
+      padding-left: 0.75rem;
+      background: linear-gradient(90deg, rgba(212, 175, 55, 0.04), transparent 70%);
+    }
+    .menu-row:hover::before { height: 65%; }
+    .menu-num {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: #D4AF37;
+      min-width: 2.2rem;
+    }
+    .menu-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 500;
+      font-size: 1.25rem;
+      color: #F5F5F5;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      transition: color 0.3s;
+    }
+    .menu-row:hover .menu-name { color: #D4AF37; }
+    .menu-dots {
+      flex: 1;
+      align-self: end;
+      margin-bottom: 6px;
+      border-bottom: 1px dotted rgba(245, 245, 245, 0.2);
+      min-width: 30px;
+    }
+    .menu-duration {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.68rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(245, 245, 245, 0.45);
+    }
+    .menu-price {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: #D4AF37;
+      min-width: 70px;
+      text-align: right;
+    }
+    .menu-price.text-slate-300 { color: #cbd5e1; }
+    .menu-price.text-purple-400 { color: #c084fc; }
+    @media (max-width: 640px) {
+      .menu-row { grid-template-columns: auto 1fr auto; gap: 0.75rem; padding: 1rem 0; }
+      .menu-dots { display: none; }
+      .menu-name { font-size: 1.05rem; }
+      .menu-duration { display: none; }
+      .menu-price { font-size: 1rem; min-width: 60px; }
+    }
+  </style>
 </head>
 
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
@@ -170,6 +313,28 @@
     </div>
   </section>
 
+  <!-- Marquee de valores -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <div>
+        <span class="word">Precisión</span><span class="dot"></span>
+        <span class="word">Estatus</span><span class="dot"></span>
+        <span class="word">Maestría</span><span class="dot"></span>
+        <span class="word">Discreción</span><span class="dot"></span>
+        <span class="word">Identidad</span><span class="dot"></span>
+        <span class="word">Lujo</span><span class="dot"></span>
+      </div>
+      <div aria-hidden="true">
+        <span class="word">Precisión</span><span class="dot"></span>
+        <span class="word">Estatus</span><span class="dot"></span>
+        <span class="word">Maestría</span><span class="dot"></span>
+        <span class="word">Discreción</span><span class="dot"></span>
+        <span class="word">Identidad</span><span class="dot"></span>
+        <span class="word">Lujo</span><span class="dot"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- El Club -->
   <section id="el-club" class="py-32 px-4 bg-jet relative border-t border-gold/5">
     <div class="max-w-6xl mx-auto">
@@ -234,8 +399,8 @@
       <h2 class="text-5xl md:text-7xl font-serif font-bold text-white tracking-tight mb-20">
         Servicios <span class="italic text-gold font-light">Elite.</span>
       </h2>
-      <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-        <p class="text-smoke/40 text-sm col-span-full py-8">Cargando servicios...</p>
+      <div id="services-grid" class="services-menu">
+        <p class="text-smoke/40 text-sm py-8 text-center">Cargando servicios...</p>
       </div>
       <div class="mt-16">
         <a href="/booking/"
@@ -253,7 +418,7 @@
       <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-48 bg-gold/5 blur-[100px]">
       </div>
     </div>
-    <div class="max-w-4xl mx-auto px-4 text-center relative z-10">
+    <div class="max-w-4xl mx-auto px-4 text-center relative z-10 reveal-stagger">
       <div class="flex items-center justify-center gap-4 mb-6">
         <div class="h-[1px] w-12 bg-gold/40"></div>
         <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold">Nuestros Trabajos</span>
@@ -292,7 +457,7 @@
 
     <div class="max-w-7xl mx-auto">
       <!-- Header -->
-      <div class="text-center mb-20">
+      <div class="text-center mb-20 reveal-stagger">
         <div class="flex items-center justify-center gap-6 mb-6">
           <div class="h-[1px] w-12 bg-gold/40"></div>
           <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold">Opiniones Reales</span>
@@ -328,7 +493,7 @@
     </div>
 
     <div class="max-w-6xl mx-auto relative z-10">
-      <div class="flex items-center gap-6 mb-16">
+      <div class="flex items-center gap-6 mb-16 reveal-up">
         <div class="flex flex-col">
           <span class="text-gold tracking-[0.6em] uppercase text-[0.65rem] font-black mb-2 select-none">// ENCONTRÁNOS
             AQUÍ</span>
@@ -546,69 +711,26 @@
           const priceK = Number(s.price) >= 1000 ? `$${Math.round(Number(s.price) / 1000)}k` : `$${Number(s.price).toLocaleString('es-CO')}`;
 
           const lowerName = s.name.toLowerCase();
-
-          let theme = {
-            borderHover: 'hover:border-gold/60',
-            textHover: 'group-hover:text-gold',
-            text: 'text-gold',
-            shadowHover: 'hover:shadow-[0_0_30px_-5px_rgba(212,175,55,0.15)]',
-            icon: 'text-gold'
-          };
-
+          let priceClass = '';
           if (lowerName.includes('silver') || lowerName.includes('plata')) {
-            theme = {
-              borderHover: 'hover:border-slate-300/60',
-              textHover: 'group-hover:text-slate-200',
-              text: 'text-slate-300',
-              shadowHover: 'hover:shadow-[0_0_30px_-5px_rgba(203,213,225,0.15)]',
-              icon: 'text-slate-300'
-            };
+            priceClass = 'text-slate-300';
           } else if (lowerName.includes('diamond') || lowerName.includes('diamot') || lowerName.includes('diamante') || lowerName.includes('vip')) {
-            theme = {
-              borderHover: 'hover:border-purple-500/60',
-              textHover: 'group-hover:text-purple-400',
-              text: 'text-purple-400',
-              shadowHover: 'hover:shadow-[0_0_30px_-5px_rgba(168,85,247,0.15)]',
-              icon: 'text-purple-500'
-            };
+            priceClass = 'text-purple-400';
           }
 
-          let descHtml = '';
-          if (s.description) {
-            const features = s.description
-              .split(/[\n,]+|\s+y\s+/i)
-              .map(item => item.trim())
-              .filter(item => item.length > 1)
-              .map(f => f.charAt(0).toUpperCase() + f.slice(1));
-
-            descHtml = `
-              <ul class="text-smoke/60 text-[0.75rem] font-light space-y-3 mt-5 pt-5 border-t border-white/5">
-                ${features.map(f => `
-                  <li class="flex items-start gap-2.5">
-                    <svg class="w-3.5 h-3.5 ${theme.icon} shrink-0 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    <span class="leading-relaxed text-smoke/80">${f}</span>
-                  </li>
-                `).join('')}
-              </ul>
-            `;
-          }
+          const num = String(i + 1).padStart(3, '0');
 
           return `
-            <div class="service-card p-12 rounded-sm relative overflow-hidden group fade-in-up ${theme.borderHover} ${theme.shadowHover} visible transition-all duration-500" style="transition-delay: ${i * 100}ms;">
-              <div class="flex justify-between items-start mb-6">
-                <h3 class="text-2xl font-serif text-white ${theme.textHover} transition-colors duration-300">${s.name}</h3>
-                <span class="${theme.text} font-medium tracking-widest">${priceK}</span>
-              </div>
-              <div class="mb-8">
-                <p class="text-smoke/60 font-light text-[0.8rem] mb-2 leading-relaxed tracking-wider uppercase">${s.duration_minutes} minutos</p>
-                ${descHtml}
-              </div>
-              <a href="/booking" class="${theme.text} text-xs tracking-widest uppercase font-bold hover:text-white transition-all flex items-center gap-3 mt-auto group-hover:gap-4">Reservar <span class="text-xl">→</span></a>
-            </div>
+            <a href="/booking" class="menu-row">
+              <span class="menu-num">${num}</span>
+              <h3 class="menu-name">${s.name}</h3>
+              <span class="menu-dots"></span>
+              <span class="menu-duration">${s.duration_minutes} MIN</span>
+              <span class="menu-price ${priceClass}">${priceK}</span>
+            </a>
           `;
         }).join('');
+        if (window.A30Reveal) window.A30Reveal.refresh();
       });
 
     // JS for Suggestion Box
@@ -677,7 +799,7 @@
             : `<p class="text-smoke/25 text-xs italic flex-1">Sin comentario adicional.</p>`;
 
           return `
-            <div class="group bg-jet border border-white/5 hover:border-gold/20 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-500 hover:shadow-[0_8px_40px_-10px_rgba(212,175,55,0.12)]" style="animation-delay:${i * 80}ms">
+            <div class="group card-lift bg-jet border border-white/5 hover:border-gold/20 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-500 hover:shadow-[0_8px_40px_-10px_rgba(212,175,55,0.12)]" style="animation-delay:${i * 80}ms">
               <div class="flex items-center gap-1">${stars}</div>
               ${commentHtml}
               <div class="h-[1px] bg-white/5"></div>
@@ -691,11 +813,13 @@
               </div>
             </div>`;
         }).join('');
+        if (window.A30Reveal) window.A30Reveal.refresh();
       })
       .catch(() => {
         document.getElementById('reviews-loader').style.display = 'none';
       });
   </script>
+  <script src="{% static 'js/animations.js' %}"></script>
 </body>
 
 </html>
