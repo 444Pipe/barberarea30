@@ -27,10 +27,24 @@ from .models import MonthlyROISnapshot, Partner, PartnerInvestment
 def roi_dashboard_view(request):
     """
     Panel de ROI — solo accesible para superadmin (Camilo / Juan David).
-    Muestra inversión inicial, ganancias del mes anterior y saldos pendientes.
+    Muestra inversión inicial, ganancias del mes seleccionado y saldos pendientes.
+
+    Acepta ?year=YYYY&month=M para navegar entre meses. Por defecto muestra el
+    mes en curso, calculado en vivo si aún no hay snapshot consolidado.
     """
     profile = getattr(request.user, 'profile', None)
-    ctx = get_dashboard_context()
+
+    sel_year = request.GET.get('year')
+    sel_month = request.GET.get('month')
+    try:
+        sel_year = int(sel_year) if sel_year else None
+        sel_month = int(sel_month) if sel_month else None
+        if sel_month is not None and not (1 <= sel_month <= 12):
+            sel_year, sel_month = None, None
+    except (TypeError, ValueError):
+        sel_year, sel_month = None, None
+
+    ctx = get_dashboard_context(selected_year=sel_year, selected_month=sel_month)
     ctx.update({
         'user_role': profile.role if profile else 'unknown',
         'user_name': request.user.get_full_name() or request.user.username,

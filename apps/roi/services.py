@@ -38,6 +38,12 @@ from .models import (
 FRANK_DAILY_EXPENSE_DESC = 'Pago Diario: Franko'
 
 
+# Inicio de operatividad del Club. El panel ROI no permite navegar a meses anteriores
+# porque no hay datos reales que reflejar. Si en el futuro arranca una nueva sede o
+# se reinicia el conteo, actualizar esta constante.
+OPERATION_START = (2026, 5)
+
+
 # ─────────────────────────────────────────────────────────
 # Utilidades de rango
 # ─────────────────────────────────────────────────────────
@@ -256,19 +262,55 @@ def delete_snapshots(periods: list, *, force_locked: bool = False) -> dict:
 # Contexto del Dashboard
 # ─────────────────────────────────────────────────────────
 
-def get_dashboard_context() -> dict:
+def _clamp_to_operation_window(year: int, month: int):
+    """
+    Restringe (year, month) al rango [OPERATION_START, mes actual]. Devuelve la
+    tupla ajustada para que la vista nunca intente mostrar un mes anterior al
+    arranque del negocio ni uno futuro sin datos.
+    """
+    from django.utils import timezone
+    now = timezone.localtime(timezone.now())
+    current = (now.year, now.month)
+    candidate = (year, month)
+
+    if candidate < OPERATION_START:
+        return OPERATION_START
+    if candidate > current:
+        return current
+    return candidate
+
+
+def _shift_month(year: int, month: int, delta: int):
+    """Suma `delta` meses a (year, month) y devuelve (y, m)."""
+    idx = year * 12 + (month - 1) + delta
+    return idx // 12, (idx % 12) + 1
+
+
+def get_dashboard_context(selected_year: int = None, selected_month: int = None) -> dict:
     """
     Retorna todos los datos necesarios para renderizar el panel ROI.
-    Si no existe snapshot del mes anterior, calcula las cifras al vuelo (sin guardar).
+
+    Si `selected_year`/`selected_month` no se pasan, usa el mes en curso. El mes
+    pedido se acota al rango [OPERATION_START, mes actual]. Si existe un snapshot
+    consolidado para ese mes se usan sus cifras; si no, se calculan en vivo con
+    `get_month_financials`.
     """
     from django.utils import timezone
     now = timezone.localtime(timezone.now())
 
-    # Mes anterior
-    if now.month == 1:
-        prev_year, prev_month = now.year - 1, 12
+    if selected_year is None or selected_month is None:
+        sel_year, sel_month = now.year, now.month
     else:
-        prev_year, prev_month = now.year, now.month - 1
+        sel_year, sel_month = selected_year, selected_month
+
+    sel_year, sel_month = _clamp_to_operation_window(sel_year, sel_month)
+
+    # Navegación: prev / next acotados al rango operativo.
+    prev_y, prev_m = _shift_month(sel_year, sel_month, -1)
+    next_y, next_m = _shift_month(sel_year, sel_month, +1)
+    can_go_prev = (prev_y, prev_m) >= OPERATION_START
+    can_go_next = (next_y, next_m) <= (now.year, now.month)
+    is_current_month = (sel_year, sel_month) == (now.year, now.month)
 
     # ── Inversión Global ──
     partners = Partner.objects.filter(is_active=True).prefetch_related('investments')
@@ -293,24 +335,24 @@ def get_dashboard_context() -> dict:
 
     total_recovered = total_invested - current_total_pending
 
-    # ── Mes anterior: usar snapshot si está consolidado, sino calcular en vivo ──
-    last_snapshot = MonthlyROISnapshot.objects.filter(
-        year=prev_year, month=prev_month
+    # ── Mes seleccionado: usar snapshot si está consolidado, sino calcular en vivo ──
+    selected_snapshot = MonthlyROISnapshot.objects.filter(
+        year=sel_year, month=sel_month
     ).prefetch_related('partner_shares__partner').first()
 
-    if last_snapshot:
-        prev = {
-            'gross_services': last_snapshot.gross_services,
-            'total_inventory_sales': last_snapshot.total_inventory_sales,
-            'gross_income': last_snapshot.gross_income,
-            'total_commissions': last_snapshot.total_commissions,
-            'total_fixed_expenses': last_snapshot.total_fixed_expenses,
-            'total_operational_expenses': last_snapshot.total_operational_expenses,
-            'total_expenses': last_snapshot.total_expenses,
-            'net_income': last_snapshot.net_income,
+    if selected_snapshot:
+        sel = {
+            'gross_services': selected_snapshot.gross_services,
+            'total_inventory_sales': selected_snapshot.total_inventory_sales,
+            'gross_income': selected_snapshot.gross_income,
+            'total_commissions': selected_snapshot.total_commissions,
+            'total_fixed_expenses': selected_snapshot.total_fixed_expenses,
+            'total_operational_expenses': selected_snapshot.total_operational_expenses,
+            'total_expenses': selected_snapshot.total_expenses,
+            'net_income': selected_snapshot.net_income,
         }
     else:
-        prev = get_month_financials(prev_year, prev_month)
+        sel = get_month_financials(sel_year, sel_month)
 
     # ── Historial (últimos 12) ──
     history = MonthlyROISnapshot.objects.prefetch_related(
@@ -324,23 +366,41 @@ def get_dashboard_context() -> dict:
         'total_recovered': total_recovered,
         'total_pending': current_total_pending,
 
-        # Mes anterior — desglose completo
-        'prev_year': prev_year,
-        'prev_month': prev_month,
-        'prev_month_name': calendar.month_name[prev_month],
-        'prev_gross_services': prev['gross_services'],
-        'prev_inventory': prev['total_inventory_sales'],
-        'prev_gross': prev['gross_income'],
-        'prev_commissions': prev['total_commissions'],
-        'prev_fixed_expenses': prev['total_fixed_expenses'],
-        'prev_operational_expenses': prev['total_operational_expenses'],
-        'prev_expenses': prev['total_expenses'],
-        'prev_net': prev['net_income'],
+        # Mes seleccionado — desglose completo
+        # (alias `prev_*` se mantienen por compatibilidad con el template existente)
+        'sel_year': sel_year,
+        'sel_month': sel_month,
+        'sel_month_name': calendar.month_name[sel_month],
+        'prev_year': sel_year,
+        'prev_month': sel_month,
+        'prev_month_name': calendar.month_name[sel_month],
+        'prev_gross_services': sel['gross_services'],
+        'prev_inventory': sel['total_inventory_sales'],
+        'prev_gross': sel['gross_income'],
+        'prev_commissions': sel['total_commissions'],
+        'prev_fixed_expenses': sel['total_fixed_expenses'],
+        'prev_operational_expenses': sel['total_operational_expenses'],
+        'prev_expenses': sel['total_expenses'],
+        'prev_net': sel['net_income'],
 
-        # Snapshot consolidado (si existe)
-        'last_snapshot': last_snapshot,
+        # Snapshot consolidado (si existe para el mes seleccionado)
+        'last_snapshot': selected_snapshot,
 
-        # Mes actual
+        # Estado del mes seleccionado respecto al calendario
+        'is_current_month': is_current_month,
+        'is_live_month': is_current_month and selected_snapshot is None,
+
+        # Navegación
+        'prev_nav_year': prev_y,
+        'prev_nav_month': prev_m,
+        'next_nav_year': next_y,
+        'next_nav_month': next_m,
+        'can_go_prev': can_go_prev,
+        'can_go_next': can_go_next,
+        'operation_start_year': OPERATION_START[0],
+        'operation_start_month': OPERATION_START[1],
+
+        # Mes actual (calendario, no el seleccionado)
         'current_year': now.year,
         'current_month': now.month,
         'current_month_name': calendar.month_name[now.month],

@@ -85,8 +85,43 @@
       </div>
       <p class="text-xs text-smoke/40 tracking-wider">Retorno de Inversión — Área 30 Barber Club</p>
     </div>
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-smoke/40">{{ current_month_name }} {{ current_year }}</span>
+    <div class="flex items-center gap-3 flex-wrap">
+      <!-- Navegación entre meses (acotada a OPERATION_START → mes actual) -->
+      <div class="flex items-center gap-1 bg-jet-lighter border border-white/10 rounded-lg p-1.5 shadow-lg">
+        {% if can_go_prev %}
+          <a href="?year={{ prev_nav_year }}&month={{ prev_nav_month }}"
+             class="p-2 text-smoke/60 hover:text-gold hover:bg-white/5 rounded-md transition-colors" title="Mes anterior">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </a>
+        {% else %}
+          <span class="p-2 text-smoke/20 cursor-not-allowed" title="Inicio de operatividad ({{ operation_start_month }}/{{ operation_start_year }})">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </span>
+        {% endif %}
+
+        <div class="px-3 py-1 text-xs text-white font-semibold tracking-wider uppercase min-w-[110px] text-center">
+          {{ sel_month_name }} {{ sel_year }}
+        </div>
+
+        {% if can_go_next %}
+          <a href="?year={{ next_nav_year }}&month={{ next_nav_month }}"
+             class="p-2 text-smoke/60 hover:text-gold hover:bg-white/5 rounded-md transition-colors" title="Mes siguiente">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        {% else %}
+          <span class="p-2 text-smoke/20 cursor-not-allowed" title="Mes en curso">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </span>
+        {% endif %}
+
+        {% if not is_current_month %}
+          <div class="w-px h-5 bg-white/10 mx-1"></div>
+          <a href="?" class="px-3 py-1.5 text-[0.65rem] font-bold bg-gold/10 text-gold rounded-md hover:bg-gold hover:text-jet transition-colors tracking-widest uppercase">
+            Hoy
+          </a>
+        {% endif %}
+      </div>
+
       <button onclick="document.getElementById('modal-clean').classList.remove('hidden')"
               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/15 border border-red-500/30 text-red-300 text-xs font-bold tracking-widest uppercase hover:bg-red-600/25 transition-colors shadow-lg">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
@@ -177,12 +212,14 @@
     </div>
   </div>
 
-  <!-- ══ MES ANTERIOR ══ -->
+  <!-- ══ MES SELECCIONADO ══ -->
   <div>
     <h2 class="text-xs font-bold tracking-[0.3em] uppercase text-smoke/50 mb-4">
-      Ganancias — {{ prev_month_name }} {{ prev_year }}
+      Ganancias — {{ sel_month_name }} {{ sel_year }}
       {% if last_snapshot and last_snapshot.is_locked %}
         <span class="locked-badge ml-2">🔒 Cerrado</span>
+      {% elif is_live_month %}
+        <span class="pending-badge ml-2" style="background: rgba(96,165,250,0.1); border-color: rgba(96,165,250,0.3); color: #93c5fd;">🟢 En vivo</span>
       {% else %}
         <span class="pending-badge ml-2">⏳ Sin consolidar</span>
       {% endif %}
@@ -269,8 +306,13 @@
       <svg class="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
       </svg>
-      <p class="font-semibold mb-1">Sin snapshot consolidado</p>
-      <p class="text-xs">Los datos de arriba son calculados en tiempo real. Presiona <strong class="text-gold">Consolidar Mes</strong> para guardarlos permanentemente.</p>
+      {% if is_live_month %}
+        <p class="font-semibold mb-1 text-blue-300">Mes en curso — cálculo en vivo</p>
+        <p class="text-xs">Las cifras se actualizan a medida que se aprueban ventas y registran egresos. La distribución a socios se generará cuando termine el mes (o al presionar <strong class="text-gold">Consolidar Mes</strong>).</p>
+      {% else %}
+        <p class="font-semibold mb-1">Sin snapshot consolidado</p>
+        <p class="text-xs">Los datos de arriba son calculados en tiempo real. Presiona <strong class="text-gold">Consolidar Mes</strong> para guardarlos permanentemente.</p>
+      {% endif %}
     </div>
     {% endif %}
   </div>
@@ -364,7 +406,7 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="stat-label block mb-1">Año</label>
-          <input type="number" name="year" value="{{ current_year }}" min="2020" max="2100"
+          <input type="number" name="year" value="{{ sel_year }}" min="2020" max="2100"
                  class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
         </div>
         <div>
