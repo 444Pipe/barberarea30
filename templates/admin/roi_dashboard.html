@@ -87,6 +87,11 @@
     </div>
     <div class="flex items-center gap-3">
       <span class="text-xs text-smoke/40">{{ current_month_name }} {{ current_year }}</span>
+      <button onclick="document.getElementById('modal-clean').classList.remove('hidden')"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/15 border border-red-500/30 text-red-300 text-xs font-bold tracking-widest uppercase hover:bg-red-600/25 transition-colors shadow-lg">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+        Limpiar Snapshots
+      </button>
       <button onclick="document.getElementById('modal-investment').classList.remove('hidden')"
               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold tracking-widest uppercase hover:bg-blue-600/30 transition-colors shadow-lg">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
@@ -183,21 +188,41 @@
       {% endif %}
     </h2>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+    <!-- Desglose de Ingresos Brutos -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
       <div class="roi-card">
-        <div class="stat-label">Ingresos Brutos</div>
-        <div class="text-lg font-bold text-white">${{ prev_gross|floatformat:0 }}</div>
-        <div class="text-xs text-smoke/30 mt-1">Ventas aprobadas</div>
+        <div class="stat-label">Ingresos por Servicios</div>
+        <div class="text-lg font-bold text-white">${{ prev_gross_services|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Sales aprobadas</div>
       </div>
+      <div class="roi-card">
+        <div class="stat-label">Venta de Inventario</div>
+        <div class="text-lg font-bold text-white">${{ prev_inventory|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Bebidas, productos</div>
+      </div>
+      <div class="roi-card" style="border-color: rgba(96,165,250,0.35);">
+        <div class="stat-label">Ingresos Brutos</div>
+        <div class="text-lg font-bold text-blue-300">${{ prev_gross|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Servicios + Inventario</div>
+      </div>
+    </div>
+
+    <!-- Desglose de Egresos + Comisiones -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
       <div class="roi-card">
         <div class="stat-label">Comisiones</div>
         <div class="text-lg font-bold text-red-400">- ${{ prev_commissions|floatformat:0 }}</div>
-        <div class="text-xs text-smoke/30 mt-1">Pago barberos</div>
+        <div class="text-xs text-smoke/30 mt-1">40% staff / 50% Frank</div>
       </div>
       <div class="roi-card">
-        <div class="stat-label">Egresos</div>
-        <div class="text-lg font-bold text-red-400">- ${{ prev_expenses|floatformat:0 }}</div>
-        <div class="text-xs text-smoke/30 mt-1">Gastos operativos</div>
+        <div class="stat-label">Egresos Operativos</div>
+        <div class="text-lg font-bold text-red-400">- ${{ prev_operational_expenses|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Variables + inventario</div>
+      </div>
+      <div class="roi-card">
+        <div class="stat-label">Egresos Fijos</div>
+        <div class="text-lg font-bold text-red-400">- ${{ prev_fixed_expenses|floatformat:0 }}</div>
+        <div class="text-xs text-smoke/30 mt-1">Arriendo, servicios, nómina</div>
       </div>
       <div class="roi-card" style="border-color: rgba(212,175,55,0.35);">
         <div class="stat-label">Ganancia Neta</div>
@@ -423,6 +448,50 @@
         <button type="submit"
                 class="flex-1 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
           Guardar Aporte
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- ══ MODAL: Limpiar Snapshots (Reset selectivo) ══ -->
+<div id="modal-clean" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-jet-card border border-red-500/30 rounded-2xl w-full max-w-md shadow-2xl">
+    <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+      <div>
+        <h3 class="font-serif font-bold text-white tracking-wide">Limpiar Snapshots</h3>
+        <p class="text-xs text-smoke/40 mt-0.5">Borra registros corruptos o duplicados</p>
+      </div>
+      <button onclick="document.getElementById('modal-clean').classList.add('hidden')"
+              class="text-smoke/40 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="post" action="{% url 'roi_clean_snapshots' %}" class="px-6 py-5 space-y-4"
+          onsubmit="return confirm('¿Borrar definitivamente los snapshots indicados? Esta acción no se puede deshacer.');">
+      {% csrf_token %}
+      <div>
+        <label class="stat-label block mb-1">Periodos a borrar (separa por espacio o coma)</label>
+        <input type="text" name="periods" required placeholder="2/2026 3/2026 4/2026"
+               class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-red-500/50 focus:outline-none font-mono">
+        <p class="text-xs text-smoke/40 mt-1">Formato: <code class="text-red-300">M/YYYY</code> (ej: <code class="text-red-300">4/2026</code>)</p>
+      </div>
+      <label class="flex items-center gap-2 text-xs text-smoke/60">
+        <input type="checkbox" name="force_locked" value="1"
+               class="rounded border-white/20 bg-jet-lighter text-red-500 focus:ring-red-500/30">
+        Forzar borrado incluso de snapshots bloqueados
+      </label>
+      <p class="text-xs text-red-300/80 bg-red-900/20 border border-red-500/20 rounded-lg px-3 py-2">
+        ⚠️ Acción irreversible. Los snapshots indicados (y sus distribuciones a socios) serán eliminados.
+        Tras borrar podrás volver a "Consolidar Mes" con la lógica corregida.
+      </p>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="document.getElementById('modal-clean').classList.add('hidden')"
+                class="flex-1 px-4 py-2 rounded-lg border border-white/10 text-smoke/60 text-xs uppercase tracking-widest hover:bg-white/5 transition-colors">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-red-500 transition-colors shadow-lg shadow-red-600/20">
+          Eliminar
         </button>
       </div>
     </form>

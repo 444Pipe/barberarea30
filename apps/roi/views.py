@@ -11,7 +11,11 @@ from django.contrib import messages
 from django.utils import timezone
 
 from apps.users.decorators import superadmin_required
-from .services import get_dashboard_context, generate_monthly_snapshot
+from .services import (
+    get_dashboard_context,
+    generate_monthly_snapshot,
+    delete_snapshots,
+)
 from .models import MonthlyROISnapshot, Partner, PartnerInvestment
 
 
@@ -124,6 +128,58 @@ def roi_api_history(request):
 # ─────────────────────────────────────────────────────────
 # Registrar Inversión (Aporte de Capital)
 # ─────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────
+# Limpiar snapshots (Fase 3 — reset selectivo de periodos corruptos)
+# ─────────────────────────────────────────────────────────
+
+@superadmin_required
+def roi_clean_snapshots_view(request):
+    """
+    POST: Borra snapshots de periodos específicos enviados como 'periods'
+    en formato 'M/YYYY' separados por coma o espacio. Por defecto NO toca
+    snapshots bloqueados a menos que se envíe force_locked=1.
+    """
+    if request.method != 'POST':
+        return redirect('roi_dashboard')
+
+    raw_periods = (request.POST.get('periods') or '').replace(',', ' ').split()
+    force_locked = request.POST.get('force_locked') == '1'
+
+    if not raw_periods:
+        messages.error(request, '⚠️ Debes indicar al menos un periodo (ej: 2/2026 3/2026 4/2026).')
+        return redirect('roi_dashboard')
+
+    periods = []
+    for raw in raw_periods:
+        try:
+            if '/' in raw:
+                m, y = raw.split('/')
+            elif '-' in raw:
+                y, m = raw.split('-')
+            else:
+                raise ValueError(f'formato inválido en "{raw}"')
+            year = int(y)
+            month = int(m)
+            if not (1 <= month <= 12) or not (2020 <= year <= 2100):
+                raise ValueError(f'rango fuera de límites en "{raw}"')
+            periods.append((year, month))
+        except ValueError as e:
+            messages.error(request, f'⚠️ Periodo inválido: {raw}. Usa formato M/YYYY (ej: 4/2026).')
+            return redirect('roi_dashboard')
+
+    try:
+        result = delete_snapshots(periods, force_locked=force_locked)
+        msg = f'🧹 Eliminados {result["deleted"]} snapshots.'
+        if result['skipped_locked']:
+            locked_str = ', '.join(f'{m}/{y}' for (y, m) in result['skipped_locked'])
+            msg += f' Saltados (bloqueados): {locked_str}.'
+        messages.success(request, msg)
+    except Exception as e:
+        messages.error(request, f'❌ Error limpiando snapshots: {e}')
+
+    return redirect('roi_dashboard')
+
 
 @superadmin_required
 def roi_add_investment_view(request):

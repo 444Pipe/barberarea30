@@ -103,21 +103,44 @@ class MonthlyROISnapshot(models.Model):
     # ── Financiero Global ──
     gross_income = models.DecimalField(
         max_digits=15, decimal_places=0, default=0,
-        verbose_name='Ingresos Brutos (Ventas)',
-        help_text='Suma total de final_price de todas las Sales del mes.',
+        verbose_name='Ingresos Brutos (Servicios + Inventario)',
+        help_text='gross_services + total_inventory_sales',
+    )
+    # Desglose de Bruto
+    gross_services = models.DecimalField(
+        max_digits=15, decimal_places=0, default=0,
+        verbose_name='Ingresos por Servicios',
+        help_text='Suma de Sale.final_price de ventas aprobadas del mes.',
+    )
+    total_inventory_sales = models.DecimalField(
+        max_digits=15, decimal_places=0, default=0,
+        verbose_name='Ingresos por Venta de Inventario',
+        help_text='Suma de InventorySale.total_price del mes.',
     )
     total_commissions = models.DecimalField(
         max_digits=15, decimal_places=0, default=0,
         verbose_name='Total Comisiones Barberos',
+        help_text='40% staff general / 50% Frank. Suma de Commission.commission_amount del mes.',
     )
+    # Desglose de Egresos
     total_expenses = models.DecimalField(
         max_digits=15, decimal_places=0, default=0,
-        verbose_name='Total Egresos',
+        verbose_name='Total Egresos (Fijos + Operativos)',
+    )
+    total_fixed_expenses = models.DecimalField(
+        max_digits=15, decimal_places=0, default=0,
+        verbose_name='Egresos Fijos (Arriendo, Servicios, Nómina)',
+        help_text='Expense.amount donde expense_type=fixed.',
+    )
+    total_operational_expenses = models.DecimalField(
+        max_digits=15, decimal_places=0, default=0,
+        verbose_name='Egresos Operativos (Variables + Inventario)',
+        help_text='Expense.amount donde expense_type IN (variable, inventory), excluyendo "Pago Diario: Franko" (ya está en comisiones).',
     )
     net_income = models.DecimalField(
         max_digits=15, decimal_places=0, default=0,
         verbose_name='Ganancia Neta del Mes',
-        help_text='gross_income - total_commissions - total_expenses',
+        help_text='gross_income - total_commissions - total_fixed_expenses - total_operational_expenses',
     )
 
     # ── Control ──
@@ -146,7 +169,12 @@ class MonthlyROISnapshot(models.Model):
 
     def compute_net(self):
         """Recalcula ganancia neta en memoria (no guarda)."""
-        return self.gross_income - self.total_commissions - self.total_expenses
+        return (
+            self.gross_income
+            - self.total_commissions
+            - self.total_fixed_expenses
+            - self.total_operational_expenses
+        )
 
 
 class PartnerMonthlyShare(models.Model):

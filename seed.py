@@ -96,6 +96,38 @@ except Exception:
     except Exception as e:
         print("⚠ No se pudo crear la columna manualmente:", e)
 
+# --- Autocuración para los campos nuevos del MonthlyROISnapshot (migración 0002) ---
+from apps.roi.models import MonthlyROISnapshot as _ROISnapshot
+
+_roi_repair_fields = [
+    ('gross_services', 'Ingresos por Servicios'),
+    ('total_inventory_sales', 'Ingresos por Venta de Inventario'),
+    ('total_fixed_expenses', 'Egresos Fijos'),
+    ('total_operational_expenses', 'Egresos Operativos'),
+]
+try:
+    # Una query que toque todas las columnas nuevas → si una falta, lanza error.
+    _ROISnapshot.objects.values_list(
+        'gross_services', 'total_inventory_sales',
+        'total_fixed_expenses', 'total_operational_expenses',
+    ).first()
+except Exception:
+    print("⚠ Columnas de desglose en roi_monthlyroisnapshot no encontradas. Intentando crearlas...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            for fname, verbose in _roi_repair_fields:
+                try:
+                    field = _dj_models.DecimalField(max_digits=15, decimal_places=0, default=0, verbose_name=verbose)
+                    field.set_attributes_from_name(fname)
+                    schema_editor.add_field(_ROISnapshot, field)
+                    print(f"  ✓ Columna '{fname}' creada.")
+                except Exception as inner:
+                    # Probablemente ya existía — no es fatal
+                    print(f"  · '{fname}': {inner}")
+    except Exception as e:
+        print("⚠ No se pudieron crear las columnas de ROI manualmente:", e)
+
 from apps.cashflow.models import PaymentMethod
 
 pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 'Efectivo', 'is_active': True, 'requires_reference': False})
