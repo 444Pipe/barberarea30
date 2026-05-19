@@ -50,6 +50,95 @@
   <link rel="stylesheet" href="{% static 'css/animations.css' %}">
 
   <style>
+    /* ───── Splash Screen (pantalla de carga inicial) ───── */
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      background: radial-gradient(ellipse at center, #0A0A0A 0%, #050505 70%, #000000 100%);
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+
+    #splash-screen.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    #splash-screen .splash-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.75rem;
+    }
+
+    #splash-screen .splash-logo {
+      width: clamp(170px, 32vw, 280px);
+      height: auto;
+      animation: splashPulse 1.8s ease-in-out infinite;
+      filter: drop-shadow(0 0 24px rgba(212, 175, 55, 0.45));
+    }
+
+    #splash-screen .splash-fallback {
+      display: none;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: clamp(2.4rem, 9vw, 3.8rem);
+      letter-spacing: 0.08em;
+      color: #D4AF37;
+      text-shadow: 0 0 24px rgba(212, 175, 55, 0.45);
+      animation: splashPulse 1.8s ease-in-out infinite;
+    }
+
+    #splash-screen .splash-fallback span {
+      display: block;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 400;
+      font-size: 0.55em;
+      letter-spacing: 0.35em;
+      color: #F5F5F5;
+      text-shadow: none;
+      margin-top: 0.4em;
+    }
+
+    #splash-screen.no-logo .splash-logo { display: none; }
+    #splash-screen.no-logo .splash-fallback { display: block; }
+
+    #splash-screen .splash-spinner {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid rgba(212, 175, 55, 0.18);
+      border-top-color: #D4AF37;
+      animation: splashSpin 0.9s linear infinite;
+    }
+
+    #splash-screen .splash-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: rgba(245, 245, 245, 0.55);
+    }
+
+    @keyframes splashPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.04); opacity: 0.9; }
+    }
+
+    @keyframes splashSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    body.splash-active {
+      overflow: hidden;
+    }
+
     /* ───── Marquee (banda de valores con movimiento lento) ───── */
     .marquee {
       overflow: hidden;
@@ -192,7 +281,57 @@
   </style>
 </head>
 
-<body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
+<body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet splash-active">
+
+  <!-- Splash Screen / Pantalla de Carga -->
+  <div id="splash-screen" role="status" aria-label="Cargando Área 30 Barber Club">
+    <div class="splash-stage">
+      <img src="{% static 'images/AREA 30.png' %}" alt="Área 30 Barber Club"
+           class="splash-logo"
+           onerror="document.getElementById('splash-screen').classList.add('no-logo');this.remove();">
+      <div class="splash-fallback" aria-hidden="true">ÁREA 30<span>Barber Club</span></div>
+      <div class="splash-spinner" aria-hidden="true"></div>
+    </div>
+    <div class="splash-label">Cargando experiencia</div>
+  </div>
+
+  <script>
+    (function () {
+      var splash = document.getElementById('splash-screen');
+      if (!splash) return;
+
+      var logo = splash.querySelector('.splash-logo');
+      // If the logo doesn't decode within 1.2s, show the text fallback so the
+      // user always sees something on the splash, never just a black screen.
+      if (logo) {
+        setTimeout(function () {
+          if (!logo.complete || !logo.naturalWidth) {
+            splash.classList.add('no-logo');
+          }
+        }, 1200);
+      }
+
+      var hidden = false;
+      function hideSplash() {
+        if (hidden) return;
+        hidden = true;
+        splash.classList.add('is-hidden');
+        document.body.classList.remove('splash-active');
+        setTimeout(function () { splash.remove(); }, 700);
+      }
+
+      // Keep the splash visible at least ~900ms so it doesn't flash on fast loads
+      var minVisible = new Promise(function (res) { setTimeout(res, 900); });
+      var pageReady = new Promise(function (res) {
+        if (document.readyState === 'complete') return res();
+        window.addEventListener('load', res, { once: true });
+      });
+      Promise.all([minVisible, pageReady]).then(hideSplash);
+
+      // Safety net: never block the user more than 6s
+      setTimeout(hideSplash, 6000);
+    })();
+  </script>
 
   <!-- Navegación -->
   <nav class="fixed w-full top-0 z-50 bg-jet/80 backdrop-blur-md border-b border-gold/10 transition-all duration-500"
