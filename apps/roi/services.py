@@ -65,21 +65,28 @@ def _D(value) -> Decimal:
 # Cálculo financiero del mes
 # ─────────────────────────────────────────────────────────
 
-def get_month_financials(year: int, month: int) -> dict:
+def get_month_financials(year: int, month: int, *, include_pending: bool = False) -> dict:
     """
-    Cierre financiero estricto para el mes (year, month). NO persiste.
+    Cierre financiero para el mes (year, month). NO persiste.
 
-    Devuelve un dict con todas las cifras necesarias para crear (o regenerar)
-    el MonthlyROISnapshot. Se usa también en la vista en tiempo real para
-    mostrar el mes anterior aún sin consolidar.
+    Por defecto sólo cuenta ventas con `approval_status='approved'` — este es el
+    criterio que usa la consolidación (snapshot definitivo).
+
+    Si `include_pending=True`, también suma las ventas en estado 'pending'. Esto
+    se usa en la vista del mes EN CURSO para reflejar la operatividad real del
+    negocio en tiempo real, sin esperar a que cada venta sea aprobada.
     """
     start, end = _month_date_range(year, month)
 
-    # ── 1. Ingresos por servicios (solo ventas aprobadas) ──
+    # ── 1. Ingresos por servicios ──
+    valid_statuses = [Sale.STATUS_APPROVED]
+    if include_pending:
+        valid_statuses.append(Sale.STATUS_PENDING)
+
     services_qs = Sale.objects.filter(
         created_at__date__gte=start,
         created_at__date__lte=end,
-        approval_status=Sale.STATUS_APPROVED,
+        approval_status__in=valid_statuses,
     )
     gross_services = _D(services_qs.aggregate(t=Sum('final_price'))['t'])
 
@@ -127,6 +134,47 @@ def get_month_financials(year: int, month: int) -> dict:
         'total_operational_expenses': total_operational_expenses,
         'total_expenses': total_expenses,
         'net_income': net_income,
+    }
+
+
+def get_month_diagnostics(year: int, month: int) -> dict:
+    """
+    Devuelve un breakdown crudo de TODOS los registros del mes (sin filtros de
+    aprobación) para que el panel ROI muestre qué hay realmente en la base de
+    datos. Sirve para detectar de un vistazo si las cifras no aparecen porque
+    las ventas están en estado 'pending' o 'rejected' en vez de 'approved'.
+    """
+    start, end = _month_date_range(year, month)
+
+    sales_qs = Sale.objects.filter(
+        created_at__date__gte=start, created_at__date__lte=end
+    )
+
+    by_status = {}
+    for status_value, _label in Sale.APPROVAL_STATUS_CHOICES:
+        sub = sales_qs.filter(approval_status=status_value)
+        by_status[status_value] = {
+            'count': sub.count(),
+            'total': _D(sub.aggregate(t=Sum('final_price'))['t']),
+        }
+
+    inventory_qs = InventorySale.objects.filter(
+        created_at__date__gte=start, created_at__date__lte=end
+    )
+    expense_qs = Expense.objects.filter(date__gte=start, date__lte=end)
+
+    return {
+        'sales_total_all': sales_qs.count(),
+        'sales_approved_count': by_status[Sale.STATUS_APPROVED]['count'],
+        'sales_approved_total': by_status[Sale.STATUS_APPROVED]['total'],
+        'sales_pending_count': by_status[Sale.STATUS_PENDING]['count'],
+        'sales_pending_total': by_status[Sale.STATUS_PENDING]['total'],
+        'sales_rejected_count': by_status[Sale.STATUS_REJECTED]['count'],
+        'sales_rejected_total': by_status[Sale.STATUS_REJECTED]['total'],
+        'inventory_count': inventory_qs.count(),
+        'inventory_total': _D(inventory_qs.aggregate(t=Sum('total_price'))['t']),
+        'expenses_count': expense_qs.count(),
+        'expenses_total': _D(expense_qs.aggregate(t=Sum('amount'))['t']),
     }
 
 
@@ -352,7 +400,14 @@ def get_dashboard_context(selected_year: int = None, selected_month: int = None)
             'net_income': selected_snapshot.net_income,
         }
     else:
-        sel = get_month_financials(sel_year, sel_month)
+        # Para el mes en curso incluimos también ventas 'pending' → operatividad en vivo.
+        # Para meses pasados sin consolidar, solo aprobadas (criterio del ledger oficial).
+        sel = get_month_financials(
+            sel_year, sel_month, include_pending=is_current_month
+        )
+
+    # ── Diagnóstico crudo del mes (cuenta TODO sin filtros, para depuración) ──
+    diagnostics = get_month_diagnostics(sel_year, sel_month)
 
     # ── Historial (últimos 12) ──
     history = MonthlyROISnapshot.objects.prefetch_related(
@@ -389,6 +444,9 @@ def get_dashboard_context(selected_year: int = None, selected_month: int = None)
         # Estado del mes seleccionado respecto al calendario
         'is_current_month': is_current_month,
         'is_live_month': is_current_month and selected_snapshot is None,
+
+        # Diagnóstico crudo del mes (lo que hay en la BD, sin filtros de aprobación)
+        'diagnostics': diagnostics,
 
         # Navegación
         'prev_nav_year': prev_y,

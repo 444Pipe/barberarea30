@@ -225,6 +225,12 @@
       {% endif %}
     </h2>
 
+    {% if is_live_month %}
+      <div class="mb-3 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/15 text-[0.65rem] text-blue-200/80 leading-relaxed">
+        Vista en vivo: suma ventas <strong class="text-emerald-300">aprobadas</strong> + <strong class="text-amber-300">pendientes</strong> del mes en curso para reflejar la operatividad real. Al consolidar, sólo las aprobadas quedan en el snapshot definitivo.
+      </div>
+    {% endif %}
+
     <!-- Desglose de Ingresos Brutos -->
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
       <div class="roi-card">
@@ -314,6 +320,108 @@
         <p class="text-xs">Los datos de arriba son calculados en tiempo real. Presiona <strong class="text-gold">Consolidar Mes</strong> para guardarlos permanentemente.</p>
       {% endif %}
     </div>
+    {% endif %}
+  </div>
+
+  <!-- ══ DIAGNÓSTICO DEL MES (transparencia: qué hay realmente en la BD) ══ -->
+  <div>
+    <h2 class="text-xs font-bold tracking-[0.3em] uppercase text-smoke/50 mb-4">
+      Diagnóstico — {{ sel_month_name }} {{ sel_year }}
+      <span class="text-[0.55rem] font-normal normal-case tracking-normal text-smoke/30 ml-2">
+        Conteo crudo de registros en la base de datos
+      </span>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Ventas de servicios por estado -->
+      <div class="roi-card">
+        <div class="stat-label mb-3">Ventas de Servicios</div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-2"></span>
+              <span class="text-emerald-400 font-semibold">Aprobadas</span>
+            </span>
+            <span class="text-sm text-white font-semibold">
+              {{ diagnostics.sales_approved_count }} <span class="text-smoke/40 text-xs">·</span>
+              ${{ diagnostics.sales_approved_total|floatformat:0 }}
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs">
+              <span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-2"></span>
+              <span class="text-amber-400 font-semibold">Pendientes</span>
+            </span>
+            <span class="text-sm text-white font-semibold">
+              {{ diagnostics.sales_pending_count }} <span class="text-smoke/40 text-xs">·</span>
+              ${{ diagnostics.sales_pending_total|floatformat:0 }}
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs">
+              <span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-2"></span>
+              <span class="text-red-400 font-semibold">Rechazadas</span>
+            </span>
+            <span class="text-sm text-smoke/50">
+              {{ diagnostics.sales_rejected_count }} <span class="text-smoke/40 text-xs">·</span>
+              ${{ diagnostics.sales_rejected_total|floatformat:0 }}
+            </span>
+          </div>
+        </div>
+        {% if diagnostics.sales_pending_count and is_live_month %}
+          <div class="mt-3 pt-3 border-t border-white/5 text-[0.65rem] text-amber-300/80 leading-relaxed">
+            Las {{ diagnostics.sales_pending_count }} ventas pendientes ya están sumando al neto en vivo. Apruébalas desde
+            <a href="/admin-panel/cashflow/" class="text-gold hover:underline font-bold">Caja</a> para consolidarlas.
+          </div>
+        {% elif diagnostics.sales_pending_count %}
+          <div class="mt-3 pt-3 border-t border-white/5 text-[0.65rem] text-amber-300/80 leading-relaxed">
+            {{ diagnostics.sales_pending_count }} ventas quedaron sin aprobar este mes — no entran al snapshot consolidado.
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Inventario -->
+      <div class="roi-card">
+        <div class="stat-label mb-3">Ventas de Inventario</div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-smoke/60">Registros</span>
+          <span class="text-sm text-white font-semibold">{{ diagnostics.inventory_count }}</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-xs text-smoke/60">Total</span>
+          <span class="text-sm text-white font-semibold">${{ diagnostics.inventory_total|floatformat:0 }}</span>
+        </div>
+        <div class="mt-3 pt-3 border-t border-white/5 text-[0.65rem] text-smoke/40 leading-relaxed">
+          Bebidas y productos vendidos directamente. Suman al ingreso bruto.
+        </div>
+      </div>
+
+      <!-- Egresos -->
+      <div class="roi-card">
+        <div class="stat-label mb-3">Egresos del Mes</div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-smoke/60">Registros</span>
+          <span class="text-sm text-white font-semibold">{{ diagnostics.expenses_count }}</span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-xs text-smoke/60">Total bruto</span>
+          <span class="text-sm text-white font-semibold">${{ diagnostics.expenses_total|floatformat:0 }}</span>
+        </div>
+        <div class="mt-3 pt-3 border-t border-white/5 text-[0.65rem] text-smoke/40 leading-relaxed">
+          Incluye fijos, variables e inventario comprado. El neto excluye <em>Pago Diario: Franko</em> (ya en comisiones).
+        </div>
+      </div>
+    </div>
+
+    {% if diagnostics.sales_total_all == 0 and diagnostics.inventory_count == 0 and diagnostics.expenses_count == 0 %}
+      <div class="roi-card mt-4 text-center py-8" style="border-color: rgba(239,68,68,0.3);">
+        <p class="text-red-300 font-semibold mb-2">⚠️ No hay ningún registro en este mes</p>
+        <p class="text-xs text-smoke/50">
+          La base de datos no contiene ventas, ventas de inventario ni egresos con fecha en {{ sel_month_name }} {{ sel_year }}.
+          Si esperas ver datos: revisa la fecha de creación de las ventas en
+          <a href="/admin-panel/cashflow/" class="text-gold hover:underline">Caja</a> o
+          <a href="/django-admin/cashflow/sale/" class="text-gold hover:underline">Django Admin</a>.
+        </p>
+      </div>
     {% endif %}
   </div>
 
