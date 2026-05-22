@@ -331,10 +331,12 @@
         Conteo crudo de registros en la base de datos
       </span>
     </h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <!-- Fila 1: Ventas registradas (post-checkout) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       <!-- Ventas de servicios por estado -->
       <div class="roi-card">
-        <div class="stat-label mb-3">Ventas de Servicios</div>
+        <div class="stat-label mb-3">Ventas de Servicios <span class="text-[0.55rem] text-smoke/30 normal-case tracking-normal">(ya cobradas)</span></div>
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <span class="text-xs">
@@ -349,7 +351,7 @@
           <div class="flex items-center justify-between">
             <span class="text-xs">
               <span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-2"></span>
-              <span class="text-amber-400 font-semibold">Pendientes</span>
+              <span class="text-amber-400 font-semibold">Esperando aprobación</span>
             </span>
             <span class="text-sm text-white font-semibold">
               {{ diagnostics.sales_pending_count }} <span class="text-smoke/40 text-xs">·</span>
@@ -369,12 +371,8 @@
         </div>
         {% if diagnostics.sales_pending_count and is_live_month %}
           <div class="mt-3 pt-3 border-t border-white/5 text-[0.65rem] text-amber-300/80 leading-relaxed">
-            Las {{ diagnostics.sales_pending_count }} ventas pendientes ya están sumando al neto en vivo. Apruébalas desde
+            Estas ya están sumando al neto en vivo. Apruébalas desde
             <a href="/admin-panel/cashflow/" class="text-gold hover:underline font-bold">Caja</a> para consolidarlas.
-          </div>
-        {% elif diagnostics.sales_pending_count %}
-          <div class="mt-3 pt-3 border-t border-white/5 text-[0.65rem] text-amber-300/80 leading-relaxed">
-            {{ diagnostics.sales_pending_count }} ventas quedaron sin aprobar este mes — no entran al snapshot consolidado.
           </div>
         {% endif %}
       </div>
@@ -412,14 +410,48 @@
       </div>
     </div>
 
-    {% if diagnostics.sales_total_all == 0 and diagnostics.inventory_count == 0 and diagnostics.expenses_count == 0 %}
+    <!-- Fila 2: Reservas sin cobrar (operatividad pendiente) -->
+    {% if diagnostics.bookings_uncharged_count %}
+    <div class="roi-card" style="border-color: rgba(251,191,36,0.25);">
+      <div class="flex items-start justify-between gap-4 mb-3 flex-wrap">
+        <div>
+          <div class="stat-label">Reservas Sin Cobrar <span class="text-[0.55rem] text-smoke/30 normal-case tracking-normal">(no son ventas aún)</span></div>
+          <p class="text-xs text-smoke/40 mt-1">Citas agendadas en {{ sel_month_name }} que no han pasado por el botón "Cobrar". No suman al ROI hasta que se cobren.</p>
+        </div>
+        <a href="/admin-panel/bookings/?status=pending" class="text-[0.65rem] tracking-widest uppercase text-amber-300 hover:text-amber-200 font-bold whitespace-nowrap">
+          Ir a Reservas →
+        </a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+          <div class="text-[0.6rem] text-amber-300/70 tracking-widest uppercase font-bold mb-1">Total Sin Cobrar</div>
+          <div class="text-lg font-bold text-amber-300">{{ diagnostics.bookings_uncharged_count }} citas</div>
+          <div class="text-xs text-smoke/60 mt-1">Potencial: ${{ diagnostics.bookings_uncharged_total|intcomma }}</div>
+        </div>
+        <div class="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+          <div class="text-[0.6rem] text-red-300/70 tracking-widest uppercase font-bold mb-1">Vencidas (acción urgente)</div>
+          <div class="text-lg font-bold text-red-300">{{ diagnostics.bookings_overdue_count }} citas</div>
+          <div class="text-xs text-smoke/60 mt-1">Fecha pasada: ${{ diagnostics.bookings_overdue_total|intcomma }}</div>
+        </div>
+        <div class="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+          <div class="text-[0.6rem] text-blue-300/70 tracking-widest uppercase font-bold mb-1">Próximas</div>
+          <div class="text-lg font-bold text-blue-300">{{ diagnostics.bookings_upcoming_count }} citas</div>
+          <div class="text-xs text-smoke/60 mt-1">Por venir: ${{ diagnostics.bookings_upcoming_total|intcomma }}</div>
+        </div>
+      </div>
+      {% if diagnostics.bookings_overdue_count %}
+        <div class="mt-3 text-[0.65rem] text-red-300/90 leading-relaxed">
+          ⚠️ Tienes {{ diagnostics.bookings_overdue_count }} reservas con fecha vencida en estado pendiente. O eran no-shows que hay que cancelar, o son servicios prestados sin cobrar (ingreso perdido).
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if diagnostics.sales_total_all == 0 and diagnostics.inventory_count == 0 and diagnostics.expenses_count == 0 and not diagnostics.bookings_uncharged_count %}
       <div class="roi-card mt-4 text-center py-8" style="border-color: rgba(239,68,68,0.3);">
         <p class="text-red-300 font-semibold mb-2">⚠️ No hay ningún registro en este mes</p>
         <p class="text-xs text-smoke/50">
-          La base de datos no contiene ventas, ventas de inventario ni egresos con fecha en {{ sel_month_name }} {{ sel_year }}.
-          Si esperas ver datos: revisa la fecha de creación de las ventas en
-          <a href="/admin-panel/cashflow/" class="text-gold hover:underline">Caja</a> o
-          <a href="/django-admin/cashflow/sale/" class="text-gold hover:underline">Django Admin</a>.
+          La base de datos no contiene ventas, ventas de inventario, egresos ni reservas con fecha en {{ sel_month_name }} {{ sel_year }}.
         </p>
       </div>
     {% endif %}

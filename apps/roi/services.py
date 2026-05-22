@@ -25,6 +25,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
 from apps.cashflow.models import Sale, Commission, Expense, InventorySale
+from apps.bookings.models import Booking
 from .models import (
     MonthlyROISnapshot,
     Partner,
@@ -163,6 +164,18 @@ def get_month_diagnostics(year: int, month: int) -> dict:
     )
     expense_qs = Expense.objects.filter(date__gte=start, date__lte=end)
 
+    # Reservas (Booking) del mes que aún no se cobraron. Usamos `date` (fecha del
+    # servicio) en vez de `created_at` para responder "¿qué citas tengo agendadas
+    # este mes que todavía no entran a caja?". Las completadas/canceladas se
+    # omiten porque ya están resueltas.
+    bookings_qs = Booking.objects.filter(date__gte=start, date__lte=end)
+    bookings_uncharged = bookings_qs.filter(status__in=['pending', 'confirmed'])
+
+    from django.utils import timezone as _tz
+    today = _tz.localtime(_tz.now()).date()
+    bookings_overdue = bookings_uncharged.filter(date__lt=today)
+    bookings_upcoming = bookings_uncharged.filter(date__gte=today)
+
     return {
         'sales_total_all': sales_qs.count(),
         'sales_approved_count': by_status[Sale.STATUS_APPROVED]['count'],
@@ -175,6 +188,14 @@ def get_month_diagnostics(year: int, month: int) -> dict:
         'inventory_total': _D(inventory_qs.aggregate(t=Sum('total_price'))['t']),
         'expenses_count': expense_qs.count(),
         'expenses_total': _D(expense_qs.aggregate(t=Sum('amount'))['t']),
+
+        # Reservas pendientes de cobro (ingreso potencial no materializado)
+        'bookings_uncharged_count': bookings_uncharged.count(),
+        'bookings_uncharged_total': _D(bookings_uncharged.aggregate(t=Sum('price'))['t']),
+        'bookings_overdue_count': bookings_overdue.count(),
+        'bookings_overdue_total': _D(bookings_overdue.aggregate(t=Sum('price'))['t']),
+        'bookings_upcoming_count': bookings_upcoming.count(),
+        'bookings_upcoming_total': _D(bookings_upcoming.aggregate(t=Sum('price'))['t']),
     }
 
 
