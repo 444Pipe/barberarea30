@@ -550,6 +550,11 @@ document.getElementById('unavail-form').addEventListener('submit', function(e) {
       alert('Error: ' + (data.error || JSON.stringify(data)));
       return;
     }
+    // Mostrar una sola advertencia si el bloqueo cae sobre reservas activas.
+    // El bloqueo se aplica igual; el aviso es solo para que se contacte al cliente.
+    if (data.warning) {
+      alert(data.warning);
+    }
     document.getElementById('unavail-form').reset();
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('unavail-date').value = today;

@@ -324,16 +324,45 @@ def barber_unavailability_list(request, barber_id):
         return Response({'error': 'La hora de inicio debe ser anterior a la de fin'},
                         status=status.HTTP_400_BAD_REQUEST)
 
+    # Detectar reservas activas que caigan dentro de la franja a bloquear.
+    # No impedimos el bloqueo — solo devolvemos una advertencia para que el
+    # barbero o admin contacte al cliente y reagende.
+    block_start_dt = datetime.combine(d, s)
+    block_end_dt = datetime.combine(d, e)
+    conflicting = []
+    for bk in Booking.objects.filter(
+        barber=barber, date=d, status__in=['pending', 'confirmed']
+    ).select_related('service'):
+        bk_start = datetime.combine(d, bk.time)
+        bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+        if block_start_dt < bk_end and block_end_dt > bk_start:
+            conflicting.append(bk)
+
     u = BarberUnavailability.objects.create(
         barber=barber, date=d, start_time=s, end_time=e, reason=reason
     )
-    return Response({
+
+    response_data = {
         'id': u.id,
         'date': u.date.strftime('%Y-%m-%d'),
         'start_time': u.start_time.strftime('%H:%M'),
         'end_time': u.end_time.strftime('%H:%M'),
         'reason': u.reason,
-    }, status=status.HTTP_201_CREATED)
+    }
+    if conflicting:
+        detalles = ', '.join(
+            f'{bk.client_name} a las {bk.time.strftime("%H:%M")}'
+            for bk in conflicting
+        )
+        plural = 's' if len(conflicting) > 1 else ''
+        response_data['warning'] = (
+            f'Atención: ya hay {len(conflicting)} reserva{plural} agendada{plural} '
+            f'con {barber.display_name} en esa franja '
+            f'({s.strftime("%H:%M")}–{e.strftime("%H:%M")} del {d.strftime("%Y-%m-%d")}): '
+            f'{detalles}. El bloqueo quedó aplicado, recuerda contactar al cliente '
+            f'para reagendar.'
+        )
+    return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['DELETE'])
