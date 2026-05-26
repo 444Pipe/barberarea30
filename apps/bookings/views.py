@@ -94,50 +94,57 @@ def create_booking_view(request):
             if not available_barbers.exists():
                 return Response({'error': 'El barbero asignado para este servicio exclusivo no está disponible.'}, status=400)
 
+        # Parsear fecha/hora una sola vez antes del loop
+        from datetime import datetime as _dt, timedelta
+        date_val = date
+        time_val = time
+        try:
+            req_d = _dt.strptime(date_val, '%Y-%m-%d').date()
+            req_t = _dt.strptime(time_val, '%H:%M').time()
+            req_start = _dt.combine(req_d, req_t)
+            req_end = req_start + timedelta(minutes=service.duration_minutes)
+            parsed_ok = True
+        except (ValueError, TypeError):
+            req_d = req_start = req_end = None
+            parsed_ok = False
+
         # Buscar quién está libre (sin reservas NI bloqueos de inactividad)
         for b in available_barbers:
-            date_val = date
-            time_val = time
-            # Conflicto con reservas existentes (Overlap check)
-            try:
-                from datetime import datetime as _dt, timedelta
-                req_time = _dt.strptime(time_val, '%H:%M').time()
-                req_start = _dt.combine(_dt.strptime(date_val, '%Y-%m-%d').date(), req_time)
-                req_end = req_start + timedelta(minutes=service.duration_minutes)
-                
-                existing_bks = Booking.objects.filter(
-                    barber=b, date=date_val, status__in=['pending', 'confirmed']
-                ).values_list('time', 'duration_minutes')
-                
+            # 1. Conflicto con reservas existentes (Overlap check)
+            if parsed_ok:
                 conflicts = False
-                for bk_time, bk_duration in existing_bks:
-                    bk_start = _dt.combine(_dt.strptime(date_val, '%Y-%m-%d').date(), bk_time)
+                for bk_time, bk_duration in Booking.objects.filter(
+                    barber=b, date=date_val, status__in=['pending', 'confirmed']
+                ).values_list('time', 'duration_minutes'):
+                    bk_start = _dt.combine(req_d, bk_time)
                     bk_end = bk_start + timedelta(minutes=bk_duration or 60)
                     if req_start < bk_end and req_end > bk_start:
                         conflicts = True
                         break
-            except Exception:
+            else:
                 conflicts = Booking.objects.filter(
                     barber=b, date=date_val, time=time_val, status__in=['pending', 'confirmed']
                 ).exists()
-                
+
             if conflicts:
                 continue
-            # Conflicto con inactividad temporal
-            from datetime import datetime as _dt
-            try:
-                slot_time = _dt.strptime(time_val, '%H:%M').time()
-            except (ValueError, TypeError):
-                slot_time = None
-            if slot_time:
-                blocked_now = BarberUnavailability.objects.filter(
-                    barber=b,
-                    date=date_val,
-                    start_time__lte=slot_time,
-                    end_time__gt=slot_time,
-                ).exists()
-                if blocked_now:
-                    continue
+
+            # 2. Conflicto con inactividad temporal (solape real, no solo hora de inicio)
+            # Un bloque [u_start, u_end) cruza la reserva [req_start, req_end)
+            # cuando u_start < req_end AND u_end > req_start.
+            blocked_now = False
+            if parsed_ok:
+                for u_start, u_end in BarberUnavailability.objects.filter(
+                    barber=b, date=date_val
+                ).values_list('start_time', 'end_time'):
+                    u_s = _dt.combine(req_d, u_start)
+                    u_e = _dt.combine(req_d, u_end)
+                    if u_s < req_end and u_e > req_start:
+                        blocked_now = True
+                        break
+            if blocked_now:
+                continue
+
             barber = b
             break
                 
@@ -149,23 +156,33 @@ def create_booking_view(request):
             # Validar servicio exclusivo
             if service.exclusive_barber and service.exclusive_barber.id != barber.id:
                 return Response({'error': 'Este servicio exclusivo solo puede ser realizado por otro barbero.'}, status=400)
-            # Validar inactividad temporal
+            # Validar inactividad temporal (solape real con la ventana del servicio)
             date_val = data.get('date')
             time_val = data.get('time')
-            from datetime import datetime as _dt
+            from datetime import datetime as _dt, timedelta as _td
             try:
                 slot_time = _dt.strptime(time_val, '%H:%M').time()
+                req_d = _dt.strptime(date_val, '%Y-%m-%d').date()
+                req_s = _dt.combine(req_d, slot_time)
+                req_e = req_s + _td(minutes=service.duration_minutes)
             except (ValueError, TypeError):
-                slot_time = None
-            if slot_time and date_val:
-                is_blocked = BarberUnavailability.objects.filter(
-                    barber=barber,
-                    date=date_val,
-                    start_time__lte=slot_time,
-                    end_time__gt=slot_time,
-                ).exists()
-                if is_blocked:
-                    return Response({'error': f'{barber.display_name} no está disponible en ese horario por una emergencia. Por favor elige otra hora.'}, status=400)
+                req_s = req_e = req_d = None
+            if req_s is not None:
+                for u_start, u_end in BarberUnavailability.objects.filter(
+                    barber=barber, date=date_val
+                ).values_list('start_time', 'end_time'):
+                    u_s = _dt.combine(req_d, u_start)
+                    u_e = _dt.combine(req_d, u_end)
+                    if u_s < req_e and u_e > req_s:
+                        return Response({
+                            'error': (
+                                f'{barber.display_name} está bloqueado de '
+                                f'{u_start.strftime("%H:%M")} a {u_end.strftime("%H:%M")} '
+                                f'el {date_val}. Tu reserva ({time_val} – '
+                                f'{req_e.strftime("%H:%M")}) se cruza con ese bloqueo. '
+                                f'Por favor elige otra hora.'
+                            )
+                        }, status=409)
         except Barber.DoesNotExist:
             return Response({'error': 'Barbero no disponible'}, status=400)
 
