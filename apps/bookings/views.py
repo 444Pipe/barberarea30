@@ -177,6 +177,39 @@ def create_booking_view(request):
         req_time = _dt.strptime(requested_time_str, '%H:%M').time()
         req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
         req_end = req_start + timedelta(minutes=service.duration_minutes)
+
+        # ── Nivel 2a: Validar bloqueos globales del local (BlockedDate) ─────────
+        # Si la fecha tiene un BlockedDate sin horario → todo el día está cerrado.
+        # Si tiene start_time/end_time → solo se atiende en esa franja; el
+        # servicio completo debe caber adentro (start..end - duration).
+        try:
+            blocked = BlockedDate.objects.get(date=req_start.date())
+        except BlockedDate.DoesNotExist:
+            blocked = None
+
+        if blocked is not None:
+            if not blocked.start_time or not blocked.end_time:
+                desc = f' ({blocked.description})' if blocked.description else ''
+                return Response({
+                    'ok': False,
+                    'error': (
+                        f'El {requested_date} la barbería está cerrada{desc}. '
+                        f'Por favor elige otra fecha.'
+                    )
+                }, status=409)
+            # Franja parcial: la reserva debe caber dentro de [start_time, end_time]
+            if req_time < blocked.start_time or req_end.time() > blocked.end_time \
+                    or req_end.date() != req_start.date():
+                return Response({
+                    'ok': False,
+                    'error': (
+                        f'El {requested_date} solo se atiende de '
+                        f'{blocked.start_time.strftime("%H:%M")} a '
+                        f'{blocked.end_time.strftime("%H:%M")}. '
+                        f'El horario que elegiste no cabe en esa franja.'
+                    )
+                }, status=409)
+        # ────────────────────────────────────────────────────────────────────────
         
         existing_bookings = Booking.objects.filter(
             barber=barber,
@@ -533,6 +566,51 @@ def admin_reschedule_booking_view(request, booking_id):
     except (ValueError, TypeError) as e:
         return Response({'error': f'Formato de fecha u hora inválido: {e}'}, status=400)
 
+    # Validar bloqueo global del local (BlockedDate)
+    try:
+        blocked = BlockedDate.objects.get(date=req_date)
+    except BlockedDate.DoesNotExist:
+        blocked = None
+
+    if blocked is not None:
+        if not blocked.start_time or not blocked.end_time:
+            desc = f' ({blocked.description})' if blocked.description else ''
+            return Response({
+                'ok': False,
+                'error': (
+                    f'El {new_date} la barbería está cerrada{desc}. '
+                    f'No se puede reagendar a esa fecha.'
+                )
+            }, status=409)
+        if req_time < blocked.start_time or req_end.time() > blocked.end_time \
+                or req_end.date() != req_start.date():
+            return Response({
+                'ok': False,
+                'error': (
+                    f'El {new_date} solo se atiende de '
+                    f'{blocked.start_time.strftime("%H:%M")} a '
+                    f'{blocked.end_time.strftime("%H:%M")}. '
+                    f'El nuevo horario no cabe en esa franja.'
+                )
+            }, status=409)
+
+    # Validar inactividad temporal del barbero (BarberUnavailability)
+    if booking.barber:
+        from apps.barbers.models import BarberUnavailability as _BU
+        unavail_qs = _BU.objects.filter(barber=booking.barber, date=req_date)
+        for ur_start, ur_end in unavail_qs.values_list('start_time', 'end_time'):
+            ur_s = _dt.combine(req_date, ur_start)
+            ur_e = _dt.combine(req_date, ur_end)
+            if req_start < ur_e and req_end > ur_s:
+                return Response({
+                    'ok': False,
+                    'error': (
+                        f'{booking.barber.display_name} tiene un bloqueo de inactividad '
+                        f'de {ur_start.strftime("%H:%M")} a {ur_end.strftime("%H:%M")} '
+                        f'el {new_date}. Por favor elige otra hora.'
+                    )
+                }, status=409)
+
     # Validar conflictos de horario (overlap)
     if booking.barber:
         conflict_qs = Booking.objects.filter(
@@ -545,7 +623,7 @@ def admin_reschedule_booking_view(request, booking_id):
             # SQLite puede devolver strings en lugar de objetos date/time
             bk_d = bk.date if not isinstance(bk.date, str) else _dt.strptime(bk.date, '%Y-%m-%d').date()
             bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
-            
+
             bk_start = _dt.combine(bk_d, bk_t)
             bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
             if req_start < bk_end and req_end > bk_start:
