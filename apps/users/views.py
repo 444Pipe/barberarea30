@@ -417,6 +417,17 @@ def admin_manual_service_view(request):
                     mat_price = float(mat.get('price', 0))
                     notes += f"\n- {mat.get('name', 'Material')}: ${mat_price:,.0f}".replace(',', '.')
 
+            # Validar bloqueos del local y del barbero antes de crear.
+            from apps.bookings.validators import check_booking_conflict
+            err = check_booking_conflict(
+                barber=barber,
+                date=date,
+                time=time,
+                duration_minutes=duration_minutes,
+            )
+            if err:
+                return JsonResponse({'error': err}, status=409)
+
             booking = Booking.objects.create(
                 client_name=client_name,
                 barber=barber,

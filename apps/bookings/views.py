@@ -520,6 +520,24 @@ def admin_booking_detail_view(request, booking_id):
         if 'price' in data and is_operational_or_super:
             booking.price = data['price']
 
+        # Si se está cambiando fecha, hora o barbero, validar bloqueos/inactividad.
+        # Cancelaciones nunca se validan (un admin debe poder cancelar siempre).
+        changed_slot = is_operational_or_super and any(
+            k in data for k in ('date', 'time', 'barber', 'service')
+        )
+        if changed_slot and booking.status not in ('cancelled', 'completed'):
+            from .validators import check_booking_conflict
+            err = check_booking_conflict(
+                barber=booking.barber,
+                date=booking.date,
+                time=booking.time,
+                duration_minutes=(booking.service.duration_minutes
+                                  if booking.service else booking.duration_minutes),
+                exclude_booking_id=booking.pk,
+            )
+            if err:
+                return Response({'ok': False, 'error': err}, status=409)
+
         booking.save()
         
         # Audit Log para cambios de estado (ej: cancelado)
