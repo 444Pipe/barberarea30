@@ -222,9 +222,12 @@ def notifications_view(request):
     
     result = []
     for log in logs:
-        user_name = log.user.get_full_name() or log.user.username if log.user else 'Sistema'
+        if log.user:
+            user_name = log.user.get_full_name() or log.user.username
+        else:
+            user_name = 'Sistema'
         msg = log.extra_data.get('msg', f"Realizó una acción: {log.get_action_display()}")
-        
+
         result.append({
             'id': log.id,
             'user': user_name,
@@ -253,10 +256,10 @@ def audit_log_api_view(request):
 
     result = []
     for log in logs:
-        user_name = (
-            log.user.get_full_name() or log.user.username
-            if log.user else 'Sistema'
-        )
+        if log.user:
+            user_name = log.user.get_full_name() or log.user.username
+        else:
+            user_name = 'Sistema'
         msg = log.extra_data.get('msg', f'Realizó: {log.get_action_display()}')
         result.append({
             'id':          log.id,
@@ -332,7 +335,7 @@ def monthly_report_view(request):
         'total_commissions': float(dc.total_commissions),
         'total_expenses': float(dc.total_expenses),
         'is_verified': dc.is_verified,
-        'closed_by': dc.closed_by.get_full_name() or dc.closed_by.username if dc.closed_by else 'N/A',
+        'closed_by': ((dc.closed_by.get_full_name() or dc.closed_by.username) if dc.closed_by else 'N/A'),
     } for dc in daily_closes]
 
     # Barber ranking for the month
