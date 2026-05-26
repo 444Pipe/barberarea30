@@ -30,13 +30,14 @@ def checkout_booking_view(request, booking_id):
         return Response({'error': 'Reserva no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data
-    
-    # Lógica de comisiones estipuladas
+
+    # Tomar la comisión configurada en el perfil del barbero. Si no hay barbero
+    # o el valor no es válido, caer a un default razonable (40% / 50% Frank).
     barber_name = booking.barber.display_name.lower() if booking.barber else ''
-    if 'frank' in barber_name:
-        default_comm = 50
+    if booking.barber and booking.barber.commission_percentage is not None:
+        comm_percentage = booking.barber.commission_percentage
     else:
-        default_comm = 40
+        comm_percentage = 50 if 'frank' in barber_name else 40
 
     try:
         sale = cashflow_services.process_checkout(
@@ -49,7 +50,7 @@ def checkout_booking_view(request, booking_id):
             discount_assumed_by=data.get('discount_assumed_by', 'none'),
             added_value_amount=_safe_decimal(data.get('added_value_amount'), 0),
             added_value_description=data.get('added_value_description', ''),
-            commission_percentage=default_comm,
+            commission_percentage=comm_percentage,
             notes=data.get('notes', ''),
             frank_materials_cost=_safe_decimal(data.get('frank_materials_cost'), 0),
             frank_labor_cost=_safe_decimal(data.get('frank_labor_cost'), 0),

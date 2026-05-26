@@ -5,7 +5,13 @@ from django.contrib import messages
 
 
 def role_required(*roles):
-    """Decorator that checks if the logged-in user has one of the given roles."""
+    """Decorator that checks if the logged-in user has one of the given roles.
+
+    Si no está autenticado, manda a login. Si está autenticado pero le
+    falta el rol, lo deja logueado y lo manda a su pantalla de inicio
+    (dashboard para staff, agenda propia para barbero) con un mensaje
+    de error — no le cierra la sesión.
+    """
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped(request, *args, **kwargs):
@@ -13,10 +19,10 @@ def role_required(*roles):
                 return redirect('admin_login')
             profile = getattr(request.user, 'profile', None)
             if not profile or profile.role not in roles:
-                from django.contrib.auth import logout
-                logout(request)
                 messages.error(request, 'No tienes permisos para acceder a esta sección.')
-                return redirect('admin_login')
+                if profile and profile.role == 'barber':
+                    return redirect('admin_barber_agenda')
+                return redirect('admin_dashboard')
             return view_func(request, *args, **kwargs)
         return _wrapped
     return decorator
