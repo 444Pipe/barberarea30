@@ -154,10 +154,19 @@ def dashboard_stats_view(request):
 
     completed = base.filter(status='completed')
 
-    # Revenue toggles
-    day_revenue = completed.filter(date=today).aggregate(r=Sum('price'))['r'] or 0
-    week_revenue = completed.filter(date__gte=week_start).aggregate(r=Sum('price'))['r'] or 0
-    month_revenue = completed.filter(date__gte=month_start).aggregate(r=Sum('price'))['r'] or 0
+    # Revenue: contar solo ventas APROBADAS para que coincida con Caja.
+    # Antes se sumaba Booking.price de las reservas 'completed', incluyendo
+    # las que tenían Sale pendiente de aprobación (Frank aún no la confirmaba),
+    # generando discrepancias con la vista de cashflow.
+    from apps.cashflow.models import Sale
+    sales_qs = Sale.objects.filter(approval_status=Sale.STATUS_APPROVED)
+    if profile and profile.is_barber and not profile.is_admin:
+        barber = getattr(request.user, 'barber_profile', None)
+        sales_qs = sales_qs.filter(barber=barber) if barber else sales_qs.none()
+
+    day_revenue = sales_qs.filter(created_at__date=today).aggregate(r=Sum('final_price'))['r'] or 0
+    week_revenue = sales_qs.filter(created_at__date__gte=week_start).aggregate(r=Sum('final_price'))['r'] or 0
+    month_revenue = sales_qs.filter(created_at__date__gte=month_start).aggregate(r=Sum('final_price'))['r'] or 0
 
     # Pending bookings
     pending_count = base.filter(status='pending').count()
@@ -306,25 +315,41 @@ def monthly_report_view(request):
     else:
         last_day = datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)
 
-    # Sales in range
-    sales = Sale.objects.filter(created_at__date__gte=first_day, created_at__date__lte=last_day)
+    # Sales in range — solo APROBADAS (las pendientes pueden ser rechazadas)
+    sales = Sale.objects.filter(
+        created_at__date__gte=first_day,
+        created_at__date__lte=last_day,
+        approval_status=Sale.STATUS_APPROVED,
+    )
     totals = sales.aggregate(
         total_sales=Sum('final_price'),
         total_tips=Sum('tip_amount'),
         total_discounts=Sum('discount_amount'),
     )
 
-    # Commissions
+    # Commissions: Frank ya está contabilizado como Expense diaria
+    # ("Pago Diario: Franko"); si sumamos también su Commission.commission_amount
+    # acá lo estaríamos contando dos veces en el net_income.
     commissions = Commission.objects.filter(sale__in=sales)
-    total_commissions = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
+    non_frank_commissions = commissions.exclude(barber__display_name__icontains='frank')
+    total_commissions = non_frank_commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
+    # Para mostrar la "torta total" sí sumamos todas
+    total_commissions_all = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
 
     # Expenses in range
     expenses = Expense.objects.filter(date__gte=first_day, date__lte=last_day)
     total_expenses = expenses.aggregate(t=Sum('amount'))['t'] or 0
 
+    # Las propinas que Frank cobra dentro de su "Pago Diario" son pass-through
+    # (cliente→barbero), no son gasto de la empresa. Las restamos del total
+    # antes de calcular el net para no inflar el costo.
+    frank_tips = commissions.filter(barber__display_name__icontains='frank') \
+        .aggregate(t=Sum('tip_amount'))['t'] or 0
+    expenses_for_net = float(total_expenses) - float(frank_tips)
+
     # Net income
     total_income = float(totals['total_sales'] or 0)
-    net_income = total_income - float(total_commissions) - float(total_expenses)
+    net_income = total_income - float(total_commissions) - expenses_for_net
 
     # Daily closes for the month
     daily_closes = DailyClose.objects.filter(date__gte=first_day, date__lte=last_day).order_by('date')
@@ -364,7 +389,7 @@ def monthly_report_view(request):
             'total_sales': total_income,
             'total_tips': float(totals['total_tips'] or 0),
             'total_discounts': float(totals['total_discounts'] or 0),
-            'total_commissions': float(total_commissions),
+            'total_commissions': float(total_commissions_all),
             'total_expenses': float(total_expenses),
             'net_income': net_income,
             'total_transactions': sales.count(),

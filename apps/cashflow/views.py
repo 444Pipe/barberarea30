@@ -141,14 +141,21 @@ def daily_close_view(request):
             # Marcar automáticamente como pagado
             frank_commissions.update(is_paid=True, is_paid_in_daily_close=True, paid_at=timezone.now())
 
-        # Egresos variables del día (no asignados a un cierre)
+        # Egresos variables del día (no asignados a un cierre).
+        # OJO: este total INCLUYE el "Pago Diario: Franko" recién creado, que
+        # a su vez es (comisión + propinas). Las propinas del cliente son
+        # pass-through (cliente → barbero), no son revenue ni gasto real de
+        # la empresa, así que las restamos del total para que el net no
+        # quede artificialmente más bajo.
         pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
         total_expenses = pending_expenses.aggregate(total=Sum('amount'))['total'] or 0
+        expenses_for_net = total_expenses - frank_total_tips
 
-        # Ingreso neto: (Ventas Base) - (Comisiones) - (Descuentos asimilados por la empresa?) 
-        # Actually total_sales was based on base_price. The real income for the company from sales is the final_price.
+        # Ingreso neto: revenue de servicios + inventario - comisiones de los
+        # demás barberos (no Frank — su comisión ya está en Expense) - egresos
+        # reales (excluyendo el componente de propina del pago a Frank).
         total_final_prices = pending_sales.aggregate(total=Sum('final_price'))['total'] or 0
-        net_income = total_final_prices + total_inventory_sales - total_commissions - total_expenses
+        net_income = total_final_prices + total_inventory_sales - total_commissions - expenses_for_net
 
         daily_close = DailyClose.objects.create(
             date=today,
@@ -361,16 +368,19 @@ def live_cashflow_detail_view(request):
     barbers_data = {}
     sales_detail = []
     payment_methods_data = {}
-    
+
     total_sales_overall = 0
     total_tips_overall = 0
     total_commissions_overall = 0
     frank_pay_live = 0
+    # Componente "propina" del pago a Frank — pass-through (cliente→barbero),
+    # no es gasto real de la empresa. Se trackea para corregir el net_income.
+    frank_tips_live = 0
 
     for sale in approved_sales:
         barber_id = sale.barber.id if sale.barber else 'unassigned'
         barber_name = sale.barber.display_name if sale.barber else 'Sin Barbero'
-        
+
         if barber_id not in barbers_data:
             barbers_data[barber_id] = {
                 'name': barber_name,
@@ -379,23 +389,24 @@ def live_cashflow_detail_view(request):
                 'total_tips': 0,
                 'total_commissions': 0,
             }
-        
+
         b_data = barbers_data[barber_id]
         b_data['sales_count'] += 1
-        
+
         f_price = float(sale.final_price)
         t_tip = float(sale.tip_amount)
         c_amount = float(sale.commission.commission_amount) if hasattr(sale, 'commission') else 0
-        
+
         b_data['total_sales'] += f_price
         b_data['total_tips'] += t_tip
         b_data['total_commissions'] += c_amount
-        
+
         total_sales_overall += f_price
         total_tips_overall += t_tip
-        
+
         if 'frank' in barber_name.lower():
             frank_pay_live += c_amount + t_tip
+            frank_tips_live += t_tip
         else:
             total_commissions_overall += c_amount
 
@@ -458,7 +469,11 @@ def live_cashflow_detail_view(request):
         })
         total_expenses_overall += frank_pay_live
 
-    net_income = total_sales_overall + total_inventory_sales_overall - total_commissions_overall - total_expenses_overall
+    # Restar el componente de propina de los gastos al calcular net_income:
+    # la propina entró como cash y sale como cash (pass-through), no afecta
+    # la utilidad real de la empresa.
+    expenses_for_net = total_expenses_overall - frank_tips_live
+    net_income = total_sales_overall + total_inventory_sales_overall - total_commissions_overall - expenses_for_net
 
     return Response({
         'date': today.strftime('%Y-%m-%d'),

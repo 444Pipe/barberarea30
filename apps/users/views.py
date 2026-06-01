@@ -72,8 +72,14 @@ def admin_dashboard_view(request):
     today_pending = today_bookings.filter(status__in=['pending', 'confirmed']).count()
 
     # Revenue today from Sales model (more accurate).
-    # Para un barbero, restringir a sus propias ventas; el admin ve el total.
-    today_sales = Sale.objects.filter(created_at__date=today)
+    # Solo contamos las ventas APROBADAS para que coincida con lo que muestra
+    # Caja / Cierre Diario — antes el dashboard sumaba pendientes de aprobar,
+    # generando discrepancias "a veces hay más, a veces menos plata".
+    # Para un barbero, además restringimos a sus propias ventas.
+    today_sales = Sale.objects.filter(
+        created_at__date=today,
+        approval_status=Sale.STATUS_APPROVED,
+    )
     if is_barber_only:
         today_sales = today_sales.filter(barber=barber_profile) if barber_profile else today_sales.none()
     today_revenue = float(today_sales.aggregate(t=Sum('final_price'))['t'] or 0)
