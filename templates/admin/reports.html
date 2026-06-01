@@ -153,11 +153,14 @@ function loadReport() {
 }
 
 function renderKPIs(k, period) {
+    // total_commissions ahora excluye a Frank — su pago diario va dentro
+    // de total_expenses, así que mostrarlo aparte evita la doble cuenta.
     const kpis = [
         { label: 'Ingresos Brutos', value: fmt(k.total_sales), sub: `${k.total_transactions} transacciones`, color: 'text-white', border: 'border-white/5' },
         { label: 'Propinas', value: fmt(k.total_tips), sub: 'para los barberos', color: 'text-white', border: 'border-white/5' },
-        { label: 'Comisiones Pagadas', value: fmt(k.total_commissions), sub: 'al equipo de barberos', color: 'text-red-400', border: 'border-white/5' },
-        { label: 'Egresos del Mes', value: fmt(k.total_expenses), sub: 'gastos operativos', color: 'text-orange-400', border: 'border-white/5' },
+        { label: 'Comisiones Equipo', value: fmt(k.total_commissions), sub: 'sin incluir a Frank', color: 'text-red-400', border: 'border-white/5' },
+        { label: 'Pago Diario a Frank', value: fmt(k.frank_payout || 0), sub: 'comisión + propinas (ya en egresos)', color: 'text-amber-400', border: 'border-white/5' },
+        { label: 'Egresos del Mes', value: fmt(k.total_expenses), sub: 'incluye pago a Frank', color: 'text-orange-400', border: 'border-white/5' },
         { label: 'Descuentos Aplicados', value: fmt(k.total_discounts), sub: 'del mes', color: 'text-blue-400', border: 'border-white/5' },
         { label: 'GANANCIA NETA', value: fmt(k.net_income), sub: `${period}`, color: 'text-gold text-3xl', border: 'border-gold/30 shadow-[0_0_15px_rgba(212,175,55,0.15)]' },
     ];

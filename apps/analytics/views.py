@@ -343,9 +343,14 @@ def monthly_report_view(request):
     # Las propinas que Frank cobra dentro de su "Pago Diario" son pass-through
     # (cliente→barbero), no son gasto de la empresa. Las restamos del total
     # antes de calcular el net para no inflar el costo.
-    frank_tips = commissions.filter(barber__display_name__icontains='frank') \
-        .aggregate(t=Sum('tip_amount'))['t'] or 0
+    frank_commissions_qs = commissions.filter(barber__display_name__icontains='frank')
+    frank_tips = frank_commissions_qs.aggregate(t=Sum('tip_amount'))['t'] or 0
+    frank_comm_only = frank_commissions_qs.aggregate(t=Sum('commission_amount'))['t'] or 0
+    # Pago diario que se le hace a Frank vía Expense (comisión + propinas).
+    frank_payout = float(frank_comm_only) + float(frank_tips)
     expenses_for_net = float(total_expenses) - float(frank_tips)
+    # Egresos NO relacionados con el pago a Frank (más útil para el KPI).
+    expenses_non_frank = float(total_expenses) - frank_payout
 
     # Net income
     total_income = float(totals['total_sales'] or 0)
@@ -389,8 +394,14 @@ def monthly_report_view(request):
             'total_sales': total_income,
             'total_tips': float(totals['total_tips'] or 0),
             'total_discounts': float(totals['total_discounts'] or 0),
-            'total_commissions': float(total_commissions_all),
+            # Comisiones del EQUIPO (no incluye a Frank — su pago diario
+            # ya está dentro de total_expenses como "Pago Diario: Franko").
+            # Antes este valor incluía a Frank y, sumado mentalmente con
+            # total_expenses, double-conteaba su comisión.
+            'total_commissions': float(total_commissions),
+            'frank_payout': frank_payout,
             'total_expenses': float(total_expenses),
+            'total_expenses_non_frank': expenses_non_frank,
             'net_income': net_income,
             'total_transactions': sales.count(),
         },

@@ -424,8 +424,11 @@ def barber_unavailability_bulk_create(request, barber_id):
 
     if all_day:
         from datetime import time as _time
-        s = _time(0, 0)
-        e = _time(23, 59)
+        s = _time(0, 0, 0)
+        # 23:59:59 cierra el último minuto del día — antes usábamos 23:59:00
+        # y una reserva a las 23:59 (con duración > 0) no se detectaba como
+        # solape porque el chequeo es u_end > req_start (estricto).
+        e = _time(23, 59, 59)
     else:
         s_str = payload.get('start_time')
         e_str = payload.get('end_time')
