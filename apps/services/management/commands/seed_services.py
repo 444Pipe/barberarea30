@@ -17,10 +17,10 @@ class Command(BaseCommand):
         services_data = [
             {'name': 'Diseño de cejas', 'slug': 'diseno-de-cejas', 'price': 5000,
              'duration_minutes': 15,
-             'description': 'Asesoría de forma según rostro, Limpieza con cera o pinza, Perfilado milimétrico, Hidratación final',
+             'description': 'Asesoría de forma según rostro, Trabajo a pura navaja (sin cera ni pinza), Perfilado milimétrico, Hidratación final',
              'features': [
                  'Asesoría de forma según rostro',
-                 'Limpieza con cera o pinza',
+                 'Trabajo a pura navaja (sin cera ni pinza)',
                  'Perfilado milimétrico',
                  'Hidratación final',
              ]},
