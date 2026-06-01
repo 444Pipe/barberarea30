@@ -278,10 +278,177 @@
       .menu-duration { display: none; }
       .menu-price { font-size: 1rem; min-width: 60px; }
     }
+
+    /* ───── Scroll Progress Bar (top of viewport) ───── */
+    #scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      width: 0%;
+      background: linear-gradient(90deg, #b39129 0%, #D4AF37 30%, #f3d97f 50%, #D4AF37 70%, #b39129 100%);
+      background-size: 200% 100%;
+      z-index: 9998;
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.55), 0 0 2px rgba(212, 175, 55, 0.85);
+      animation: progressShimmer 3.5s linear infinite;
+      pointer-events: none;
+      transform-origin: left center;
+    }
+    @keyframes progressShimmer {
+      0%   { background-position: 0% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    /* ───── Hero parallax background ───── */
+    .hero-bg {
+      will-change: transform;
+    }
+    .hero-bg img {
+      transform: translate3d(0, var(--hero-shift, 0), 0) scale(1.15);
+      transition: transform 80ms linear;
+    }
+
+    /* ───── Animated section title underline (revealed on scroll) ───── */
+    .title-underline {
+      position: relative;
+      display: inline-block;
+    }
+    .title-underline::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -22px;
+      width: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #D4AF37 50%, transparent);
+      transform: translateX(-50%);
+      transition: width 1.3s cubic-bezier(0.22, 1, 0.36, 1) 200ms;
+    }
+    .title-underline.is-visible::after { width: 100%; }
+    @media (max-width: 640px) { .title-underline::after { bottom: -16px; } }
+
+    /* ───── Stat counters (El Club) ───── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+      border-top: 1px solid rgba(212, 175, 55, 0.2);
+      padding-top: 2.5rem;
+      margin-top: 2.5rem;
+    }
+    .stat-block { text-align: left; }
+    .stat-num {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: clamp(2rem, 4.2vw, 3.4rem);
+      line-height: 1;
+      background: linear-gradient(135deg, #f3d97f 0%, #D4AF37 50%, #b39129 100%);
+      -webkit-background-clip: text;
+              background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: block;
+    }
+    .stat-num .stat-suffix {
+      -webkit-text-fill-color: #D4AF37;
+      color: #D4AF37;
+      font-size: 0.65em;
+      margin-left: 0.05em;
+    }
+    .stat-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(245, 245, 245, 0.45);
+      margin-top: 0.85rem;
+      line-height: 1.4;
+    }
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 1.75rem; padding-top: 2rem; margin-top: 2rem; }
+    }
+
+    /* ───── Scroll cue bouncing arrow (hero) ───── */
+    @keyframes scrollCueBounce {
+      0%, 100% { transform: translateY(0) rotate(45deg); opacity: 0.35; }
+      50%      { transform: translateY(8px) rotate(45deg); opacity: 1; }
+    }
+    .scroll-cue-arrow {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-right: 1px solid #D4AF37;
+      border-bottom: 1px solid #D4AF37;
+      animation: scrollCueBounce 2.2s ease-in-out infinite;
+    }
+
+    /* ───── Section ornament divider ───── */
+    .section-ornament {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      padding: 1.5rem 0;
+      pointer-events: none;
+    }
+    .section-ornament .line {
+      height: 1px;
+      width: 120px;
+      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.45), transparent);
+    }
+    .section-ornament .diamond {
+      width: 7px;
+      height: 7px;
+      background: #D4AF37;
+      transform: rotate(45deg);
+      box-shadow: 0 0 14px rgba(212, 175, 55, 0.6);
+    }
+
+    /* ───── Atmosphere orbs (subtle gold glow) ───── */
+    .atm-orb {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.14) 0%, rgba(212, 175, 55, 0) 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      z-index: 0;
+      will-change: transform;
+    }
+
+    /* ───── Service rows: staggered slide-in from left ───── */
+    .menu-row {
+      opacity: 0;
+      transform: translateX(-24px);
+      transition: opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
+                  padding 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                  background 0.4s;
+    }
+    .menu-row.is-visible { opacity: 1; transform: translateX(0); }
+    .menu-row.is-visible:nth-child(1) { transition-delay: 0ms; }
+    .menu-row.is-visible:nth-child(2) { transition-delay: 140ms; }
+    .menu-row.is-visible:nth-child(3) { transition-delay: 280ms; }
+
+    /* ───── Navbar enhanced scroll state ───── */
+    #navbar.is-scrolled {
+      padding-top: 0.45rem;
+      padding-bottom: 0.45rem;
+      background: rgba(10, 10, 10, 0.92);
+      border-bottom-color: rgba(212, 175, 55, 0.28);
+      box-shadow: 0 14px 40px -20px rgba(0, 0, 0, 0.7);
+    }
+
+    /* ───── Card tilt (for reviews / map) ───── */
+    .tilt-card {
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
   </style>
 </head>
 
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet splash-active">
+
+  <!-- Scroll Progress Bar (parte superior, color dorado, sigue el scroll) -->
+  <div id="scroll-progress" aria-hidden="true"></div>
 
   <!-- Splash Screen / Pantalla de Carga -->
   <div id="splash-screen" role="status" aria-label="Cargando Área 30 Barber Club">
@@ -389,8 +556,8 @@
   <!-- Hero Section Rediseñado -->
   <section class="hero-section relative min-h-screen flex items-center justify-center px-4 overflow-hidden pt-20">
     <!-- Background Image with Parallax & Lujo -->
-    <div class="absolute inset-0 z-0">
-      <img src="{% static 'images/hero_luxury.png' %}" alt="Área 30 Club" class="w-full h-full object-cover scale-110">
+    <div class="absolute inset-0 z-0 hero-bg" id="hero-bg">
+      <img src="{% static 'images/hero_luxury.png' %}" alt="Área 30 Club" class="w-full h-full object-cover">
       <div class="absolute inset-0 bg-gradient-to-r from-jet via-jet/40 to-transparent z-10"></div>
       <div class="absolute inset-0 bg-gradient-to-b from-jet/60 via-transparent to-jet z-10"></div>
       <div class="absolute top-1/2 left-0 w-full h-1/2 bg-gold/5 blur-[120px] -translate-y-1/2 z-10"></div>
@@ -416,11 +583,11 @@
           </p>
 
           <div class="flex flex-col sm:flex-row gap-8 items-start">
-            <a href="booking.html" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn">
-              <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold">Reserva Tu Lugar</span>
-              <div
-                class="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500">
-              </div>
+            <a href="booking.html" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
+              <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold flex items-center gap-3">
+                Reserva Tu Lugar
+                <span class="btn-icon text-sm">→</span>
+              </span>
             </a>
             <a href="#servicios"
               class="group flex items-center gap-4 text-xs tracking-[0.3em] uppercase font-bold text-smoke/60 hover:text-gold transition-all py-5">
@@ -445,10 +612,11 @@
     </div>
 
     <div
-      class="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 hidden md:flex flex-col items-center gap-6 opacity-40">
+      class="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 hidden md:flex flex-col items-center gap-4">
       <span
-        class="text-[0.6rem] tracking-[0.5em] uppercase text-smoke/50 font-bold rotate-90 mb-10 origin-center">Scroll</span>
-      <div class="w-[1px] h-24 bg-gradient-to-b from-gold to-transparent"></div>
+        class="text-[0.6rem] tracking-[0.5em] uppercase text-gold/60 font-bold">Descubre</span>
+      <div class="w-[1px] h-16 bg-gradient-to-b from-gold/70 to-transparent"></div>
+      <span class="scroll-cue-arrow"></span>
     </div>
   </section>
 
@@ -475,17 +643,21 @@
   </div>
 
   <!-- El Club -->
-  <section id="el-club" class="py-32 px-4 bg-jet relative border-t border-gold/5">
-    <div class="max-w-6xl mx-auto">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center fade-in-up">
-        <div class="order-2 lg:order-1 relative">
+  <section id="el-club" class="py-32 px-4 bg-jet relative border-t border-gold/5 overflow-hidden">
+    <!-- Atmosphere orbs -->
+    <div class="atm-orb" style="width:520px;height:520px;top:-160px;left:-200px;"></div>
+    <div class="atm-orb" style="width:380px;height:380px;bottom:-120px;right:-120px;opacity:0.7;"></div>
+
+    <div class="max-w-6xl mx-auto relative z-10">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+        <div class="order-2 lg:order-1 relative reveal-scale">
           <div class="absolute -inset-4 border border-gold/20 rounded-sm transform translate-x-4 -translate-y-4"></div>
           <div
-            class="aspect-[4/5] bg-jet border border-white/5 relative z-10 flex items-center justify-center overflow-hidden group">
+            class="aspect-[4/5] bg-jet border border-white/5 relative z-10 flex items-center justify-center overflow-hidden group zoom-img">
             <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10 duration-500">
             </div>
             <video id="club-video" src="{% static 'images/videoarea30.mp4' %}" autoplay muted loop playsinline
-              class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"></video>
+              class="w-full h-full object-cover"></video>
             <button id="unmute-btn" onclick="toggleMute()"
               class="absolute bottom-4 right-4 z-20 w-10 h-10 bg-black/60 hover:bg-gold/80 rounded-full flex items-center justify-center text-white transition-colors">
               <svg id="mute-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -501,7 +673,7 @@
             </button>
           </div>
         </div>
-        <div class="order-1 lg:order-2">
+        <div class="order-1 lg:order-2 reveal-up">
           <div class="flex items-center gap-4 mb-6">
             <div class="h-[1px] w-12 bg-gold"></div>
             <span class="text-gold tracking-widest uppercase text-sm font-semibold">Concepto 5 Estrellas</span>
@@ -513,18 +685,24 @@
             En Área 30, esculpimos identidades. Dejamos atrás lo convencional para abrazar la elegancia de un club privado
             donde la pulcritud y el lujo son la única norma en Restrepo.
           </p>
-          <div class="grid grid-cols-2 gap-12 border-t border-gold/20 pt-10 mt-10">
-            <div>
-              <div class="text-4xl font-serif text-gold mb-3">⚜️</div>
-              <h4 class="text-white font-bold mb-2 uppercase tracking-widest text-xs">ARTE EN EL DETALLE</h4>
-              <p class="text-smoke/50 text-xs font-light tracking-wide uppercase">La perfección no es negociable; es
-                nuestra norma.</p>
+
+          <!-- Stat counters (animan al entrar en viewport) -->
+          <div class="stats-grid reveal-stagger">
+            <div class="stat-block">
+              <span class="stat-num" data-count-to="9"><span class="counter">0</span><span class="stat-suffix">+</span></span>
+              <p class="stat-label">Servicios<br>Premium</p>
             </div>
-            <div>
-              <div class="text-4xl font-serif text-gold mb-3">⚜️</div>
-              <h4 class="text-white font-bold mb-2 uppercase tracking-widest text-xs">EXPERIENCIA ÉLITE</h4>
-              <p class="text-smoke/50 text-xs font-light tracking-wide uppercase">Más que una barbería, un club privado
-                de estilo personal.</p>
+            <div class="stat-block">
+              <span class="stat-num" data-count-to="5"><span class="counter">0</span><span class="stat-suffix">★</span></span>
+              <p class="stat-label">Estándar<br>5 Estrellas</p>
+            </div>
+            <div class="stat-block">
+              <span class="stat-num" data-count-to="1000"><span class="counter">0</span><span class="stat-suffix">+</span></span>
+              <p class="stat-label">Clientes<br>Atendidos</p>
+            </div>
+            <div class="stat-block">
+              <span class="stat-num" data-count-to="100"><span class="counter">0</span><span class="stat-suffix">%</span></span>
+              <p class="stat-label">Pasión<br>por el detalle</p>
             </div>
           </div>
         </div>
@@ -532,20 +710,32 @@
     </div>
   </section>
 
+  <!-- Ornamento divisorio -->
+  <div class="section-ornament" aria-hidden="true">
+    <span class="line"></span>
+    <span class="diamond"></span>
+    <span class="line"></span>
+  </div>
+
   <!-- Menú de Servicios -->
-  <section id="servicios" class="py-32 px-4 bg-jet-lighter relative border-y border-gold/5">
-    <div class="max-w-7xl mx-auto text-center">
-      <h2 class="text-5xl md:text-7xl font-serif font-bold text-white tracking-tight mb-20">
-        Servicios <span class="italic text-gold font-light">Elite.</span>
-      </h2>
+  <section id="servicios" class="py-32 px-4 bg-jet-lighter relative border-y border-gold/5 overflow-hidden">
+    <!-- Atmosphere orb -->
+    <div class="atm-orb" style="width:600px;height:600px;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.5;"></div>
+
+    <div class="max-w-7xl mx-auto text-center relative z-10">
+      <div class="reveal-up">
+        <h2 class="title-underline text-5xl md:text-7xl font-serif font-bold text-white tracking-tight mb-20">
+          Servicios <span class="italic text-gold font-light">Elite.</span>
+        </h2>
+      </div>
       <div id="services-grid" class="services-menu">
         <p class="text-smoke/40 text-sm py-8 text-center">Cargando servicios...</p>
       </div>
-      <div class="mt-16">
+      <div class="mt-16 reveal-up">
         <a href="/booking/"
-          class="group inline-flex items-center gap-4 px-10 py-4 border border-gold/40 text-gold font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold hover:text-jet transition-all duration-300">
+          class="group inline-flex items-center gap-4 px-10 py-4 border border-gold/40 text-gold font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold hover:text-jet transition-all duration-300 ripple-btn icon-slide">
           Ver todos los servicios
-          <span class="w-8 h-[1px] bg-gold group-hover:bg-jet/40 transition-all duration-300"></span>
+          <span class="btn-icon w-8 h-[1px] bg-gold group-hover:bg-jet/40 transition-all duration-300"></span>
         </a>
       </div>
     </div>
@@ -563,7 +753,7 @@
         <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold">Nuestros Trabajos</span>
         <div class="h-[1px] w-12 bg-gold/40"></div>
       </div>
-      <h2 class="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight mb-6">
+      <h2 class="title-underline text-4xl md:text-6xl font-serif font-bold text-white tracking-tight mb-6">
         Ve la <span class="italic text-gold font-light">Excelencia.</span>
       </h2>
       <p class="text-smoke/50 mb-10 font-light leading-relaxed max-w-lg mx-auto">
@@ -571,7 +761,7 @@
         identidades en Restrepo.
       </p>
       <a href="/reels/"
-        class="group inline-flex items-center gap-4 px-10 py-4 bg-gold text-jet font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold-light transition-all duration-300 shadow-lg shadow-gold/20">
+        class="group inline-flex items-center gap-4 px-10 py-4 bg-gold text-jet font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold-light transition-all duration-300 shadow-lg shadow-gold/20 magnetic-btn ripple-btn">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -602,7 +792,7 @@
           <span class="text-gold tracking-[0.5em] uppercase text-xs font-bold">Opiniones Reales</span>
           <div class="h-[1px] w-12 bg-gold/40"></div>
         </div>
-        <h2 class="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight mb-4">
+        <h2 class="title-underline text-4xl md:text-6xl font-serif font-bold text-white tracking-tight mb-4">
           Lo que dicen <span class="italic text-gold font-light">nuestros clientes.</span>
         </h2>
         <p class="text-smoke/40 font-light text-sm max-w-md mx-auto">Experiencias auténticas de quienes ya viven el
@@ -643,7 +833,7 @@
 
       <!-- Contenedor del Mapa con borde dinámico y amigable -->
       <div
-        class="relative group p-1 sm:p-2 bg-gradient-to-br from-gold/30 via-transparent to-gold/30 rounded-[2.5rem] transition-all duration-700 hover:shadow-[0_0_50px_rgba(212,175,55,0.15)]">
+        class="reveal-scale relative group p-1 sm:p-2 bg-gradient-to-br from-gold/30 via-transparent to-gold/30 rounded-[2.5rem] transition-all duration-700 hover:shadow-[0_0_50px_rgba(212,175,55,0.15)]">
         <div
           class="w-full h-[500px] rounded-[2rem] overflow-hidden border border-white/10 relative shadow-2xl transition-transform duration-700 group-hover:scale-[1.01]">
           <div
@@ -674,7 +864,7 @@
   <!-- Footer de Lujo Rediseñado Final -->
   <footer class="bg-black pt-24 pb-12 px-4 border-t border-white/5">
     <div class="max-w-7xl mx-auto">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-16 mb-24">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-16 mb-24 reveal-stagger">
 
         <div class="lg:col-span-4 pr-8">
           <div class="text-4xl font-serif font-bold tracking-[0.2em] text-gold mb-6 uppercase">ÁREA 30</div>
@@ -814,20 +1004,87 @@
     document.getElementById('menu-toggle').addEventListener('click', () => {
       document.getElementById('mobile-menu').classList.toggle('hidden');
     });
-    window.addEventListener('scroll', () => {
-      const nav = document.getElementById('navbar');
-      if (window.scrollY > 50) {
-        nav.classList.add('py-2', 'bg-jet/95', 'shadow-2xl');
-      } else {
-        nav.classList.remove('py-2', 'bg-jet/95', 'shadow-2xl');
+
+    // ─── Scroll handler unificado: navbar shrink + progress bar + hero parallax ───
+    const _navEl = document.getElementById('navbar');
+    const _progressEl = document.getElementById('scroll-progress');
+    const _heroBg = document.getElementById('hero-bg');
+    const _prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let _scrollTicking = false;
+
+    function onScrollFrame() {
+      const y = window.scrollY || window.pageYOffset;
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = docH > 0 ? Math.min(100, (y / docH) * 100) : 0;
+
+      if (_progressEl) _progressEl.style.width = pct + '%';
+
+      if (_navEl) {
+        if (y > 60) _navEl.classList.add('is-scrolled');
+        else        _navEl.classList.remove('is-scrolled');
       }
-    });
+
+      // Parallax: la imagen del hero se mueve a 0.35x del scroll (sólo mientras el hero está visible)
+      if (_heroBg && !_prefersReducedMotion && y < window.innerHeight * 1.2) {
+        _heroBg.style.setProperty('--hero-shift', (y * 0.35).toFixed(1) + 'px');
+      }
+
+      _scrollTicking = false;
+    }
+
+    window.addEventListener('scroll', () => {
+      if (!_scrollTicking) {
+        window.requestAnimationFrame(onScrollFrame);
+        _scrollTicking = true;
+      }
+    }, { passive: true });
+    onScrollFrame();
+
+    // ─── Legacy fade-in-up observer (mantengo para hero) ───
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) entry.target.classList.add('visible');
       });
     }, { threshold: 0.1 });
     document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+    // ─── Animated counters (El Club stats) ───
+    function animateCounter(span, target) {
+      const duration = 1600;
+      const start = performance.now();
+      const initial = 0;
+      const ease = t => 1 - Math.pow(1 - t, 3); // easeOutCubic
+      function step(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const val = Math.round(initial + (target - initial) * ease(t));
+        span.textContent = val >= 1000 ? val.toLocaleString('es-CO') : val;
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    const counterIO = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const wrap = entry.target;
+        const target = parseInt(wrap.dataset.countTo, 10) || 0;
+        const span = wrap.querySelector('.counter');
+        if (span) animateCounter(span, target);
+        obs.unobserve(wrap);
+      });
+    }, { threshold: 0.4 });
+    document.querySelectorAll('[data-count-to]').forEach(el => counterIO.observe(el));
+
+    // ─── Title underline reveal ───
+    const underlineIO = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.title-underline').forEach(el => underlineIO.observe(el));
 
     // Load services from API
     fetch('/api/servicios-nativos/')
@@ -869,6 +1126,18 @@
             </a>
           `;
         }).join('');
+
+        // Disparar reveal escalonado de las menu-row cuando entren al viewport
+        const rowsIO = new IntersectionObserver((entries, obs) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              obs.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.2, rootMargin: '0px 0px -40px 0px' });
+        document.querySelectorAll('#services-grid .menu-row').forEach(r => rowsIO.observe(r));
+
         if (window.A30Reveal) window.A30Reveal.refresh();
       });
 
