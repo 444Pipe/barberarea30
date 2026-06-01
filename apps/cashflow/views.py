@@ -413,6 +413,9 @@ def live_cashflow_detail_view(request):
         pm_name = sale.payment_method.name if sale.payment_method else 'Efectivo/Sin Especificar'
         payment_methods_data[pm_name] = payment_methods_data.get(pm_name, 0) + f_price
 
+        commission_pct = None
+        if hasattr(sale, 'commission') and sale.commission:
+            commission_pct = float(sale.commission.percentage)
         sales_detail.append({
             'type': 'service',
             'id': sale.id,
@@ -420,8 +423,12 @@ def live_cashflow_detail_view(request):
             'service_name': sale.service.name if sale.service else 'General',
             'time': timezone.localtime(sale.created_at).strftime('%I:%M %p'),
             'base_price': float(sale.base_price),
+            'discount_amount': float(sale.discount_amount),
+            'discount_assumed_by': sale.discount_assumed_by,
             'final_price': f_price,
             'tip_amount': t_tip,
+            'commission_amount': c_amount,
+            'commission_percentage': commission_pct,
             'payment_method': sale.payment_method.name if sale.payment_method else 'N/A',
             'barber_name': barber_name,
             'approved_by': sale.approved_by.username if sale.approved_by else 'N/A'

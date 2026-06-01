@@ -1,1160 +1,1260 @@
 {% extends 'admin/base_admin.html' %}
+{% block title %}Caja y Finanzas - Área 30{% endblock %}
 
-{% block title %}Caja y Finanzas - Área 30
+{% block extra_head %}
+<style>
+  /* ───── Caja v2 — Mobile-first ─────────────────────────── */
+  .cf-section { margin-top: 1.25rem; }
+  @media (min-width: 768px) { .cf-section { margin-top: 1.75rem; } }
 
+  .cf-section-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(245,245,245,0.5);
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
 
+  /* KPI strip — horizontal scroll en mobile, grid en desktop */
+  .cf-kpi-strip {
+    display: flex;
+    gap: 0.6rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px 4px 8px 4px;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .cf-kpi-strip::-webkit-scrollbar { display: none; }
+  .cf-kpi {
+    flex: 0 0 auto;
+    width: 11.5rem;
+    scroll-snap-align: start;
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 0.55rem;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    transition: border-color .2s, transform .15s;
+  }
+  .cf-kpi:hover { border-color: rgba(212,175,55,0.4); }
+  .cf-kpi:active { transform: scale(0.98); }
+  .cf-kpi.is-active {
+    border-color: rgba(212,175,55,0.55);
+    background: linear-gradient(180deg, rgba(212,175,55,0.06), transparent 60%), #111;
+  }
+  .cf-kpi-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(245,245,245,0.45);
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+  }
+  .cf-kpi-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.35rem;
+    line-height: 1.1;
+  }
+  .cf-kpi-sub { font-size: 0.6rem; color: rgba(245,245,245,0.35); margin-top: 0.35rem; }
+
+  @media (min-width: 768px) {
+    .cf-kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      overflow: visible;
+      margin: 0;
+      padding: 0;
+    }
+    .cf-kpi { width: auto; }
+  }
+  @media (min-width: 1024px) {
+    .cf-kpi-strip { grid-template-columns: repeat(5, 1fr); }
+  }
+
+  /* Tabs — horizontal scroll en mobile */
+  .cf-tabs {
+    display: flex;
+    gap: 0.4rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -1rem 0.75rem;
+    padding: 0 1rem 4px;
+  }
+  .cf-tabs::-webkit-scrollbar { display: none; }
+  .cf-tab {
+    flex: 0 0 auto;
+    padding: 0.55rem 0.95rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: rgba(245,245,245,0.55);
+    background: #0d0d0d;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .cf-tab:hover { color: white; border-color: rgba(212,175,55,0.3); }
+  .cf-tab.is-active {
+    color: #0a0a0a;
+    background: #D4AF37;
+    border-color: #D4AF37;
+  }
+  .cf-tab .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    margin-left: 0.4rem;
+    border-radius: 999px;
+    font-size: 0.55rem;
+    background: rgba(239,68,68,0.85);
+    color: white;
+  }
+  .cf-tab.is-active .badge { background: rgba(10,10,10,0.7); }
+
+  /* Filas de trazabilidad — card en mobile, tabla virtual en desktop */
+  .cf-rows { display: flex; flex-direction: column; gap: 0.55rem; }
+  .cf-row {
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 0.55rem;
+    padding: 0.85rem 1rem;
+    transition: border-color .2s;
+  }
+  .cf-row.is-open { border-color: rgba(212,175,55,0.4); }
+  .cf-row-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    cursor: pointer;
+  }
+  .cf-row-left { min-width: 0; flex: 1; }
+  .cf-row-time {
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(245,245,245,0.4);
+    font-weight: 600;
+  }
+  .cf-row-title {
+    color: white;
+    font-weight: 600;
+    font-size: 0.92rem;
+    line-height: 1.25;
+    margin-top: 0.18rem;
+    word-break: break-word;
+  }
+  .cf-row-sub {
+    font-size: 0.72rem;
+    color: rgba(245,245,245,0.55);
+    margin-top: 0.15rem;
+  }
+  .cf-row-amount {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .cf-row-amount.is-out { color: #f87171; }
+  .cf-row-amount.is-in { color: #D4AF37; }
+  .cf-row-tip { display: block; font-size: 0.55rem; color: #fbbf24; letter-spacing: 0.12em; margin-top: 0.15rem; }
+  .cf-chev { color: rgba(245,245,245,0.4); transition: transform .2s; flex-shrink: 0; margin-top: 4px; }
+  .cf-row.is-open .cf-chev { transform: rotate(180deg); }
+
+  .cf-row-detail {
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed rgba(255,255,255,0.08);
+    font-size: 0.72rem;
+    color: rgba(245,245,245,0.7);
+  }
+  .cf-row.is-open .cf-row-detail { display: block; }
+  .cf-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .cf-detail-grid > div { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .cf-detail-grid .lbl { color: rgba(245,245,245,0.4); }
+  .cf-detail-grid .val { color: white; font-weight: 500; text-align: right; }
+
+  .cf-empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: rgba(245,245,245,0.35);
+    font-size: 0.85rem;
+    border: 1px dashed rgba(255,255,255,0.08);
+    border-radius: 0.55rem;
+  }
+
+  /* Badges de tipo */
+  .cf-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.5rem;
+    border-radius: 0.3rem;
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-right: 0.4rem;
+  }
+  .cf-badge.service { background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+  .cf-badge.product { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+  .cf-badge.expense { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+  .cf-badge.pending { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+  .cf-badge.commission { background: rgba(212,175,55,0.12); color: #f3d97f; border: 1px solid rgba(212,175,55,0.3); }
+
+  /* Botones de acción en filas */
+  .cf-row-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+  }
+  .cf-row-actions button {
+    flex: 1;
+    min-height: 38px;
+  }
+
+  /* Botonera principal — mobile vs desktop */
+  .cf-headbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.7rem;
+  }
+  .cf-headbar .row { display: flex; gap: 0.5rem; }
+  .cf-headbar .row button { flex: 1; min-height: 44px; }
+  .cf-cta-primary {
+    background: #D4AF37;
+    color: #0a0a0a;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    border-radius: 0.4rem;
+    padding: 0.85rem 1rem;
+    transition: background .15s, opacity .15s;
+  }
+  .cf-cta-primary:hover:not(:disabled) { background: #f3d97f; }
+  .cf-cta-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .cf-cta-secondary {
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border-radius: 0.4rem;
+    padding: 0.7rem 0.8rem;
+  }
+  .cf-cta-secondary:hover { border-color: rgba(212,175,55,0.4); }
+
+  @media (min-width: 768px) {
+    .cf-headbar { flex-direction: row; align-items: center; gap: 0.5rem; }
+    .cf-headbar .row { flex: 0 0 auto; }
+    .cf-cta-primary { padding: 0.7rem 1.5rem; }
+  }
+
+  /* Pagos a barbero — cards */
+  .cf-pay-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+  @media (min-width: 640px) { .cf-pay-grid { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1024px) { .cf-pay-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1280px) { .cf-pay-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  /* Historial de cierres */
+  .cf-close-list { display: grid; grid-template-columns: 1fr; gap: 0.6rem; }
+  @media (min-width: 768px) { .cf-close-list { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1024px) { .cf-close-list { grid-template-columns: repeat(3, 1fr); } }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 fade-in">
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-serif text-white">Caja y Finanzas</h1>
-            <p class="text-smoke/60 text-sm mt-1">Resumen financiero del día: {{ today }}</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <button onclick="openInventorySaleModal()" class="px-5 py-2.5 bg-jet-card hover:bg-white/5 border border-white/10 text-white font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-all flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                VENTA RÁPIDA
-            </button>
-            <button onclick="showLiveDetails()" class="px-5 py-2.5 bg-jet-card hover:bg-white/5 border border-gold/30 text-gold font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-all flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                VER RESUMEN EN VIVO
-            </button>
-            <button id="btn-daily-close" class="px-6 py-2.5 bg-gold hover:bg-gold-light text-jet font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-colors flex items-center gap-2" {% if pending_sales_count == 0 %}disabled style="opacity:0.5; cursor:not-allowed;"{% endif %}>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                EJECUTAR CIERRE DE CAJA
-            </button>
-        </div>
+<div class="space-y-3 fade-in" id="cf-root" data-user-role="{{ user_role }}">
+
+  <!-- ═══ HEADER + ACTION BAR ═══ -->
+  <div>
+    <div class="flex items-baseline justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-xl md:text-2xl font-serif text-white">Caja y Finanzas</h1>
+        <p class="text-smoke/50 text-xs mt-0.5">Día actual · {{ today|date:"d M Y" }}</p>
+      </div>
+      <span class="text-[0.6rem] text-smoke/30 tracking-widest uppercase hidden sm:inline" id="cf-last-refresh">—</span>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
-            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Ventas Servicios</div>
-            <div class="text-2xl font-serif text-white">${{ total_sales|floatformat:0 }}</div>
-            <div class="text-xs text-smoke/40 mt-1">{{ pending_sales_count }} operaciones pendientes</div>
-        </div>
-        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
-            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Ventas Productos</div>
-            <div class="text-2xl font-serif text-white">${{ total_inventory_sales|floatformat:0 }}</div>
-            <div class="text-xs text-smoke/40 mt-1">100% ganancia local</div>
-        </div>
-        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
-            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Propinas</div>
-            <div class="text-2xl font-serif text-white">${{ total_tips|floatformat:0 }}</div>
-        </div>
-        <div class="bg-jet-card border border-white/5 p-5 rounded-sm">
-            <div class="text-smoke/50 text-xs tracking-widest uppercase mb-1">Comisiones a Pagar</div>
-            <div class="text-2xl font-serif text-red-400">-${{ total_commissions|floatformat:0 }}</div>
-        </div>
-        <div class="bg-jet-card border border-gold/30 p-5 rounded-sm shadow-[0_0_15px_rgba(212,175,55,0.1)] relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-br from-gold/10 to-transparent pointer-events-none"></div>
-            <div class="relative z-10">
-                <div class="text-gold text-xs tracking-widest uppercase mb-1 font-bold">Ingreso Neto (Aprox)</div>
-                <div class="text-3xl font-serif text-gold">${{ net_income|floatformat:0 }}</div>
-            </div>
-        </div>
+    <div class="cf-headbar">
+      <button id="btn-daily-close" class="cf-cta-primary" {% if pending_sales_count == 0 %}disabled{% endif %}>
+        Cerrar caja del día
+      </button>
+      <div class="row">
+        <button onclick="openInventorySaleModal()" class="cf-cta-secondary">+ Venta rápida</button>
+        <button onclick="cfRefreshAll()" class="cf-cta-secondary" title="Actualizar todo">
+          <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span class="ml-1">Actualizar</span>
+        </button>
+      </div>
     </div>
+  </div>
 
-    <!-- ═══ ALERTA: Ventas por Aprobar ═══ -->
-    {% if pending_approvals_count and pending_approvals_count > 0 %}
-    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-5 flex items-start gap-4">
-        <div class="relative flex h-4 w-4 mt-0.5 flex-shrink-0">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
-        </div>
-        <div>
-            <p class="text-sm font-bold text-red-400 tracking-wider uppercase">{{ pending_approvals_count }} venta(s) pendiente(s) de aprobación</p>
-            <p class="text-xs text-smoke/60 mt-1">El cierre de caja está <strong class="text-red-400">bloqueado</strong> hasta que apruebe o rechace todas las ventas pendientes.</p>
-        </div>
+  <!-- ═══ KPI STRIP ═══ -->
+  <div class="cf-section">
+    <div class="cf-section-title">Resumen del día</div>
+    <div class="cf-kpi-strip" id="cf-kpi-strip">
+      <div class="cf-kpi is-active" data-filter="all">
+        <div class="cf-kpi-label" style="color:#D4AF37">Ingreso Neto</div>
+        <div class="cf-kpi-value text-gold" id="kpi-net">${{ net_income|floatformat:0 }}</div>
+        <div class="cf-kpi-sub">después de comisiones y egresos</div>
+      </div>
+      <div class="cf-kpi" data-filter="service">
+        <div class="cf-kpi-label">Ventas servicios</div>
+        <div class="cf-kpi-value text-white" id="kpi-sales">${{ total_sales|floatformat:0 }}</div>
+        <div class="cf-kpi-sub" id="kpi-sales-sub">{{ pending_sales_count }} pendientes de cerrar</div>
+      </div>
+      <div class="cf-kpi" data-filter="product">
+        <div class="cf-kpi-label">Ventas productos</div>
+        <div class="cf-kpi-value text-white" id="kpi-products">${{ total_inventory_sales|floatformat:0 }}</div>
+        <div class="cf-kpi-sub">100% ganancia local</div>
+      </div>
+      <div class="cf-kpi" data-filter="commission">
+        <div class="cf-kpi-label">Comisiones</div>
+        <div class="cf-kpi-value text-red-400" id="kpi-comm">-${{ total_commissions|floatformat:0 }}</div>
+        <div class="cf-kpi-sub">a pagar a barberos</div>
+      </div>
+      <div class="cf-kpi" data-filter="expense">
+        <div class="cf-kpi-label">Egresos</div>
+        <div class="cf-kpi-value text-red-400" id="kpi-exp">-${{ total_expenses|floatformat:0 }}</div>
+        <div class="cf-kpi-sub" id="kpi-tips-sub">Propinas hoy: ${{ total_tips|floatformat:0 }}</div>
+      </div>
     </div>
-    {% endif %}
+  </div>
 
-    <!-- ═══ PANEL DE APROBACIONES ═══ -->
-    <div id="cashflow-approvals-section" class="{% if not pending_approvals_count or pending_approvals_count == 0 %}hidden{% endif %}">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Ventas por Aprobar</h2>
-            <span id="cf-approvals-count" class="bg-red-500 text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full">{{ pending_approvals_count }}</span>
-        </div>
-        <div id="cf-approvals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div class="text-center text-smoke/30 text-sm py-8 col-span-full">Cargando...</div>
-        </div>
+  <!-- ═══ ALERTA APROBACIONES ═══ -->
+  <div id="cf-approvals-alert" class="cf-section {% if not pending_approvals_count or pending_approvals_count == 0 %}hidden{% endif %}">
+    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
+      <div class="relative flex h-3 w-3 flex-shrink-0">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-bold text-red-400">
+          <span id="cf-approvals-banner-count">{{ pending_approvals_count }}</span> ventas por aprobar
+        </p>
+        <p class="text-[0.7rem] text-smoke/60">El cierre de caja está bloqueado hasta resolverlas.</p>
+      </div>
+      <button onclick="cfShowTab('pending')" class="px-3 py-2 bg-red-500 hover:bg-red-400 text-white text-[0.65rem] font-bold tracking-widest uppercase rounded">
+        Revisar
+      </button>
     </div>
+  </div>
 
-    <!-- Info Message -->
-    {% if pending_sales_count == 0 %}
-    <div class="bg-jet border border-white/5 rounded-sm p-8 text-center">
-        <svg class="w-12 h-12 text-smoke/20 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <h3 class="text-lg font-serif text-white mb-2">No hay ventas aprobadas pendientes por cerrar</h3>
-        <p class="text-smoke/60 text-sm max-w-md mx-auto">Ya se realizó el cierre de caja o aún no hay ventas aprobadas en el sistema.</p>
+  <!-- ═══ TRAZABILIDAD DEL DÍA ═══ -->
+  <div class="cf-section">
+    <div class="flex items-baseline justify-between mb-2">
+      <div class="cf-section-title" style="margin-bottom:0">Trazabilidad del día</div>
+      <span class="text-[0.6rem] text-smoke/30 uppercase tracking-widest" id="cf-tz-count"></span>
+    </div>
+    <div class="cf-tabs" id="cf-tabs">
+      <button class="cf-tab is-active" data-tab="all">Todo</button>
+      <button class="cf-tab" data-tab="service">Ventas</button>
+      <button class="cf-tab" data-tab="product">Productos</button>
+      <button class="cf-tab" data-tab="expense">Egresos</button>
+      <button class="cf-tab" data-tab="commission">Comisiones</button>
+      <button class="cf-tab" data-tab="pending">
+        Pendientes <span id="cf-tab-pending-badge" class="badge {% if not pending_approvals_count %}hidden{% endif %}">{{ pending_approvals_count }}</span>
+      </button>
+    </div>
+    <div id="cf-trazabilidad" class="cf-rows">
+      <div class="cf-empty">Cargando movimientos...</div>
+    </div>
+  </div>
+
+  <!-- ═══ PAGOS PENDIENTES A BARBEROS ═══ -->
+  <div class="cf-section">
+    <div class="flex items-baseline justify-between mb-2">
+      <div>
+        <div class="cf-section-title" style="margin-bottom:0">Pagos pendientes a barberos</div>
+        <p class="text-[0.65rem] text-smoke/40 mt-0.5">Comisiones + propinas acumuladas de ventas aprobadas</p>
+      </div>
+      <button onclick="fetchBarberPayments()" class="text-smoke/40 hover:text-gold p-2 rounded" title="Actualizar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+    </div>
+    <div id="barber-payments-container" class="cf-pay-grid">
+      <div class="cf-empty col-span-full">Cargando pagos...</div>
+    </div>
+  </div>
+
+  <!-- ═══ HISTORIAL DE CIERRES ═══ -->
+  <div class="cf-section">
+    <div class="cf-section-title">Historial de cierres</div>
+    {% if recent_closes %}
+    <div class="cf-close-list">
+      {% for close in recent_closes %}
+      <div class="bg-jet-card border border-white/5 rounded-md p-4 hover:border-gold/30 transition-colors flex flex-col">
+        <div class="flex justify-between items-start mb-2">
+          <div>
+            <div class="text-white font-bold text-sm">{{ close.date|date:"d M Y" }}</div>
+            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest mt-0.5">{{ close.closed_at|date:"H:i" }} · {{ close.closed_by.username }}</div>
+          </div>
+          <span class="px-2 py-0.5 bg-gold/10 text-gold text-[0.55rem] uppercase tracking-widest font-bold rounded">Cerrado</span>
+        </div>
+        <div class="space-y-1 text-[0.7rem] border-t border-white/5 pt-2 mt-1 mb-3">
+          <div class="flex justify-between"><span class="text-smoke/50">Ventas</span><span class="text-white">${{ close.total_sales|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-red-400">-${{ close.total_commissions|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Egresos</span><span class="text-red-400">-${{ close.total_expenses|floatformat:0 }}</span></div>
+          <div class="flex justify-between border-t border-white/5 pt-1.5 mt-1.5 font-bold">
+            <span class="text-gold uppercase tracking-widest text-[0.6rem]">Neto</span>
+            <span class="text-gold text-sm">${{ close.net_income|floatformat:0 }}</span>
+          </div>
+        </div>
+        <div class="mt-auto flex gap-2">
+          <button onclick="showDailyCloseDetails({{ close.id }})" class="flex-1 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/5 hover:border-gold/30 py-2 rounded transition-colors">
+            Detalle
+          </button>
+          {% if user_role == 'superadmin' %}
+          <button onclick="deleteDailyClose({{ close.id }}, '{{ close.date|date:"d M Y" }}')" class="px-3 py-2 text-smoke/30 hover:text-red-400 border border-transparent hover:border-red-400/30 rounded transition-all" title="Borrar Cierre">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
     </div>
     {% else %}
-    <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-white/5">
-            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Desglose antes del cierre</h2>
-        </div>
-        <div class="p-5">
-            <p class="text-smoke/60 text-sm">Asegúrate de que el dinero en caja (efectivo) coincida con los totales listados antes de ejecutar el cierre. Esta acción es <strong>irreversible</strong> y notificará a los administradores principales.</p>
-        </div>
-    </div>
+    <div class="cf-empty">No hay cierres registrados aún.</div>
     {% endif %}
+  </div>
 
 </div>
 
-<!-- ═══ MODAL DE RECHAZO (Cashflow) ═══ -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- ═══ MODALES (reutilizados, sin cambios mayores) ═══ -->
+<!-- ═══════════════════════════════════════════════ -->
+
+<!-- Modal: Cierre de caja confirmación -->
+<div id="modal-daily-close" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('modal-daily-close').classList.add('hidden')"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl p-5">
+      <h3 class="text-lg font-serif text-white mb-2">Confirmar cierre</h3>
+      <p class="text-smoke/60 text-sm mb-5">Se liquidan comisiones y se bloquean las ventas del día. Neto reportado: <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>.</p>
+      <div class="flex gap-2 justify-end">
+        <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="document.getElementById('modal-daily-close').classList.add('hidden')">Cancelar</button>
+        <button id="btn-confirm-close" class="px-5 py-2 bg-gold text-jet font-bold rounded text-xs tracking-widest uppercase">Sí, cerrar</button>
+      </div>
+      <div id="close-error" class="hidden mt-3 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rechazo -->
 <div id="cf-modal-reject" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="cfCloseRejectModal()"></div>
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
-    <div class="bg-jet-card border border-red-500/30 rounded-xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
-        <h3 class="text-base font-serif text-white">Rechazar Venta</h3>
-        <button onclick="cfCloseRejectModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-red-500/30 rounded-md shadow-2xl">
+      <div class="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white tracking-widest uppercase">Rechazar venta</h3>
+        <button onclick="cfCloseRejectModal()" class="text-smoke/40 hover:text-white">✕</button>
       </div>
-      <div class="p-6 space-y-4">
-        <div class="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-          <svg class="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-          <div class="text-xs text-smoke/70 leading-relaxed">
-            Venta de: <strong class="text-white" id="cf-reject-barber-name"></strong><br>
-            La reserva volverá a estado <span class="text-amber-400 font-semibold">Pendiente</span>.
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs tracking-widest uppercase text-smoke/50 mb-2 font-semibold">Razón del Rechazo <span class="text-smoke/30">(opcional)</span></label>
-          <textarea id="cf-reject-reason-input"
-                    class="w-full bg-jet border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-smoke/30 focus:outline-none focus:border-red-500/50 resize-none transition-colors"
-                    rows="3" placeholder="Ej: Monto incorrecto, servicio no coincide..."></textarea>
-        </div>
-        <div id="cf-reject-error" class="hidden p-3 bg-red-500/20 border border-red-500/40 text-red-400 text-xs rounded-lg"></div>
+      <div class="p-5 space-y-3">
+        <div class="text-xs text-smoke/70">Venta de <strong class="text-white" id="cf-reject-barber-name"></strong>. La reserva vuelve a <span class="text-amber-400">Pendiente</span>.</div>
+        <textarea id="cf-reject-reason-input" rows="3" placeholder="Razón (opcional)" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50"></textarea>
+        <div id="cf-reject-error" class="hidden p-2 bg-red-500/20 border border-red-500/40 text-red-400 text-xs rounded"></div>
       </div>
-      <div class="px-6 pb-6 flex gap-3 justify-end">
-        <button onclick="cfCloseRejectModal()" class="px-5 py-2.5 text-smoke/70 hover:text-white transition-colors text-xs tracking-widest uppercase border border-white/10 rounded-lg">
-          Cancelar
-        </button>
-        <button id="cf-btn-confirm-reject" onclick="cfConfirmRejectSale()"
-                class="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs tracking-widest uppercase transition-all flex items-center gap-2">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-          Rechazar Venta
-        </button>
+      <div class="px-5 pb-4 flex gap-2 justify-end">
+        <button onclick="cfCloseRejectModal()" class="px-4 py-2 text-xs uppercase tracking-widest text-smoke border border-white/10 rounded">Cancelar</button>
+        <button id="cf-btn-confirm-reject" onclick="cfConfirmRejectSale()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-widest rounded">Rechazar</button>
       </div>
     </div>
   </div>
 </div>
 
-    <!-- Historial de Cierres -->
-    <div class="mt-8">
-        <h2 class="text-lg font-serif text-white mb-4">Historial de Cierres</h2>
-        {% if recent_closes %}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for close in recent_closes %}
-            <div class="bg-jet-card border border-white/5 p-5 rounded-sm hover:border-gold/30 transition-colors">
-                <div class="flex justify-between items-start mb-3">
-                    <div>
-                        <div class="text-white font-bold">{{ close.date|date:"d M Y" }}</div>
-                        <div class="text-[0.65rem] text-smoke/40 uppercase tracking-widest">{{ close.closed_at|date:"h:i A" }} por {{ close.closed_by.username }}</div>
-                    </div>
-                    <div class="px-2 py-1 bg-gold/10 text-gold text-[0.6rem] uppercase tracking-widest font-bold rounded">
-                        Cerrado
-                    </div>
-                </div>
-                <div class="space-y-2 mt-4 border-t border-white/5 pt-4">
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="text-smoke/60">Ventas Brutas:</span>
-                        <span class="text-white">${{ close.total_sales|floatformat:0 }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="text-smoke/60">Propinas:</span>
-                        <span class="text-white">${{ close.total_tips|floatformat:0 }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="text-smoke/60">Comisiones:</span>
-                        <span class="text-red-400">-${{ close.total_commissions|floatformat:0 }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="text-smoke/60">Egresos:</span>
-                        <span class="text-red-400">-${{ close.total_expenses|floatformat:0 }}</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm font-bold border-t border-white/5 pt-2 mt-2">
-                        <span class="text-gold">Neto:</span>
-                        <span class="text-gold">${{ close.net_income|floatformat:0 }}</span>
-                    </div>
-                    <div class="mt-4 flex gap-2">
-                        <button onclick="showDailyCloseDetails({{ close.id }})" class="flex-1 text-xs tracking-widest uppercase font-semibold text-smoke/50 hover:text-gold border border-white/5 hover:border-gold/30 bg-white/[0.02] hover:bg-gold/5 py-2 rounded-sm transition-all duration-300">
-                            + Ver Detalles
-                        </button>
-                        {% if user_role == 'superadmin' %}
-                        <button onclick="deleteDailyClose({{ close.id }}, '{{ close.date|date:"d M Y" }}')" class="px-3 text-xs tracking-widest text-smoke/30 hover:text-red-400 border border-transparent hover:border-red-400/30 hover:bg-red-500/10 rounded-sm transition-all duration-300" title="Borrar Cierre">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="text-center py-8 text-smoke/40 text-sm border border-white/5 rounded-sm bg-jet">
-            No hay cierres de caja registrados aún.
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- ═══ PAGOS A BARBEROS ═══ -->
-    <div class="mt-8 border-t border-white/5 pt-8">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <h2 class="text-lg font-serif text-white">Pagos a Barberos</h2>
-                <p class="text-xs text-smoke/40 mt-1">Saldos pendientes de comisiones y propinas de ventas cerradas.</p>
-            </div>
-            <button onclick="fetchBarberPayments()" class="text-smoke/40 hover:text-gold transition-colors p-2 border border-white/5 rounded hover:border-gold/30 bg-jet" title="Actualizar">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            </button>
-        </div>
-        
-        <div id="barber-payments-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div class="text-center py-8 text-smoke/40 text-sm border border-white/5 rounded-sm bg-jet col-span-full">
-                Cargando pagos pendientes...
-            </div>
-        </div>
-    </div>
-
-<!-- Modal Confirmación -->
-<div id="modal-daily-close" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
-        <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl overflow-hidden p-6">
-            <h3 class="text-xl font-serif text-white mb-2">Confirmar Cierre de Caja</h3>
-            <p class="text-smoke/60 text-sm mb-6">Se liquidarán las comisiones de los barberos y se bloquearán las ventas del día. La ganancia neta reportada será de <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>. ¿Deseas continuar?</p>
-            
-            <div class="flex gap-3 justify-end">
-                <button type="button" class="px-5 py-2 text-smoke hover:text-white transition-colors text-xs tracking-widest uppercase" onclick="document.getElementById('modal-daily-close').classList.add('hidden')">
-                    Cancelar
-                </button>
-                <button type="button" id="btn-confirm-close" class="px-6 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-xs tracking-widest uppercase transition-colors">
-                    Sí, Ejecutar Cierre
-                </button>
-            </div>
-            <div id="close-error" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded-sm"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Detalles del Cierre -->
+<!-- Modal: Detalle cierre histórico -->
 <div id="modal-close-detail" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('modal-close-detail').classList.add('hidden')"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl flex flex-col h-full overflow-hidden">
-            <!-- Header -->
-            <div class="p-6 border-b border-white/5 flex justify-between items-start bg-jet shrink-0">
-                <div>
-                    <h3 class="text-xl font-serif text-white mb-1">Detalle del Cierre</h3>
-                    <p class="text-smoke/50 text-xs tracking-widest uppercase" id="detail-date"></p>
-                </div>
-                <button onclick="document.getElementById('modal-close-detail').classList.add('hidden')" class="text-smoke/40 hover:text-white transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            
-            <!-- Body -->
-            <div class="p-6 overflow-y-auto" id="detail-body">
-                <div class="flex justify-center py-10">
-                    <div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
-                </div>
-            </div>
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('modal-close-detail').classList.add('hidden')"></div>
+  <div class="absolute inset-0 sm:inset-x-4 sm:top-1/2 sm:-translate-y-1/2 sm:max-w-2xl sm:mx-auto sm:h-[90vh]">
+    <div class="bg-jet-card sm:border sm:border-gold/20 sm:rounded-md shadow-2xl flex flex-col h-full overflow-hidden">
+      <div class="p-5 border-b border-white/5 flex justify-between items-start bg-jet shrink-0">
+        <div>
+          <h3 class="text-lg font-serif text-white">Detalle del cierre</h3>
+          <p class="text-smoke/50 text-[0.65rem] uppercase tracking-widest" id="detail-date"></p>
         </div>
+        <button onclick="document.getElementById('modal-close-detail').classList.add('hidden')" class="text-smoke/40 hover:text-white text-2xl leading-none">✕</button>
+      </div>
+      <div class="p-5 overflow-y-auto" id="detail-body">
+        <div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>
+      </div>
     </div>
+  </div>
 </div>
 
-
-
-
-
-<!-- ═══ MODAL VENTA DE INVENTARIO ═══ -->
+<!-- Modal: Venta rápida (inventario) -->
 <div id="modal-inventory-sale" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeInventorySaleModal()"></div>
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg px-4">
-    <div class="bg-jet-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
-        <h3 class="text-base font-serif text-white">Venta Rápida (Bebidas / Productos)</h3>
-        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white transition-colors p-1">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-lg mx-auto">
+    <div class="bg-jet-card border border-white/10 rounded-md shadow-2xl">
+      <div class="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white tracking-widest uppercase">Venta rápida</h3>
+        <button onclick="closeInventorySaleModal()" class="text-smoke/40 hover:text-white">✕</button>
       </div>
-      <div class="p-6 space-y-5">
+      <div class="p-5 space-y-4">
         <div>
-            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
-            <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none" onchange="updateInvPrice()">
-                <option value="" data-price="0">Selecciona un producto...</option>
-                {% for item in inventory_items %}
-                <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
-                    {{ item.name }} - ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
-                </option>
-                {% endfor %}
-            </select>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Producto</label>
+          <select id="inv-item-id" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none" onchange="updateInvPrice()">
+            <option value="" data-price="0">Selecciona un producto...</option>
+            {% for item in inventory_items %}
+            <option value="{{ item.id }}" data-price="{{ item.sale_price }}" {% if item.quantity <= 0 %}disabled{% endif %}>
+              {{ item.name }} — ${{ item.sale_price|floatformat:0 }} {% if item.quantity <= 0 %}(Agotado){% else %}(Disp: {{ item.quantity|floatformat:0 }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
-                <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
-            </div>
-            <div>
-                <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Total</label>
-                <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded-sm px-4 py-3 outline-none cursor-not-allowed">
-            </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Cantidad</label>
+            <input type="number" id="inv-qty" value="1" min="1" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-gold outline-none" oninput="updateInvPrice()">
+          </div>
+          <div>
+            <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Total</label>
+            <input type="text" id="inv-total" value="$0" readonly class="w-full bg-jet/50 border border-white/5 text-gold font-bold rounded px-3 py-3 cursor-not-allowed">
+          </div>
         </div>
         <div>
-            <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Método de Pago</label>
-            <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded-sm px-4 py-3 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none">
-                {% for method in payment_methods %}
-                <option value="{{ method.id }}">{{ method.name }}</option>
-                {% endfor %}
-            </select>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Método de pago</label>
+          <select id="inv-payment-method" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-gold outline-none">
+            {% for method in payment_methods %}
+            <option value="{{ method.id }}">{{ method.name }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
-      <div class="px-6 py-4 border-t border-white/5 bg-jet/50 flex justify-end gap-3">
-        <button onclick="closeInventorySaleModal()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-white hover:bg-white/5 transition-colors">Cancelar</button>
-        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-5 py-2 rounded-sm text-sm font-semibold tracking-wide text-jet bg-gold hover:bg-gold-light transition-colors">Confirmar Venta</button>
+      <div class="px-5 py-3 border-t border-white/5 flex justify-end gap-2">
+        <button onclick="closeInventorySaleModal()" class="px-4 py-2 text-xs uppercase tracking-widest text-smoke">Cancelar</button>
+        <button id="btn-submit-inv-sale" onclick="submitInventorySale()" class="px-4 py-2 bg-gold hover:bg-gold-light text-jet font-bold text-xs uppercase tracking-widest rounded">Confirmar</button>
       </div>
     </div>
   </div>
 </div>
-{% endblock %}
 
-
-{% block extra_js %}
-
-<script>
-function openInventorySaleModal() {
-    const m = document.getElementById('modal-inventory-sale');
-    if (m) {
-        m.classList.remove('hidden');
-        document.getElementById('inv-item-id').value = '';
-        document.getElementById('inv-qty').value = '1';
-        updateInvPrice();
-    } else {
-        console.error('Modal not found');
-    }
-}
-
-function closeInventorySaleModal() {
-    const m = document.getElementById('modal-inventory-sale');
-    if (m) m.classList.add('hidden');
-}
-
-function updateInvPrice() {
-    const select = document.getElementById('inv-item-id');
-    const option = select.options[select.selectedIndex];
-    const price = parseFloat(option ? option.getAttribute('data-price') : 0);
-    const qty = parseInt(document.getElementById('inv-qty').value) || 1;
-    const total = price * qty;
-    document.getElementById('inv-total').value = '$' + total.toLocaleString('es-CO');
-}
-
-async function submitInventorySale() {
-    const btn = document.getElementById('btn-submit-inv-sale');
-    const itemId = document.getElementById('inv-item-id').value;
-    const qty = document.getElementById('inv-qty').value;
-    const methodId = document.getElementById('inv-payment-method').value;
-
-    if (!itemId) {
-        alert('Selecciona un producto');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = 'PROCESANDO...';
-
-    try {
-        const response = await fetch('/api/admin/cashflow/inventory-sales/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({
-                item_id: itemId,
-                quantity: qty,
-                payment_method_id: methodId
-            })
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            alert('Éxito: Venta de inventario registrada');
-            setTimeout(() => window.location.reload(), 500);
-        } else {
-            alert('Error: ' + (data.error || 'Error procesando venta'));
-            btn.disabled = false;
-            btn.innerHTML = 'Confirmar Venta';
-        }
-    } catch (e) {
-        alert('Error de conexión');
-        btn.disabled = false;
-        btn.innerHTML = 'Confirmar Venta';
-    }
-}
-</script>
-
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-
-    // ── Cierre de Caja ───────────────────────────────────────────────────────
-    const btnOpen   = document.getElementById('btn-daily-close');
-    const modal     = document.getElementById('modal-daily-close');
-    const btnConfirm = document.getElementById('btn-confirm-close');
-    const errorDiv  = document.getElementById('close-error');
-
-    if (btnOpen) {
-        btnOpen.addEventListener('click', () => {
-            modal.classList.remove('hidden');
-            errorDiv.classList.add('hidden');
-        });
-    }
-    if (btnConfirm) {
-        btnConfirm.addEventListener('click', () => {
-            const originalText = btnConfirm.innerHTML;
-            btnConfirm.innerHTML = 'Procesando...';
-            btnConfirm.disabled = true;
-            fetch('/api/admin/cashflow/daily-close/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
-            })
-            .then(r => r.json().then(data => ({ status: r.status, body: data })))
-            .then(res => {
-                if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
-                    window.location.reload();
-                } else {
-                    throw new Error(res.body.error || 'Error al ejecutar cierre');
-                }
-            })
-            .catch(err => {
-                errorDiv.textContent = err.message;
-                errorDiv.classList.remove('hidden');
-                btnConfirm.innerHTML = originalText;
-                btnConfirm.disabled = false;
-            });
-        });
-    }
-
-    // ── Panel de Aprobaciones (Cashflow) ─────────────────────────────────────
-    function cfLoadApprovals() {
-        fetch('/api/admin/cashflow/pending-approvals/')
-            .then(r => r.json())
-            .then(data => cfRenderApprovals(data.pending_approvals || []))
-            .catch(() => {});
-    }
-
-    function cfRenderApprovals(sales) {
-        const section   = document.getElementById('cashflow-approvals-section');
-        const container = document.getElementById('cf-approvals-container');
-        const countEl   = document.getElementById('cf-approvals-count');
-
-        if (!section) return;
-
-        if (!sales || sales.length === 0) {
-            section.classList.add('hidden');
-            // Quitar también el banner de alerta
-            const banner = section.previousElementSibling;
-            if (banner && banner.classList.contains('bg-red-500\\/10')) banner.classList.add('hidden');
-            return;
-        }
-
-        if (countEl) countEl.textContent = sales.length;
-        section.classList.remove('hidden');
-
-        container.innerHTML = sales.map(s => `
-          <div class="bg-jet-card border border-red-500/30 rounded-xl p-4 shadow-lg flex flex-col gap-3" id="cf-card-${s.id}">
-            <div class="flex justify-between items-start">
-              <div>
-                <div class="text-white font-bold text-sm">${s.barber_name}</div>
-                <div class="text-[0.65rem] text-smoke/50 uppercase tracking-widest">${s.service_name}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-gold font-bold">$${s.final_price.toLocaleString('es-CO')}</div>
-                ${s.tip_amount > 0 ? `<div class="text-[0.6rem] text-amber-400">+ $${s.tip_amount.toLocaleString('es-CO')} propina</div>` : ''}
-              </div>
-            </div>
-            <div class="text-xs text-smoke/60 border-t border-white/5 pt-2 space-y-0.5">
-              <div>Cliente: <span class="text-white">${s.client_name}</span></div>
-              <div>Hora: <span class="text-smoke/80">${s.created_at}</span></div>
-            </div>
-            <div class="flex gap-2 mt-auto pt-1">
-              <button onclick="cfApproveSale(${s.id})"
-                      class="flex-1 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Aprobar
-              </button>
-              <button onclick="cfOpenRejectModal(${s.id}, '${s.barber_name.replace(/'/g, "\\'")}')"
-                      class="flex-1 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                Rechazar
-              </button>
-            </div>
-          </div>
-        `).join('');
-    }
-
-    window.cfApproveSale = function(id) {
-        const card = document.getElementById(`cf-card-${id}`);
-        if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
-        fetch(`/api/admin/cashflow/sales/${id}/approve/`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                cfLoadApprovals();
-            } else {
-                if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
-                alert(data.error || 'Error al aprobar.');
-            }
-        })
-        .catch(() => {
-            if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
-            alert('Error de conexión.');
-        });
-    };
-
-    // Modal de rechazo (Cashflow)
-    let cfRejectId = null;
-
-    window.cfOpenRejectModal = function(id, name) {
-        cfRejectId = id;
-        document.getElementById('cf-reject-barber-name').textContent = name;
-        document.getElementById('cf-reject-reason-input').value = '';
-        document.getElementById('cf-reject-error').classList.add('hidden');
-        const btn = document.getElementById('cf-btn-confirm-reject');
-        btn.disabled = false;
-        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
-        document.getElementById('cf-modal-reject').classList.remove('hidden');
-        setTimeout(() => document.getElementById('cf-reject-reason-input').focus(), 80);
-    };
-
-    window.cfCloseRejectModal = function() {
-        document.getElementById('cf-modal-reject').classList.add('hidden');
-        cfRejectId = null;
-    };
-
-    window.cfConfirmRejectSale = function() {
-        if (!cfRejectId) return;
-        const reason = document.getElementById('cf-reject-reason-input').value.trim();
-        const btn    = document.getElementById('cf-btn-confirm-reject');
-        const errDiv = document.getElementById('cf-reject-error');
-        btn.disabled = true;
-        btn.textContent = 'Procesando...';
-        errDiv.classList.add('hidden');
-
-        fetch(`/api/admin/cashflow/sales/${cfRejectId}/reject/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ reason: reason || 'Sin razón especificada.' })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                cfCloseRejectModal();
-                cfLoadApprovals();
-            } else {
-                errDiv.textContent = data.error || 'Error al rechazar.';
-                errDiv.classList.remove('hidden');
-                btn.disabled = false;
-                btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
-            }
-        })
-        .catch(() => {
-            errDiv.textContent = 'Error de conexión.';
-            errDiv.classList.remove('hidden');
-            btn.disabled = false;
-            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Rechazar Venta`;
-        });
-    };
-
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') cfCloseRejectModal(); });
-
-    // Cargar aprobaciones si hay pendientes
-    {% if pending_approvals_count and pending_approvals_count > 0 %}
-    cfLoadApprovals();
-    {% endif %}
-
-    // ── Detalles del Cierre ──────────────────────────────────────────────────
-    window.showDailyCloseDetails = function(closeId) {
-        const modal = document.getElementById('modal-close-detail');
-        const body = document.getElementById('detail-body');
-        const dateEl = document.getElementById('detail-date');
-        
-        modal.classList.remove('hidden');
-        body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
-        
-        fetch(`/api/admin/cashflow/daily-close/${closeId}/detail/`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
-                    return;
-                }
-                
-                dateEl.textContent = `${data.date} (Cerrado a las ${data.closed_at.split(' ')[1]} por ${data.closed_by})`;
-                
-                let html = '';
-                
-                // Barber Breakdown
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Rendimiento por Barbero</h4>';
-                html += '<div class="space-y-3 mb-8">';
-                data.barbers.forEach(b => {
-                    html += `
-                    <div class="bg-jet-lighter border border-white/5 rounded-sm p-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="font-bold text-white">${b.name} <span class="text-[0.6rem] text-smoke/40 ml-1">(${b.sales_count} ventas)</span></span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 text-xs">
-                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
-                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Ventas</span>
-                                <span class="text-white font-bold">$${Number(b.total_sales).toLocaleString('es-CO')}</span>
-                            </div>
-                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
-                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Comisión</span>
-                                <span class="text-red-400 font-bold">-$${Number(b.total_commissions).toLocaleString('es-CO')}</span>
-                            </div>
-                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
-                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Propinas (+100%)</span>
-                                <span class="text-emerald-400 font-bold">$${Number(b.total_tips).toLocaleString('es-CO')}</span>
-                            </div>
-                        </div>
-                        <div class="mt-2 text-right border-t border-white/5 pt-2">
-                            <span class="text-[0.65rem] text-smoke/60 tracking-widest uppercase mr-2">Ganancia del Barbero:</span>
-                            <span class="text-white font-bold">$${Number(b.total_commissions + b.total_tips).toLocaleString('es-CO')}</span>
-                        </div>
-                    </div>`;
-                });
-                if (data.barbers.length === 0) {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center">No hubo ventas en este cierre.</div>';
-                }
-                html += '</div>';
-                
-                // Detailed Sales List
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Transacciones Individuales</h4>';
-                if (data.sales_detail && data.sales_detail.length > 0) {
-                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
-                    html += `
-                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/10 text-[0.6rem] tracking-widest uppercase text-smoke/40 font-bold bg-black/50">
-                            <div class="col-span-3">Cliente / Hora</div>
-                            <div class="col-span-3">Servicio</div>
-                            <div class="col-span-3 text-center">Método</div>
-                            <div class="col-span-2 text-right">Venta</div>
-                            <div class="col-span-1 text-right">Propina</div>
-                        </div>`;
-                    data.sales_detail.forEach(sale => {
-                        html += `
-                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/5 last:border-0 text-xs items-center hover:bg-white/[0.02]">
-                            <div class="col-span-3">
-                                <span class="text-white block font-medium truncate" title="${sale.client_name}">${sale.client_name}</span>
-                                <span class="text-[0.6rem] text-smoke/40">${sale.time} - ${sale.barber_name}</span>
-                            </div>
-                            <div class="col-span-3">
-                                <span class="text-smoke/80 block truncate" title="${sale.service_name}">${sale.service_name}</span>
-                                <span class="text-[0.55rem] text-gold/60 tracking-widest uppercase">Por: ${sale.approved_by}</span>
-                            </div>
-                            <div class="col-span-3 text-center text-smoke/60 text-[0.55rem] uppercase tracking-widest break-words leading-tight">
-                                ${sale.payment_method}
-                            </div>
-                            <div class="col-span-2 text-right text-white font-medium">
-                                $${Number(sale.final_price).toLocaleString('es-CO')}
-                            </div>
-                            <div class="col-span-1 text-right text-emerald-400 font-medium">
-                                ${sale.tip_amount > 0 ? '+$' + Number(sale.tip_amount).toLocaleString('es-CO') : '-'}
-                            </div>
-                        </div>`;
-                    });
-                    html += '</div>';
-                } else {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se encontraron ventas para este cierre.</div>';
-                }
-                
-                // Expenses Breakdown
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Egresos Registrados</h4>';
-                if (data.expenses && data.expenses.length > 0) {
-                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
-                    data.expenses.forEach(e => {
-                        html += `
-                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
-                            <div>
-                                <span class="text-white block font-medium">${e.description}</span>
-                                <span class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${e.type}</span>
-                            </div>
-                            <span class="text-red-400 font-bold">-$${Number(e.amount).toLocaleString('es-CO')}</span>
-                        </div>`;
-                    });
-                    html += '</div>';
-                } else {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron egresos.</div>';
-                }
-                
-                // Payment Methods Breakdown
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Métodos de Cobro</h4>';
-                if (data.payment_methods && Object.keys(data.payment_methods).length > 0) {
-                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
-                    for (const [pm, total] of Object.entries(data.payment_methods)) {
-                        html += `
-                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
-                            <span class="text-smoke/80 uppercase tracking-widest">${pm}</span>
-                            <span class="text-white font-bold">$${Number(total).toLocaleString('es-CO')}</span>
-                        </div>`;
-                    }
-                    html += '</div>';
-                } else {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron pagos.</div>';
-                }
-
-                // Totals summary
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
-                html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
-                html += `
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Servicios:</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Productos:</span><span class="text-emerald-400 font-medium">+$${Number(data.total_inventory_sales).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Propinas (Pasan derecho):</span><span class="text-emerald-400 font-medium">+$${Number(data.total_tips).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Comisiones Barberos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_commissions).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Egresos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_expenses).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center pt-3 mt-3 border-t border-white/10 text-lg font-bold font-serif"><span class="text-gold tracking-widest uppercase">INGRESO NETO BARBERÍA:</span><span class="text-gold">$${Number(data.net_income).toLocaleString('es-CO')}</span></div>
-                `;
-                html += '</div>';
-                
-                body.innerHTML = html;
-            })
-            .catch(() => {
-                body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles.</div>';
-            });
-    }
-    
-    // Función reutilizable para renderizar el contenido del modal
-    function renderDetailContent(data, isLive = false) {
-                let html = '';
-                
-                if (isLive && data.pending_approvals_count > 0) {
-                    html += `
-                    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start gap-4">
-                        <div class="relative flex h-4 w-4 mt-0.5 flex-shrink-0">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
-                        </div>
-                        <div>
-                            <p class="text-sm font-bold text-red-400 tracking-wider uppercase">¡Atención!</p>
-                            <p class="text-xs text-smoke/80 mt-1">Hay <strong class="text-red-400">${data.pending_approvals_count} venta(s)</strong> pendiente(s) de aprobación. Estas no están incluidas en el resumen abajo. Aprobarlas actualizará estos números.</p>
-                        </div>
-                    </div>`;
-                }
-
-                // Barber Breakdown
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Rendimiento por Barbero</h4>';
-                html += '<div class="space-y-3 mb-8">';
-                data.barbers.forEach(b => {
-                    html += `
-                    <div class="bg-jet-lighter border border-white/5 rounded-sm p-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="font-bold text-white">${b.name} <span class="text-[0.6rem] text-smoke/40 ml-1">(${b.sales_count} ventas)</span></span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 text-xs">
-                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
-                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Ventas</span>
-                                <span class="text-white font-bold">$${Number(b.total_sales).toLocaleString('es-CO')}</span>
-                            </div>
-                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
-                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Comisión</span>
-                                <span class="text-red-400 font-bold">-$${Number(b.total_commissions).toLocaleString('es-CO')}</span>
-                            </div>
-                            <div class="bg-black/30 p-2 rounded-sm border border-white/5 flex flex-col justify-between">
-                                <span class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Propinas (+100%)</span>
-                                <span class="text-emerald-400 font-bold">$${Number(b.total_tips).toLocaleString('es-CO')}</span>
-                            </div>
-                        </div>
-                        <div class="mt-2 text-right border-t border-white/5 pt-2">
-                            <span class="text-[0.65rem] text-smoke/60 tracking-widest uppercase mr-2">Ganancia del Barbero:</span>
-                            <span class="text-white font-bold">$${Number(b.total_commissions + b.total_tips).toLocaleString('es-CO')}</span>
-                        </div>
-                    </div>`;
-                });
-                if (data.barbers.length === 0) {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center">No hay ventas registradas aún.</div>';
-                }
-                html += '</div>';
-                
-                // Detailed Sales List
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Transacciones Individuales</h4>';
-                if (data.sales_detail && data.sales_detail.length > 0) {
-                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
-                    html += `
-                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/10 text-[0.6rem] tracking-widest uppercase text-smoke/40 font-bold bg-black/50">
-                            <div class="col-span-3">Cliente / Hora</div>
-                            <div class="col-span-3">Servicio</div>
-                            <div class="col-span-3 text-center">Método</div>
-                            <div class="col-span-2 text-right">Venta</div>
-                            <div class="col-span-1 text-right">Propina</div>
-                        </div>`;
-                    data.sales_detail.forEach(sale => {
-                        html += `
-                        <div class="grid grid-cols-12 gap-2 p-3 border-b border-white/5 last:border-0 text-xs items-center hover:bg-white/[0.02]">
-                            <div class="col-span-3">
-                                <span class="text-white block font-medium truncate" title="${sale.client_name}">${sale.client_name}</span>
-                                <span class="text-[0.6rem] text-smoke/40">${sale.time} - ${sale.barber_name}</span>
-                            </div>
-                            <div class="col-span-3">
-                                <span class="text-smoke/80 block truncate" title="${sale.service_name}">${sale.service_name}</span>
-                                <span class="text-[0.55rem] text-gold/60 tracking-widest uppercase">Por: ${sale.approved_by}</span>
-                            </div>
-                            <div class="col-span-3 text-center text-smoke/60 text-[0.55rem] uppercase tracking-widest break-words leading-tight flex items-center justify-center gap-1">
-                                <span>${sale.payment_method}</span>
-                                ${isLive ? `
-                                <button onclick="cfOpenEditPaymentModal(${sale.id}, '${sale.type}', '${sale.payment_method}')" class="text-gold/60 hover:text-white transition-colors" title="Editar Método de Pago">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                </button>
-                                ` : ''}
-                            </div>
-                            <div class="col-span-2 text-right text-white font-medium">
-                                $${Number(sale.final_price).toLocaleString('es-CO')}
-                            </div>
-                            <div class="col-span-1 text-right text-emerald-400 font-medium">
-                                ${sale.tip_amount > 0 ? '+$' + Number(sale.tip_amount).toLocaleString('es-CO') : '-'}
-                            </div>
-                        </div>`;
-                    });
-                    html += '</div>';
-                } else {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se encontraron ventas para mostrar.</div>';
-                }
-                
-                // Expenses Breakdown
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Egresos Registrados</h4>';
-                if (data.expenses && data.expenses.length > 0) {
-                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
-                    data.expenses.forEach(e => {
-                        html += `
-                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
-                            <div>
-                                <span class="text-white block font-medium">${e.description}</span>
-                                <span class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${e.type}</span>
-                            </div>
-                            <span class="text-red-400 font-bold">-$${Number(e.amount).toLocaleString('es-CO')}</span>
-                        </div>`;
-                    });
-                    html += '</div>';
-                } else {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron egresos.</div>';
-                }
-                
-                // Payment Methods Breakdown
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3 mt-6">Métodos de Cobro</h4>';
-                if (data.payment_methods && Object.keys(data.payment_methods).length > 0) {
-                    html += '<div class="bg-jet-lighter border border-white/5 rounded-sm overflow-hidden mb-8">';
-                    for (const [pm, total] of Object.entries(data.payment_methods)) {
-                        html += `
-                        <div class="p-3 border-b border-white/5 last:border-0 flex justify-between items-center text-xs hover:bg-white/[0.02]">
-                            <span class="text-smoke/80 uppercase tracking-widest">${pm}</span>
-                            <span class="text-white font-bold">$${Number(total).toLocaleString('es-CO')}</span>
-                        </div>`;
-                    }
-                    html += '</div>';
-                } else {
-                    html += '<div class="text-xs text-smoke/40 p-4 bg-jet-lighter rounded-sm text-center mb-8 border border-white/5">No se registraron pagos.</div>';
-                }
-
-                // Totals summary
-                html += '<h4 class="text-sm font-bold tracking-widest uppercase text-gold mb-3">Resumen Financiero</h4>';
-                html += '<div class="bg-black/50 border border-gold/20 rounded-sm p-5 text-sm space-y-3">';
-                html += `
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Servicios:</span><span class="text-white font-medium">$${Number(data.total_sales).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Ventas Productos:</span><span class="text-emerald-400 font-medium">+$${Number(data.total_inventory_sales).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Propinas (Pasan derecho):</span><span class="text-emerald-400 font-medium">+$${Number(data.total_tips).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Comisiones Barberos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_commissions).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center"><span class="text-smoke/60">Total Egresos (Costo):</span><span class="text-red-400 font-medium">-$${Number(data.total_expenses).toLocaleString('es-CO')}</span></div>
-                    <div class="flex justify-between items-center pt-3 mt-3 border-t border-white/10 text-lg font-bold font-serif"><span class="text-gold tracking-widest uppercase">INGRESO NETO BARBERÍA:</span><span class="text-gold">$${Number(data.net_income).toLocaleString('es-CO')}</span></div>
-                `;
-                html += '</div>';
-        
-        return html;
-    }
-    
-    window.showDailyCloseDetails = function(closeId) {
-        const modal = document.getElementById('modal-close-detail');
-        const body = document.getElementById('detail-body');
-        const dateEl = document.getElementById('detail-date');
-        
-        modal.classList.remove('hidden');
-        body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
-        
-        fetch(`/api/admin/cashflow/daily-close/${closeId}/detail/`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
-                    return;
-                }
-                
-                dateEl.textContent = `${data.date} (Cerrado a las ${data.closed_at.split(' ')[1]} por ${data.closed_by})`;
-                
-                body.innerHTML = renderDetailContent(data, false);
-            })
-            .catch(() => {
-                body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles.</div>';
-            });
-    };
-    
-    window.showLiveDetails = function() {
-        const modal = document.getElementById('modal-close-detail');
-        const body = document.getElementById('detail-body');
-        const dateEl = document.getElementById('detail-date');
-        
-        modal.classList.remove('hidden');
-        body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
-        
-        fetch(`/api/admin/cashflow/live-detail/`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
-                    return;
-                }
-                
-                dateEl.textContent = `En Vivo: ${data.date} (Antes del cierre) - Auto actualizable`;
-                
-                body.innerHTML = renderDetailContent(data, true);
-            })
-            .catch(() => {
-                body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión al cargar los detalles en vivo.</div>';
-            });
-    };
-
-    {% if user_role == 'superadmin' %}
-    window.deleteDailyClose = function(closeId, dateStr) {
-        if (!confirm(`¿Estás 100% seguro que deseas BORRAR el cierre de caja del ${dateStr}?\n\nLas ventas y egresos volverán a estar pendientes para un nuevo cierre. Esta acción es reportada al log de auditoría.`)) {
-            return;
-        }
-        
-        fetch(`/api/admin/cashflow/daily-close/${closeId}/delete/`, {
-            method: 'DELETE',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                alert('Cierre de caja eliminado exitosamente.');
-                window.location.reload();
-            } else {
-                alert(data.error || 'Error al eliminar el cierre.');
-            }
-        })
-        .catch(err => alert('Error de conexión.'));
-    };
-    {% endif %}
-
-    // --- PAGOS A BARBEROS ---
-    window.fetchBarberPayments = function() {
-        const container = document.getElementById('barber-payments-container');
-        if (!container) return;
-        
-        container.innerHTML = '<div class="text-center py-8 text-smoke/40 text-sm border border-white/5 rounded-sm bg-jet col-span-full">Cargando pagos pendientes...</div>';
-        
-        fetch('/api/admin/cashflow/barber-payments/')
-            .then(r => r.json())
-            .then(data => {
-                if (!data.payments || data.payments.length === 0) {
-                    container.innerHTML = `
-                        <div class="col-span-full bg-jet border border-emerald-500/30 p-6 rounded-sm text-center flex flex-col items-center">
-                            <svg class="w-10 h-10 text-emerald-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            <h3 class="text-white font-bold tracking-widest uppercase text-sm">Todo al día</h3>
-                            <p class="text-smoke/50 text-xs mt-1">No hay comisiones ni propinas pendientes de pago.</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                let html = '';
-                data.payments.forEach(p => {
-                    html += `
-                    <div class="bg-jet-card border border-gold/20 p-5 rounded-sm hover:border-gold/50 transition-colors shadow-lg relative overflow-hidden flex flex-col justify-between">
-                        <div class="absolute inset-0 bg-gradient-to-br from-gold/5 to-transparent pointer-events-none"></div>
-                        <div class="relative z-10 mb-4">
-                            <h3 class="text-white font-serif text-lg tracking-wider">${p.barber_name}</h3>
-                            <div class="space-y-1 mt-3">
-                                <div class="flex justify-between items-center text-xs">
-                                    <span class="text-smoke/50 uppercase tracking-widest">Comisiones</span>
-                                    <span class="text-white font-medium">$${Number(p.total_commissions).toLocaleString('es-CO')}</span>
-                                </div>
-                                <div class="flex justify-between items-center text-xs">
-                                    <span class="text-smoke/50 uppercase tracking-widest">Propinas</span>
-                                    <span class="text-emerald-400 font-medium">+$${Number(p.total_tips).toLocaleString('es-CO')}</span>
-                                </div>
-                                <div class="flex justify-between items-center text-sm border-t border-white/10 pt-2 mt-2 mb-2">
-                                    <span class="text-gold font-bold tracking-widest uppercase">Total a Pagar</span>
-                                    <span class="text-gold font-bold">$${Number(p.total_earnings).toLocaleString('es-CO')}</span>
-                                </div>
-                            </div>
-                            
-                            ${p.history && p.history.length > 0 ? `
-                            <div class="mt-3 border-t border-white/10 pt-3">
-                                <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')" class="w-full flex justify-between items-center text-[10px] text-smoke/50 hover:text-white uppercase tracking-widest transition-colors mb-2">
-                                    <span>Ver Historial Diario</span>
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                </button>
-                                <div class="hidden space-y-1.5 max-h-32 overflow-y-auto pr-1 text-[10px] custom-scrollbar">
-                                    ${p.history.map(h => `
-                                        <div class="flex justify-between items-center bg-white/[0.02] p-1.5 rounded-sm border border-white/5">
-                                            <span class="text-smoke/70">${h.date}</span>
-                                            <span class="text-gold font-medium">$${Number(h.total).toLocaleString('es-CO')}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                            ` : ''}
-
-                        </div>
-                        <button onclick="payBarber(${p.barber_id}, '${p.barber_name}', ${p.total_earnings})" class="relative z-10 w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-widest text-xs uppercase rounded-sm transition-colors flex items-center justify-center gap-2 mt-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            Marcar como Pagado
-                        </button>
-                    </div>`;
-                });
-                
-                container.innerHTML = html;
-            })
-            .catch(err => {
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-red-400 text-sm border border-red-500/20 rounded-sm bg-red-500/10">Error al cargar la información. Inténtalo de nuevo.</div>';
-            });
-    };
-    
-    window.payBarber = function(barberId, barberName, amount) {
-        const formatted = '$' + Number(amount).toLocaleString('es-CO');
-        if (!confirm(`¿Estás 100% seguro de marcar como PAGADO el saldo de ${formatted} a ${barberName}?\n\nEsta acción dejará el saldo pendiente en $0 y se registrará en el Log de Auditoría.`)) {
-            return;
-        }
-        
-        fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                alert(data.message);
-                fetchBarberPayments(); // Reload section
-            } else {
-                alert(data.error || 'Error al procesar el pago.');
-            }
-        })
-        .catch(err => alert('Error de conexión.'));
-    };
-
-    // Load initial data
-    if (document.getElementById('barber-payments-container')) {
-        fetchBarberPayments();
-    }
-
-});
-</script>
-
-<!-- Modal Editar Método de Pago -->
+<!-- Modal: Editar método de pago -->
 <div id="modal-edit-payment" class="fixed inset-0 z-[60] hidden">
-    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="cfCloseEditPaymentModal()"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-sm px-4">
-        <div class="bg-jet-card border border-gold/30 rounded-xl shadow-2xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-white/5 bg-jet-lighter flex items-center justify-between">
-                <h3 class="text-sm font-bold tracking-widest uppercase text-gold">Editar Método de Pago</h3>
-                <button onclick="cfCloseEditPaymentModal()" class="text-smoke/40 hover:text-white transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div class="p-5 space-y-4">
-                <div id="edit-payment-error" class="hidden text-xs bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-sm"></div>
-                <div>
-                    <label class="block text-xs uppercase tracking-widest text-smoke/60 mb-2">Nuevo Método</label>
-                    <select id="edit-payment-select" class="w-full bg-jet border border-white/10 text-white rounded-sm px-3 py-2.5 focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all appearance-none text-sm">
-                        {% for method in payment_methods %}
-                        <option value="{{ method.id }}">{{ method.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="px-5 py-3 border-t border-white/5 bg-jet/50 flex justify-end gap-2">
-                <button onclick="cfCloseEditPaymentModal()" class="px-4 py-1.5 rounded-sm text-xs font-bold tracking-widest uppercase text-smoke hover:bg-white/5 transition-colors">Cancelar</button>
-                <button id="btn-submit-edit-payment" onclick="cfSubmitEditPayment()" class="px-4 py-1.5 rounded-sm text-xs font-bold tracking-widest uppercase text-jet bg-gold hover:bg-gold-light transition-colors">Guardar</button>
-            </div>
-        </div>
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="cfCloseEditPaymentModal()"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-sm mx-auto">
+    <div class="bg-jet-card border border-gold/30 rounded-md shadow-2xl">
+      <div class="px-4 py-3 border-b border-white/5 flex justify-between items-center">
+        <h3 class="text-xs font-bold tracking-widest uppercase text-gold">Cambiar método de pago</h3>
+        <button onclick="cfCloseEditPaymentModal()" class="text-smoke/40 hover:text-white">✕</button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div id="edit-payment-error" class="hidden text-xs bg-red-500/10 border border-red-500/30 text-red-400 p-2 rounded"></div>
+        <select id="edit-payment-select" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2.5 focus:border-gold outline-none text-sm">
+          {% for method in payment_methods %}
+          <option value="{{ method.id }}">{{ method.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="px-4 py-3 border-t border-white/5 flex justify-end gap-2">
+        <button onclick="cfCloseEditPaymentModal()" class="px-3 py-1.5 text-xs uppercase tracking-widest text-smoke">Cancelar</button>
+        <button id="btn-submit-edit-payment" onclick="cfSubmitEditPayment()" class="px-3 py-1.5 bg-gold text-jet font-bold text-xs uppercase tracking-widest rounded">Guardar</button>
+      </div>
     </div>
+  </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
 <script>
-    let cfEditSaleId = null;
-    let cfEditSaleType = null;
+const CSRF = '{{ csrf_token }}';
+const USER_ROLE = '{{ user_role }}';
+let cfLiveData = null;
+let cfPendingApprovals = [];
+let cfActiveFilter = 'all';
+let cfRefreshTimer = null;
 
-    window.cfOpenEditPaymentModal = function(saleId, saleType, currentMethodName) {
-        cfEditSaleId = saleId;
-        cfEditSaleType = saleType;
-        document.getElementById('edit-payment-error').classList.add('hidden');
-        
-        // Intentar preseleccionar el método actual (basado en el nombre)
-        const select = document.getElementById('edit-payment-select');
-        let found = false;
-        for (let i = 0; i < select.options.length; i++) {
-            if (select.options[i].text.trim() === currentMethodName.trim()) {
-                select.selectedIndex = i;
-                found = true;
-                break;
-            }
+// ═══ FORMATEO ═══════════════════════════════════════════
+const fmt = n => '$' + Number(n || 0).toLocaleString('es-CO');
+function setLastRefresh() {
+  const el = document.getElementById('cf-last-refresh');
+  if (!el) return;
+  const d = new Date();
+  el.textContent = 'Actualizado ' + d.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+}
+
+// ═══ KPI INTERACCION ════════════════════════════════════
+document.addEventListener('click', e => {
+  const kpi = e.target.closest('.cf-kpi');
+  if (kpi) {
+    document.querySelectorAll('.cf-kpi').forEach(k => k.classList.remove('is-active'));
+    kpi.classList.add('is-active');
+    cfShowTab(kpi.dataset.filter);
+    return;
+  }
+  const tab = e.target.closest('.cf-tab');
+  if (tab) {
+    cfShowTab(tab.dataset.tab);
+    // Sync KPI active state
+    document.querySelectorAll('.cf-kpi').forEach(k => {
+      k.classList.toggle('is-active', k.dataset.filter === tab.dataset.tab);
+    });
+  }
+  const row = e.target.closest('.cf-row-top');
+  if (row && !e.target.closest('button')) {
+    row.parentElement.classList.toggle('is-open');
+  }
+});
+
+function cfShowTab(name) {
+  cfActiveFilter = name;
+  document.querySelectorAll('.cf-tab').forEach(t => t.classList.toggle('is-active', t.dataset.tab === name));
+  cfRenderTrazabilidad();
+}
+
+// ═══ CARGA Y RENDER DE TRAZABILIDAD ═════════════════════
+async function cfLoadLive() {
+  try {
+    const [liveRes, pendingRes] = await Promise.all([
+      fetch('/api/admin/cashflow/live-detail/').then(r => r.json()),
+      fetch('/api/admin/cashflow/pending-approvals/').then(r => r.json()).catch(() => ({pending_approvals: []})),
+    ]);
+    cfLiveData = liveRes;
+    cfPendingApprovals = pendingRes.pending_approvals || [];
+    cfUpdateKPIs();
+    cfUpdatePendingBanner();
+    cfRenderTrazabilidad();
+    setLastRefresh();
+  } catch (e) {
+    console.error('Error cargando datos de caja:', e);
+    document.getElementById('cf-trazabilidad').innerHTML =
+      '<div class="cf-empty text-red-400">Error al cargar datos. <button onclick="cfRefreshAll()" class="underline">Reintentar</button></div>';
+  }
+}
+
+function cfUpdateKPIs() {
+  if (!cfLiveData) return;
+  document.getElementById('kpi-net').textContent = fmt(cfLiveData.net_income);
+  document.getElementById('kpi-sales').textContent = fmt(cfLiveData.total_sales);
+  document.getElementById('kpi-products').textContent = fmt(cfLiveData.total_inventory_sales);
+  document.getElementById('kpi-comm').textContent = '-' + fmt(cfLiveData.total_commissions);
+  document.getElementById('kpi-exp').textContent = '-' + fmt(cfLiveData.total_expenses);
+  document.getElementById('kpi-tips-sub').textContent = 'Propinas hoy: ' + fmt(cfLiveData.total_tips);
+  // Sales pending count
+  const pendingSales = (cfLiveData.sales_detail || []).filter(s => s.type === 'service').length;
+  document.getElementById('kpi-sales-sub').textContent = pendingSales + ' venta(s) pendientes de cerrar';
+}
+
+function cfUpdatePendingBanner() {
+  const count = cfPendingApprovals.length;
+  const alert = document.getElementById('cf-approvals-alert');
+  const badge = document.getElementById('cf-tab-pending-badge');
+  const bannerCount = document.getElementById('cf-approvals-banner-count');
+  if (count > 0) {
+    alert.classList.remove('hidden');
+    badge.classList.remove('hidden');
+    badge.textContent = count;
+    bannerCount.textContent = count;
+  } else {
+    alert.classList.add('hidden');
+    badge.classList.add('hidden');
+  }
+}
+
+function cfRenderTrazabilidad() {
+  const container = document.getElementById('cf-trazabilidad');
+  if (!cfLiveData) return;
+
+  const filter = cfActiveFilter;
+  let items = [];
+
+  if (filter === 'pending') {
+    items = cfPendingApprovals.map(s => ({
+      kind: 'pending',
+      time: s.created_at,
+      title: s.barber_name,
+      subtitle: `${s.service_name} · ${s.client_name}`,
+      amount: s.final_price,
+      tip: s.tip_amount,
+      raw: s,
+    }));
+  } else {
+    const sales = cfLiveData.sales_detail || [];
+    const expenses = (cfLiveData.expenses || []).map((e, i) => ({
+      kind: 'expense',
+      time: '—',
+      title: e.description,
+      subtitle: e.type,
+      amount: e.amount,
+      raw: e,
+    }));
+
+    if (filter === 'all' || filter === 'service') {
+      sales.filter(s => s.type === 'service').forEach(s => items.push({
+        kind: 'service',
+        time: s.time,
+        title: s.client_name,
+        subtitle: `${s.service_name} · ${s.barber_name}`,
+        amount: s.final_price,
+        tip: s.tip_amount,
+        raw: s,
+      }));
+    }
+    if (filter === 'all' || filter === 'product') {
+      sales.filter(s => s.type === 'inventory').forEach(s => items.push({
+        kind: 'product',
+        time: s.time,
+        title: s.service_name,
+        subtitle: s.client_name,
+        amount: s.final_price,
+        raw: s,
+      }));
+    }
+    if (filter === 'all' || filter === 'expense') {
+      items = items.concat(expenses);
+    }
+    if (filter === 'commission') {
+      sales.filter(s => s.type === 'service' && s.commission_amount > 0).forEach(s => items.push({
+        kind: 'commission',
+        time: s.time,
+        title: s.barber_name,
+        subtitle: `${s.service_name} · ${s.client_name}`,
+        amount: s.commission_amount,
+        tip: s.tip_amount,
+        raw: s,
+      }));
+    }
+  }
+
+  document.getElementById('cf-tz-count').textContent = items.length + (items.length === 1 ? ' movimiento' : ' movimientos');
+
+  if (items.length === 0) {
+    container.innerHTML = '<div class="cf-empty">No hay movimientos en esta categoría.</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(it => renderRow(it)).join('');
+}
+
+function renderRow(it) {
+  const isOut = (it.kind === 'expense' || it.kind === 'commission');
+  const amountClass = isOut ? 'is-out' : 'is-in';
+  const sign = isOut ? '-' : '';
+  const badge = badgeFor(it.kind);
+  let actions = '';
+  let detail = '';
+
+  if (it.kind === 'service') {
+    const r = it.raw;
+    detail = `
+      <div class="cf-detail-grid">
+        <div><span class="lbl">Precio base</span><span class="val">${fmt(r.base_price)}</span></div>
+        <div><span class="lbl">Descuento</span><span class="val">${r.discount_amount > 0 ? '-'+fmt(r.discount_amount) : '$0'}</span></div>
+        <div><span class="lbl">Propina</span><span class="val">${r.tip_amount > 0 ? '+'+fmt(r.tip_amount) : '$0'}</span></div>
+        <div><span class="lbl">Final cobrado</span><span class="val">${fmt(r.final_price + r.tip_amount)}</span></div>
+        <div><span class="lbl">Comisión ${r.commission_percentage ? r.commission_percentage+'%' : ''}</span><span class="val text-red-400">-${fmt(r.commission_amount)}</span></div>
+        <div><span class="lbl">Método</span><span class="val">${r.payment_method}</span></div>
+        <div><span class="lbl">Confirmó</span><span class="val">${r.approved_by}</span></div>
+      </div>
+      <div class="cf-row-actions">
+        <button onclick="cfOpenEditPaymentModal(${r.id}, 'service', '${(r.payment_method||'').replace(/'/g,"\\'")}')" class="cf-cta-secondary text-[0.65rem]">Cambiar método</button>
+      </div>
+    `;
+  } else if (it.kind === 'product') {
+    const r = it.raw;
+    detail = `
+      <div class="cf-detail-grid">
+        <div><span class="lbl">Método</span><span class="val">${r.payment_method}</span></div>
+        <div><span class="lbl">Vendido por</span><span class="val">${r.approved_by}</span></div>
+      </div>
+      <div class="cf-row-actions">
+        <button onclick="cfOpenEditPaymentModal(${r.id}, 'inventory', '${(r.payment_method||'').replace(/'/g,"\\'")}')" class="cf-cta-secondary text-[0.65rem]">Cambiar método</button>
+      </div>
+    `;
+  } else if (it.kind === 'commission') {
+    const r = it.raw;
+    detail = `
+      <div class="cf-detail-grid">
+        <div><span class="lbl">Base</span><span class="val">${fmt(r.base_price)}</span></div>
+        <div><span class="lbl">Porcentaje</span><span class="val">${r.commission_percentage || '—'}%</span></div>
+        <div><span class="lbl">Comisión</span><span class="val text-red-400">-${fmt(r.commission_amount)}</span></div>
+        <div><span class="lbl">Propina (100%)</span><span class="val text-emerald-400">+${fmt(r.tip_amount)}</span></div>
+        <div><span class="lbl">Venta de</span><span class="val">${r.client_name}</span></div>
+        <div><span class="lbl">Servicio</span><span class="val">${r.service_name}</span></div>
+      </div>
+    `;
+  } else if (it.kind === 'expense') {
+    detail = `
+      <div class="cf-detail-grid">
+        <div><span class="lbl">Categoría</span><span class="val">${it.subtitle}</span></div>
+      </div>
+    `;
+  } else if (it.kind === 'pending') {
+    const r = it.raw;
+    detail = `
+      <div class="cf-detail-grid">
+        <div><span class="lbl">Servicio</span><span class="val">${r.service_name}</span></div>
+        <div><span class="lbl">Cliente</span><span class="val">${r.client_name}</span></div>
+        <div><span class="lbl">Final</span><span class="val">${fmt(r.final_price)}</span></div>
+        <div><span class="lbl">Propina</span><span class="val">${r.tip_amount > 0 ? '+'+fmt(r.tip_amount) : '$0'}</span></div>
+      </div>
+      <div class="cf-row-actions">
+        <button onclick="cfApproveSale(${r.id})" class="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 text-[0.65rem] font-bold uppercase tracking-widest rounded py-2">✓ Aprobar</button>
+        <button onclick="cfOpenRejectModal(${r.id}, '${(r.barber_name||'').replace(/'/g,"\\'")}')" class="bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 text-[0.65rem] font-bold uppercase tracking-widest rounded py-2">✕ Rechazar</button>
+      </div>
+    `;
+  }
+
+  const tipHtml = it.tip > 0 ? `<span class="cf-row-tip">+${fmt(it.tip)} propina</span>` : '';
+
+  return `
+    <div class="cf-row" data-kind="${it.kind}">
+      <div class="cf-row-top">
+        <div class="cf-row-left">
+          <div class="cf-row-time">${it.time}</div>
+          <div class="cf-row-title">${badge}${it.title}</div>
+          <div class="cf-row-sub">${it.subtitle}</div>
+        </div>
+        <div>
+          <div class="cf-row-amount ${amountClass}">${sign}${fmt(it.amount)}</div>
+          ${tipHtml}
+          <svg class="cf-chev w-4 h-4 inline-block mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </div>
+      </div>
+      <div class="cf-row-detail">${detail}</div>
+    </div>
+  `;
+}
+
+function badgeFor(kind) {
+  const map = {
+    service: '<span class="cf-badge service">Servicio</span>',
+    product: '<span class="cf-badge product">Producto</span>',
+    expense: '<span class="cf-badge expense">Egreso</span>',
+    pending: '<span class="cf-badge pending">Por aprobar</span>',
+    commission: '<span class="cf-badge commission">Comisión</span>',
+  };
+  return map[kind] || '';
+}
+
+// ═══ ACCIONES ═══════════════════════════════════════════
+window.cfApproveSale = function(id) {
+  fetch(`/api/admin/cashflow/sales/${id}/approve/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) cfRefreshAll();
+    else alert(data.error || 'Error al aprobar.');
+  })
+  .catch(() => alert('Error de conexión.'));
+};
+
+let cfRejectId = null;
+window.cfOpenRejectModal = function(id, name) {
+  cfRejectId = id;
+  document.getElementById('cf-reject-barber-name').textContent = name;
+  document.getElementById('cf-reject-reason-input').value = '';
+  document.getElementById('cf-reject-error').classList.add('hidden');
+  const btn = document.getElementById('cf-btn-confirm-reject');
+  btn.disabled = false;
+  btn.textContent = 'Rechazar';
+  document.getElementById('cf-modal-reject').classList.remove('hidden');
+};
+
+window.cfCloseRejectModal = function() {
+  document.getElementById('cf-modal-reject').classList.add('hidden');
+  cfRejectId = null;
+};
+
+window.cfConfirmRejectSale = function() {
+  if (!cfRejectId) return;
+  const reason = document.getElementById('cf-reject-reason-input').value.trim();
+  const btn = document.getElementById('cf-btn-confirm-reject');
+  const errDiv = document.getElementById('cf-reject-error');
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
+  errDiv.classList.add('hidden');
+  fetch(`/api/admin/cashflow/sales/${cfRejectId}/reject/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ reason: reason || 'Sin razón especificada.' })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      cfCloseRejectModal();
+      cfRefreshAll();
+    } else {
+      errDiv.textContent = data.error || 'Error al rechazar.';
+      errDiv.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Rechazar';
+    }
+  })
+  .catch(() => {
+    errDiv.textContent = 'Error de conexión.';
+    errDiv.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Rechazar';
+  });
+};
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cfCloseRejectModal(); });
+
+// ═══ EDIT PAYMENT METHOD ════════════════════════════════
+let cfEditSaleId = null;
+let cfEditSaleType = null;
+window.cfOpenEditPaymentModal = function(saleId, saleType, currentMethodName) {
+  cfEditSaleId = saleId;
+  cfEditSaleType = saleType;
+  document.getElementById('edit-payment-error').classList.add('hidden');
+  const select = document.getElementById('edit-payment-select');
+  for (let i = 0; i < select.options.length; i++) {
+    if (select.options[i].text.trim() === (currentMethodName || '').trim()) {
+      select.selectedIndex = i;
+      break;
+    }
+  }
+  document.getElementById('modal-edit-payment').classList.remove('hidden');
+};
+window.cfCloseEditPaymentModal = function() {
+  document.getElementById('modal-edit-payment').classList.add('hidden');
+  cfEditSaleId = null;
+  cfEditSaleType = null;
+};
+window.cfSubmitEditPayment = function() {
+  if (!cfEditSaleId || !cfEditSaleType) return;
+  const methodId = document.getElementById('edit-payment-select').value;
+  const btn = document.getElementById('btn-submit-edit-payment');
+  const errDiv = document.getElementById('edit-payment-error');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  errDiv.classList.add('hidden');
+  const endpoint = cfEditSaleType === 'service'
+    ? `/api/admin/cashflow/sales/${cfEditSaleId}/edit-payment/`
+    : `/api/admin/cashflow/inventory-sales/${cfEditSaleId}/edit-payment/`;
+  fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ payment_method_id: methodId })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      cfCloseEditPaymentModal();
+      cfRefreshAll();
+    } else {
+      errDiv.textContent = data.error || 'Error al cambiar método.';
+      errDiv.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Guardar';
+    }
+  })
+  .catch(() => {
+    errDiv.textContent = 'Error de conexión.';
+    errDiv.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Guardar';
+  });
+};
+
+// ═══ CIERRE DE CAJA ═════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const btnOpen = document.getElementById('btn-daily-close');
+  const modal = document.getElementById('modal-daily-close');
+  const btnConfirm = document.getElementById('btn-confirm-close');
+  const errorDiv = document.getElementById('close-error');
+
+  if (btnOpen && !btnOpen.disabled) {
+    btnOpen.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      errorDiv.classList.add('hidden');
+    });
+  }
+  if (btnConfirm) {
+    btnConfirm.addEventListener('click', () => {
+      const original = btnConfirm.textContent;
+      btnConfirm.textContent = 'Procesando...';
+      btnConfirm.disabled = true;
+      fetch('/api/admin/cashflow/daily-close/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF }
+      })
+      .then(r => r.json().then(data => ({ status: r.status, body: data })))
+      .then(res => {
+        if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
+          window.location.reload();
+        } else {
+          throw new Error(res.body.error || 'Error al ejecutar cierre');
         }
-        if (!found && select.options.length > 0) {
-            select.selectedIndex = 0;
-        }
-        
-        document.getElementById('modal-edit-payment').classList.remove('hidden');
-    };
+      })
+      .catch(err => {
+        errorDiv.textContent = err.message;
+        errorDiv.classList.remove('hidden');
+        btnConfirm.textContent = original;
+        btnConfirm.disabled = false;
+      });
+    });
+  }
+  cfRefreshAll();
+});
 
-    window.cfCloseEditPaymentModal = function() {
-        document.getElementById('modal-edit-payment').classList.add('hidden');
-        cfEditSaleId = null;
-        cfEditSaleType = null;
-    };
+// ═══ VENTA RAPIDA ═══════════════════════════════════════
+function openInventorySaleModal() {
+  document.getElementById('inv-item-id').value = '';
+  document.getElementById('inv-qty').value = '1';
+  updateInvPrice();
+  document.getElementById('modal-inventory-sale').classList.remove('hidden');
+}
+function closeInventorySaleModal() {
+  document.getElementById('modal-inventory-sale').classList.add('hidden');
+}
+function updateInvPrice() {
+  const select = document.getElementById('inv-item-id');
+  const option = select.options[select.selectedIndex];
+  const price = parseFloat(option ? option.getAttribute('data-price') : 0);
+  const qty = parseInt(document.getElementById('inv-qty').value) || 1;
+  document.getElementById('inv-total').value = '$' + (price * qty).toLocaleString('es-CO');
+}
+async function submitInventorySale() {
+  const btn = document.getElementById('btn-submit-inv-sale');
+  const itemId = document.getElementById('inv-item-id').value;
+  const qty = document.getElementById('inv-qty').value;
+  const methodId = document.getElementById('inv-payment-method').value;
+  if (!itemId) { alert('Selecciona un producto'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
+  try {
+    const r = await fetch('/api/admin/cashflow/inventory-sales/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ item_id: itemId, quantity: qty, payment_method_id: methodId })
+    });
+    const data = await r.json();
+    if (r.ok) {
+      closeInventorySaleModal();
+      cfRefreshAll();
+    } else {
+      alert('Error: ' + (data.error || 'Error procesando venta'));
+      btn.disabled = false;
+      btn.textContent = 'Confirmar';
+    }
+  } catch (e) {
+    alert('Error de conexión');
+    btn.disabled = false;
+    btn.textContent = 'Confirmar';
+  }
+}
 
-    window.cfSubmitEditPayment = function() {
-        if (!cfEditSaleId || !cfEditSaleType) return;
-        
-        const methodId = document.getElementById('edit-payment-select').value;
-        const btn = document.getElementById('btn-submit-edit-payment');
-        const errDiv = document.getElementById('edit-payment-error');
-        
-        btn.disabled = true;
-        btn.textContent = 'Guardando...';
-        errDiv.classList.add('hidden');
-        
-        const endpoint = cfEditSaleType === 'service' 
-            ? `/api/admin/cashflow/sales/${cfEditSaleId}/edit-payment/`
-            : `/api/admin/cashflow/inventory-sales/${cfEditSaleId}/edit-payment/`;
-            
-        fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ payment_method_id: methodId })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                cfCloseEditPaymentModal();
-                showLiveDetails(); // Refrescar detalles en vivo
-            } else {
-                errDiv.textContent = data.error || 'Error al cambiar método.';
-                errDiv.classList.remove('hidden');
-                btn.disabled = false;
-                btn.textContent = 'Guardar';
-            }
-        })
-        .catch(() => {
-            errDiv.textContent = 'Error de conexión.';
-            errDiv.classList.remove('hidden');
-            btn.disabled = false;
-            btn.textContent = 'Guardar';
-        });
-    };
+// ═══ PAGOS A BARBEROS ═══════════════════════════════════
+function fetchBarberPayments() {
+  const container = document.getElementById('barber-payments-container');
+  container.innerHTML = '<div class="cf-empty col-span-full">Cargando pagos...</div>';
+  fetch('/api/admin/cashflow/barber-payments/')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.payments || data.payments.length === 0) {
+        container.innerHTML = `
+          <div class="cf-empty col-span-full" style="border-color: rgba(16,185,129,0.3); color: rgba(110,231,183,0.9);">
+            ✓ Todo al día — sin saldos pendientes.
+          </div>`;
+        return;
+      }
+      container.innerHTML = data.payments.map(p => `
+        <div class="bg-jet-card border border-gold/20 rounded-md p-4 flex flex-col">
+          <div class="flex items-baseline justify-between mb-3">
+            <h3 class="text-white font-serif text-base">${p.barber_name}</h3>
+            <span class="text-gold font-bold text-base">${fmt(p.total_earnings)}</span>
+          </div>
+          <div class="space-y-1 text-[0.7rem]">
+            <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-white">${fmt(p.total_commissions)}</span></div>
+            <div class="flex justify-between"><span class="text-smoke/50">Propinas</span><span class="text-emerald-400">+${fmt(p.total_tips)}</span></div>
+          </div>
+          ${p.history && p.history.length > 0 ? `
+            <details class="mt-2">
+              <summary class="text-[0.6rem] text-smoke/40 uppercase tracking-widest cursor-pointer hover:text-white">Historial diario (${p.history.length})</summary>
+              <div class="mt-2 space-y-1 max-h-32 overflow-y-auto text-[0.65rem]">
+                ${p.history.map(h => `<div class="flex justify-between bg-white/[0.02] p-1.5 rounded"><span class="text-smoke/60">${h.date}</span><span class="text-gold">${fmt(h.total)}</span></div>`).join('')}
+              </div>
+            </details>
+          ` : ''}
+          <button onclick="payBarber(${p.barber_id}, '${(p.barber_name||'').replace(/'/g,"\\'")}', ${p.total_earnings})" class="mt-auto pt-3 w-full">
+            <span class="block py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-widest text-[0.7rem] uppercase rounded transition-colors">Marcar pagado</span>
+          </button>
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      container.innerHTML = '<div class="cf-empty col-span-full text-red-400">Error al cargar pagos.</div>';
+    });
+}
+window.fetchBarberPayments = fetchBarberPayments;
+window.payBarber = function(barberId, barberName, amount) {
+  if (!confirm(`Marcar como PAGADO ${fmt(amount)} a ${barberName}?`)) return;
+  fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      alert(data.message);
+      fetchBarberPayments();
+    } else {
+      alert(data.error || 'Error.');
+    }
+  })
+  .catch(() => alert('Error de conexión.'));
+};
+
+// ═══ DETALLE DE CIERRE HISTÓRICO ═══════════════════════
+window.showDailyCloseDetails = function(closeId) {
+  const modal = document.getElementById('modal-close-detail');
+  const body = document.getElementById('detail-body');
+  const dateEl = document.getElementById('detail-date');
+  modal.classList.remove('hidden');
+  body.innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin"></div></div>';
+  fetch(`/api/admin/cashflow/daily-close/${closeId}/detail/`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        body.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`;
+        return;
+      }
+      dateEl.textContent = `${data.date} · cerrado ${data.closed_at.split(' ')[1]} por ${data.closed_by}`;
+      body.innerHTML = renderCloseDetail(data);
+    })
+    .catch(() => {
+      body.innerHTML = '<div class="text-red-400 text-center py-8">Error de conexión.</div>';
+    });
+};
+
+function renderCloseDetail(data) {
+  let html = '';
+  // Totals
+  html += `
+    <div class="bg-black/30 border border-gold/20 rounded p-4 mb-5 text-sm space-y-2">
+      <div class="flex justify-between"><span class="text-smoke/60">Ventas servicios</span><span class="text-white">${fmt(data.total_sales)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Ventas productos</span><span class="text-emerald-400">+${fmt(data.total_inventory_sales)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Propinas (pass-through)</span><span class="text-amber-400">${fmt(data.total_tips)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Comisiones</span><span class="text-red-400">-${fmt(data.total_commissions)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Egresos</span><span class="text-red-400">-${fmt(data.total_expenses)}</span></div>
+      <div class="flex justify-between border-t border-white/10 pt-2 mt-2 font-bold">
+        <span class="text-gold uppercase tracking-widest text-[0.65rem]">Ingreso neto</span>
+        <span class="text-gold text-base">${fmt(data.net_income)}</span>
+      </div>
+    </div>
+  `;
+  // Barbers
+  if (data.barbers && data.barbers.length) {
+    html += '<div class="cf-section-title">Por barbero</div><div class="space-y-2 mb-5">';
+    data.barbers.forEach(b => {
+      html += `
+        <div class="bg-jet-lighter border border-white/5 rounded p-3">
+          <div class="flex justify-between items-baseline mb-2">
+            <span class="text-white font-bold text-sm">${b.name}</span>
+            <span class="text-[0.6rem] text-smoke/40">${b.sales_count} ventas</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-[0.7rem]">
+            <div><div class="text-[0.55rem] text-smoke/40 uppercase tracking-widest">Ventas</div><div class="text-white font-bold">${fmt(b.total_sales)}</div></div>
+            <div><div class="text-[0.55rem] text-smoke/40 uppercase tracking-widest">Comisión</div><div class="text-red-400 font-bold">-${fmt(b.total_commissions)}</div></div>
+            <div><div class="text-[0.55rem] text-smoke/40 uppercase tracking-widest">Propinas</div><div class="text-emerald-400 font-bold">+${fmt(b.total_tips)}</div></div>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+  // Transactions list
+  if (data.sales_detail && data.sales_detail.length) {
+    html += '<div class="cf-section-title">Transacciones</div><div class="space-y-1.5 mb-5">';
+    data.sales_detail.forEach(s => {
+      const typeBadge = s.type === 'inventory' ? '<span class="cf-badge product">Producto</span>' : '<span class="cf-badge service">Servicio</span>';
+      html += `
+        <div class="bg-jet-lighter border border-white/5 rounded p-3 flex justify-between items-start gap-3">
+          <div class="min-w-0 flex-1">
+            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${s.time}</div>
+            <div class="text-white text-sm font-medium">${typeBadge}${s.client_name}</div>
+            <div class="text-[0.65rem] text-smoke/55">${s.service_name} · ${s.barber_name} · ${s.payment_method}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-white font-bold text-sm">${fmt(s.final_price)}</div>
+            ${s.tip_amount > 0 ? `<div class="text-[0.6rem] text-emerald-400">+${fmt(s.tip_amount)}</div>` : ''}
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+  // Expenses
+  if (data.expenses && data.expenses.length) {
+    html += '<div class="cf-section-title">Egresos</div><div class="space-y-1.5 mb-5">';
+    data.expenses.forEach(e => {
+      html += `
+        <div class="bg-jet-lighter border border-white/5 rounded p-3 flex justify-between items-center">
+          <div>
+            <div class="text-white text-sm">${e.description}</div>
+            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${e.type}</div>
+          </div>
+          <span class="text-red-400 font-bold">-${fmt(e.amount)}</span>
+        </div>`;
+    });
+    html += '</div>';
+  }
+  // Payment methods
+  if (data.payment_methods && Object.keys(data.payment_methods).length) {
+    html += '<div class="cf-section-title">Métodos de cobro</div><div class="space-y-1.5">';
+    for (const [pm, total] of Object.entries(data.payment_methods)) {
+      html += `<div class="bg-jet-lighter border border-white/5 rounded p-3 flex justify-between"><span class="text-smoke/70 text-sm">${pm}</span><span class="text-white font-bold">${fmt(total)}</span></div>`;
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+// ═══ BORRAR CIERRE (superadmin) ════════════════════════
+{% if user_role == 'superadmin' %}
+window.deleteDailyClose = function(closeId, dateStr) {
+  if (!confirm(`¿BORRAR el cierre del ${dateStr}?\n\nLas ventas y egresos volverán a pendientes.`)) return;
+  fetch(`/api/admin/cashflow/daily-close/${closeId}/delete/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': CSRF }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      alert('Cierre eliminado.');
+      window.location.reload();
+    } else {
+      alert(data.error || 'Error.');
+    }
+  })
+  .catch(() => alert('Error de conexión.'));
+};
+{% endif %}
+
+// ═══ REFRESH ORQUESTADO ═════════════════════════════════
+function cfRefreshAll() {
+  cfLoadLive();
+  fetchBarberPayments();
+}
+// Auto-refresh cada 60s
+clearInterval(cfRefreshTimer);
+cfRefreshTimer = setInterval(cfLoadLive, 60000);
 </script>
-
 {% endblock %}
