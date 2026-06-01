@@ -68,6 +68,23 @@ class Barber(models.Model):
             self.schedule = self.get_default_schedule()
         super().save(*args, **kwargs)
 
+    @property
+    def is_frank(self):
+        """Frank tiene comportamiento especial (slots de 2h en cualquier servicio)."""
+        return 'frank' in (self.display_name or '').lower()
+
+    def effective_duration_minutes(self, service):
+        """Duración real de una reserva para ESTE barbero ofreciendo `service`.
+
+        Frank usa siempre 2h por servicio (decisión de negocio). El resto de
+        barberos toma la duración del servicio (default 60).
+        """
+        if self.is_frank:
+            return 120
+        if service is None:
+            return 60
+        return service.duration_minutes or 60
+
 
 class BarberUnavailability(models.Model):
     """Bloqueo temporal de un barbero en una fecha y rango de hora."""

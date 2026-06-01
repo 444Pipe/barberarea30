@@ -56,15 +56,21 @@ def barber_availability_view(request, barber_id):
                         status=status.HTTP_404_NOT_FOUND)
 
     # ── Duración del servicio seleccionado (default 30 min) ──────────────────
+    # Frank usa siempre 2h por servicio, sin importar la duración nominal.
     SLOT_SIZE = 30  # cada bloque horario en el calendario = 30 min
     service_duration = SLOT_SIZE  # duración a reservar
+    svc = None
     service_id = request.query_params.get('service_id')
     if service_id:
         try:
             svc = Service.objects.get(pk=service_id)
-            service_duration = svc.duration_minutes or SLOT_SIZE
         except Service.DoesNotExist:
-            pass  # si no existe el servicio, usamos 60 min por defecto
+            svc = None
+    if svc is not None:
+        service_duration = barber.effective_duration_minutes(svc)
+    elif barber.is_frank:
+        # Sin servicio pero es Frank → todavía bloquea 2h por slot
+        service_duration = 120
 
     # Cuántos bloques de 60 min ocupa este servicio (mínimo 1)
     slots_needed = max(1, -(-service_duration // SLOT_SIZE))  # ceil division

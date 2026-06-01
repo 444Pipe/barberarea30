@@ -76,6 +76,17 @@ def create_booking_view(request):
     except Service.DoesNotExist:
         return Response({'error': 'Servicio no válido'}, status=400)
 
+    # 1b. Servicios "a consulta" no se reservan online.
+    if service.requires_consultation:
+        return Response({
+            'error': (
+                f'El servicio "{service.name}" es por consulta. '
+                'Por favor contáctanos por WhatsApp para acordar fecha, '
+                'precio y detalles.'
+            ),
+            'requires_consultation': True,
+        }, status=400)
+
     # 2. Lógica "Cualquier barbero" vs barbero específico
     barber_id = data.get('barber_id')
     barber = None
@@ -102,16 +113,20 @@ def create_booking_view(request):
             req_d = _dt.strptime(date_val, '%Y-%m-%d').date()
             req_t = _dt.strptime(time_val, '%H:%M').time()
             req_start = _dt.combine(req_d, req_t)
-            req_end = req_start + timedelta(minutes=service.duration_minutes)
             parsed_ok = True
         except (ValueError, TypeError):
-            req_d = req_start = req_end = None
+            req_d = req_start = None
             parsed_ok = False
 
-        # Buscar quién está libre (sin reservas NI bloqueos de inactividad)
+        # Buscar quién está libre (sin reservas NI bloqueos de inactividad).
+        # OJO: la ventana del servicio depende del barbero (Frank usa 2h en
+        # cualquier servicio), así que se recalcula req_end por candidato.
         for b in available_barbers:
-            # 1. Conflicto con reservas existentes (Overlap check)
             if parsed_ok:
+                eff_dur = b.effective_duration_minutes(service)
+                req_end = req_start + timedelta(minutes=eff_dur)
+
+                # 1. Conflicto con reservas existentes (overlap real)
                 conflicts = False
                 for bk_time, bk_duration in Booking.objects.filter(
                     barber=b, date=date_val, status__in=['pending', 'confirmed']
@@ -125,13 +140,12 @@ def create_booking_view(request):
                 conflicts = Booking.objects.filter(
                     barber=b, date=date_val, time=time_val, status__in=['pending', 'confirmed']
                 ).exists()
+                req_end = None
 
             if conflicts:
                 continue
 
             # 2. Conflicto con inactividad temporal (solape real, no solo hora de inicio)
-            # Un bloque [u_start, u_end) cruza la reserva [req_start, req_end)
-            # cuando u_start < req_end AND u_end > req_start.
             blocked_now = False
             if parsed_ok:
                 for u_start, u_end in BarberUnavailability.objects.filter(
@@ -160,11 +174,12 @@ def create_booking_view(request):
             date_val = data.get('date')
             time_val = data.get('time')
             from datetime import datetime as _dt, timedelta as _td
+            eff_dur = barber.effective_duration_minutes(service)
             try:
                 slot_time = _dt.strptime(time_val, '%H:%M').time()
                 req_d = _dt.strptime(date_val, '%Y-%m-%d').date()
                 req_s = _dt.combine(req_d, slot_time)
-                req_e = req_s + _td(minutes=service.duration_minutes)
+                req_e = req_s + _td(minutes=eff_dur)
             except (ValueError, TypeError):
                 req_s = req_e = req_d = None
             if req_s is not None:
@@ -189,11 +204,12 @@ def create_booking_view(request):
     # ── Nivel 2: Validación explícita de doble agendamiento (Con overlaps) ───────────────────
     requested_date = data.get('date')
     requested_time_str = data.get('time')
+    effective_duration = barber.effective_duration_minutes(service)
     try:
         from datetime import datetime as _dt, timedelta
         req_time = _dt.strptime(requested_time_str, '%H:%M').time()
         req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
-        req_end = req_start + timedelta(minutes=service.duration_minutes)
+        req_end = req_start + timedelta(minutes=effective_duration)
 
         # ── Nivel 2a: Validar bloqueos globales del local (BlockedDate) ─────────
         # Si la fecha tiene un BlockedDate sin horario → todo el día está cerrado.
@@ -267,7 +283,7 @@ def create_booking_view(request):
             barber=barber,
             service=service,
             price=data.get('price', service.price),
-            duration_minutes=service.duration_minutes,
+            duration_minutes=effective_duration,
         )
 
         import threading
@@ -525,14 +541,22 @@ def admin_booking_detail_view(request, booking_id):
         changed_slot = is_operational_or_super and any(
             k in data for k in ('date', 'time', 'barber', 'service')
         )
+        # Recalcular duración efectiva si cambió barbero o servicio (Frank → 2h).
+        if changed_slot and booking.barber:
+            new_eff = booking.barber.effective_duration_minutes(booking.service)
+            booking.duration_minutes = new_eff
+            effective_dur_for_check = new_eff
+        else:
+            effective_dur_for_check = (
+                booking.service.duration_minutes if booking.service else booking.duration_minutes
+            )
         if changed_slot and booking.status not in ('cancelled', 'completed'):
             from .validators import check_booking_conflict
             err = check_booking_conflict(
                 barber=booking.barber,
                 date=booking.date,
                 time=booking.time,
-                duration_minutes=(booking.service.duration_minutes
-                                  if booking.service else booking.duration_minutes),
+                duration_minutes=effective_dur_for_check,
                 exclude_booking_id=booking.pk,
             )
             if err:

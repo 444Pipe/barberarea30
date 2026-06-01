@@ -39,6 +39,12 @@ class Service(models.Model):
         related_name='exclusive_services',
         help_text='Dejar vacío para servicio disponible para todos los barberos.'
     )
+    # Servicios "a consulta" — el cliente NO puede reservar online; debe escribir por
+    # WhatsApp para acordar precio/fecha/condiciones (ej.: color de cabello).
+    requires_consultation = models.BooleanField(
+        default=False,
+        help_text='Si está activo, el botón "reservar" abre WhatsApp en lugar de iniciar el flujo de reserva.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

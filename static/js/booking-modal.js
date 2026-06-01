@@ -162,6 +162,9 @@ function cargarModalServicios() {
       
       let optionsHtml = '<option value="" class="bg-jet">Selecciona un servicio</option>';
       data.servicios.forEach(servicio => {
+        // Servicios "a consulta" (ej. Color) no se reservan por modal rápido —
+        // el cliente los inicia desde el wizard de booking, que abre WhatsApp.
+        if (servicio.requires_consultation) return;
         const precioFormat = parseFloat(servicio.price).toLocaleString('es-CO');
         optionsHtml += `<option value="${servicio.name}" data-service-id="${servicio.id}" data-price="${servicio.price}" class="bg-jet">${servicio.name} - $${precioFormat}</option>`;
       });

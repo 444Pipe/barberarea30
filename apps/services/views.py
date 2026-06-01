@@ -38,7 +38,10 @@ from django.core.serializers.json import DjangoJSONEncoder
 def obtener_servicios_nativos(request):
     """Endpoint nativo de servicios para JS Vanilla"""
     try:
-        servicios = list(Service.objects.filter(is_active=True).order_by('price').values('id', 'name', 'price', 'duration_minutes', 'description', 'exclusive_barber_id'))
+        servicios = list(Service.objects.filter(is_active=True).order_by('price').values(
+            'id', 'name', 'price', 'duration_minutes', 'description',
+            'exclusive_barber_id', 'requires_consultation',
+        ))
         return JsonResponse({'servicios': servicios}, safe=False, encoder=DjangoJSONEncoder)
     except Exception as e:
         import traceback

@@ -78,6 +78,22 @@ except Exception as check_err:
     except Exception as e:
         print("⚠ Fallo forzando la tabla (probablemente ya existe o hay otro error):", e)
 
+# --- Autocuración para services_service.requires_consultation ---
+from apps.services.models import Service as _SvcModel
+try:
+    _SvcModel.objects.filter(requires_consultation=False).exists()
+except Exception:
+    print("⚠ Columna 'requires_consultation' no encontrada en services_service. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.BooleanField(default=False)
+            _f.set_attributes_from_name('requires_consultation')
+            schema_editor.add_field(_SvcModel, _f)
+        print("✓ Columna 'requires_consultation' creada exitosamente.")
+    except Exception as _e:
+        print("⚠ No se pudo crear la columna manualmente:", _e)
+
 # --- NUEVO: Autocuración para cashflow_sale.approval_status ---
 from apps.cashflow.models import Sale
 try:

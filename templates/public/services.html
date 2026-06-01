@@ -80,27 +80,43 @@
             if (!contenedor) return;
             let htmlFragment = '';
             
+            const WA = '573112651032';
             data.servicios.forEach((servicio, index) => {
                 const delay = index * 100;
                 const formatPrice = parseFloat(servicio.price).toLocaleString('es-CO');
                 const slug = servicio.name.toLowerCase().replace(/[\s\W-]+/g, '-');
-                
+                const isConsult = !!servicio.requires_consultation;
+
+                const priceTag = isConsult
+                  ? '<span class="text-emerald-400 font-medium tracking-wide">A CONSULTA</span>'
+                  : `<span class="text-gold font-medium tracking-wide">$${formatPrice}</span>`;
+                const durationTag = isConsult
+                  ? '<span class="text-smoke/50 text-xs tracking-wider uppercase">Precio según largo y producto</span>'
+                  : `<span class="text-smoke/50 text-xs tracking-wider uppercase">${servicio.duration_minutes} min</span>`;
+                const cta = isConsult
+                  ? `<a href="https://wa.me/${WA}?text=${encodeURIComponent('Hola Área 30 👋 Quiero agendar el servicio *' + servicio.name + '* (a consulta). ¿Me podrían indicar disponibilidad y precio?')}"
+                       target="_blank" rel="noopener noreferrer"
+                       class="text-emerald-400 text-sm tracking-wider uppercase hover:text-emerald-300 transition-colors flex items-center gap-2 group-hover:gap-3 duration-300">
+                       WhatsApp <span class="text-lg">→</span>
+                     </a>`
+                  : `<a href="booking.html#${slug}" class="text-gold text-sm tracking-wider uppercase hover:text-white transition-colors flex items-center gap-2 group-hover:gap-3 duration-300">
+                       Agendar <span class="text-lg">→</span>
+                     </a>`;
+
                 htmlFragment += `
                   <div class="service-card p-10 rounded-sm relative overflow-hidden group fade-in-up" style="animation-delay: ${delay}ms;">
-                    <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-gold/10 to-transparent"></div>
+                    <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl ${isConsult ? 'from-emerald-500/10' : 'from-gold/10'} to-transparent"></div>
                     <div class="flex justify-between items-start mb-6 mt-4">
-                      <h3 class="text-xl font-serif text-white group-hover:text-gold transition-colors">${servicio.name}</h3>
-                      <span class="text-gold font-medium tracking-wide">$${formatPrice}</span>
+                      <h3 class="text-xl font-serif text-white ${isConsult ? 'group-hover:text-emerald-400' : 'group-hover:text-gold'} transition-colors">${servicio.name}</h3>
+                      ${priceTag}
                     </div>
-                    <div class="w-full h-[1px] bg-gold/20 mb-6 group-hover:bg-gold/50 transition-colors"></div>
+                    <div class="w-full h-[1px] ${isConsult ? 'bg-emerald-500/20 group-hover:bg-emerald-500/50' : 'bg-gold/20 group-hover:bg-gold/50'} mb-6 transition-colors"></div>
                     <ul class="text-smoke/60 text-sm font-light space-y-3 mb-8">
-                      <li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> ${servicio.features ? servicio.features.join('</li><li class="flex items-center gap-2"><span class="text-gold text-xs">◆</span> ') : 'Atención premium'}</li>
+                      <li class="flex items-center gap-2"><span class="${isConsult ? 'text-emerald-400' : 'text-gold'} text-xs">◆</span> ${servicio.features ? servicio.features.join('</li><li class="flex items-center gap-2"><span class="' + (isConsult ? 'text-emerald-400' : 'text-gold') + ' text-xs">◆</span> ') : 'Atención premium'}</li>
                     </ul>
                     <div class="flex items-center justify-between mt-auto">
-                      <span class="text-smoke/50 text-xs tracking-wider uppercase">${servicio.duration_minutes} min</span>
-                      <a href="booking.html#${slug}" class="text-gold text-sm tracking-wider uppercase hover:text-white transition-colors flex items-center gap-2 group-hover:gap-3 duration-300">
-                        Agendar <span class="text-lg">→</span>
-                      </a>
+                      ${durationTag}
+                      ${cta}
                     </div>
                   </div>
                 `;

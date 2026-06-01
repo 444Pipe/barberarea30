@@ -31,6 +31,15 @@ class Command(BaseCommand):
              'duration_minutes': 120, 'features': ['Servicio Gold Dama', 'Tratamientos extra']},
             {'name': 'Diamond VIP', 'slug': 'diamond-vip', 'price': 115000,
              'duration_minutes': 120, 'features': ['Gold Exclusive', 'Beneficios Diamond']},
+            # ─── Color a consulta — hombres y mujeres ──────────────────────
+            # Precio variable según largo y producto; el cliente DEBE escribir
+            # por WhatsApp para acordar antes de reservar. requires_consultation
+            # hace que el botón abra wa.me en lugar del wizard.
+            {'name': 'Color', 'slug': 'color-cabello',
+             'category': 'vip', 'price': 0, 'duration_minutes': 120,
+             'description': 'Color para hombres y mujeres. Precio y tiempo según largo y producto. A consulta — escríbenos por WhatsApp.',
+             'features': ['Diagnóstico capilar', 'Color profesional', 'Producto premium'],
+             'requires_consultation': True},
         ]
 
         # Deactivate all existing services first
