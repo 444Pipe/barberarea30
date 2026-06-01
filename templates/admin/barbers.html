@@ -387,26 +387,35 @@ function deleteBarber() {
 </div>
 
 <style>
-  /* Tabs del modal de bloqueo */
+  /* ────── Tabs del modal de bloqueo ───────────────────── */
   .unavail-tab {
     color: rgba(245, 245, 245, 0.55);
+    min-height: 44px;        /* touch target en mobile */
+    touch-action: manipulation;
   }
   .unavail-tab:hover { color: white; }
   .unavail-tab.is-active {
     background: #f59e0b;
     color: #0a0a0a;
   }
-  /* Botones de día de la semana */
+  @media (min-width: 640px) {
+    .unavail-tab { min-height: 36px; }
+  }
+
+  /* ────── Botones de día de la semana ─────────────────── */
   .weekday-btn {
-    padding: 0.55rem 0;
-    font-size: 0.72rem;
+    padding: 0;
+    min-height: 48px;        /* touch target generoso en mobile */
+    font-size: 0.95rem;
     font-weight: 700;
-    border-radius: 0.35rem;
+    border-radius: 0.5rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: #0d0d0d;
-    color: rgba(245, 245, 245, 0.4);
+    color: rgba(245, 245, 245, 0.45);
     transition: all .15s;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .weekday-btn:hover {
     color: #fbbf24;
@@ -417,34 +426,87 @@ function deleteBarber() {
     color: #0a0a0a;
     border-color: #fbbf24;
   }
+  @media (min-width: 640px) {
+    .weekday-btn {
+      min-height: 38px;
+      font-size: 0.78rem;
+    }
+  }
+
+  /* ────── Modal — full-screen en mobile, centrado en sm+ ─ */
+  #unavailability-modal { align-items: stretch; padding: 0; }
+  #unavailability-modal > div {
+    border-radius: 0;
+    border: none;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    min-height: 100vh;
+    margin: 0;
+  }
+  @media (min-width: 640px) {
+    #unavailability-modal { align-items: center; padding: 1rem; }
+    #unavailability-modal > div {
+      border-radius: 0.75rem;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      max-width: 32rem;
+      max-height: 90vh;
+      min-height: 0;
+    }
+  }
+
+  /* Header sticky para que el ✕ siempre esté a la mano */
+  .unavail-modal-header {
+    position: sticky;
+    top: 0;
+    background: #111111;
+    z-index: 10;
+  }
+
+  /* Botón ✕ del header con tamaño tappable */
+  .unavail-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    touch-action: manipulation;
+  }
+
+  /* Botones de acción primarios/secundarios con altura tappable */
+  .unavail-actions button { min-height: 48px; touch-action: manipulation; }
 </style>
 
 <!-- Modal Inactividad Temporal -->
-<div id="unavailability-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-  <div class="bg-jet-card border border-amber-400/20 rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
-      <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
+<div id="unavailability-modal" class="fixed inset-0 bg-black/80 flex justify-center z-50 hidden overflow-y-auto">
+  <div class="bg-jet-card shadow-2xl flex flex-col">
+    <!-- HEADER sticky -->
+    <div class="unavail-modal-header flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0">
           <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
-        <div>
-          <h3 class="text-sm tracking-[0.15em] uppercase text-white font-semibold">Bloquear Horario</h3>
-          <p class="text-[0.6rem] text-smoke/40" id="unavail-barber-subtitle">Cargando...</p>
+        <div class="min-w-0">
+          <h3 class="text-sm tracking-[0.15em] uppercase text-white font-semibold truncate">Bloquear Horario</h3>
+          <p class="text-[0.65rem] text-smoke/40 truncate" id="unavail-barber-subtitle">Cargando...</p>
         </div>
       </div>
-      <button onclick="closeUnavailabilityModal()" class="text-smoke/40 hover:text-white transition-colors">✕</button>
+      <button onclick="closeUnavailabilityModal()" class="unavail-close-btn text-smoke/40 hover:text-white hover:bg-white/5 transition-colors flex-shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
     </div>
 
     <!-- Tabs -->
-    <div class="px-6 pt-5">
+    <div class="px-4 sm:px-6 pt-4 sm:pt-5">
       <div class="flex gap-1 bg-jet rounded-md p-1 border border-white/5">
-        <button type="button" data-tab="single" class="unavail-tab flex-1 py-2 text-[0.65rem] font-bold uppercase tracking-widest rounded transition-colors is-active">Un día</button>
-        <button type="button" data-tab="bulk" class="unavail-tab flex-1 py-2 text-[0.65rem] font-bold uppercase tracking-widest rounded transition-colors">Por rango</button>
+        <button type="button" data-tab="single" class="unavail-tab flex-1 text-[0.7rem] font-bold uppercase tracking-widest rounded transition-colors is-active">Un día</button>
+        <button type="button" data-tab="bulk" class="unavail-tab flex-1 text-[0.7rem] font-bold uppercase tracking-widest rounded transition-colors">Por rango</button>
       </div>
     </div>
 
     <!-- Pane: Un día -->
-    <div class="px-6 py-5 border-b border-white/5 unavail-pane" data-pane="single">
+    <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/5 unavail-pane" data-pane="single">
       <p class="text-[0.65rem] text-amber-400/70 uppercase tracking-widest font-semibold mb-3">⚠️ Bloqueo de un día</p>
       <form id="unavail-form" class="space-y-3">
         <div>
@@ -465,18 +527,18 @@ function deleteBarber() {
           <label class="admin-label">Motivo (opcional)</label>
           <input type="text" id="unavail-reason" class="admin-input" placeholder="Emergencia, cita médica, etc.">
         </div>
-        <div class="flex gap-2 pt-1">
-          <button type="submit" id="unavail-submit-btn" class="flex-1 py-2.5 rounded-md bg-amber-500 hover:bg-amber-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Bloquear Horario</button>
-          <button type="button" onclick="closeUnavailabilityModal()" class="px-5 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+        <div class="unavail-actions flex flex-col sm:flex-row gap-2 pt-2">
+          <button type="submit" id="unavail-submit-btn" class="flex-1 rounded-md bg-amber-500 hover:bg-amber-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Bloquear Horario</button>
+          <button type="button" onclick="closeUnavailabilityModal()" class="sm:px-5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
         </div>
       </form>
     </div>
 
     <!-- Pane: Por rango -->
-    <div class="px-6 py-5 border-b border-white/5 unavail-pane hidden" data-pane="bulk">
+    <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/5 unavail-pane hidden" data-pane="bulk">
       <p class="text-[0.65rem] text-amber-400/70 uppercase tracking-widest font-semibold mb-3">⚠️ Bloqueo por rango de fechas</p>
       <form id="unavail-bulk-form" class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="admin-label">Fecha desde</label>
             <input type="date" id="unavail-bulk-from" class="admin-input" required>
@@ -487,9 +549,9 @@ function deleteBarber() {
           </div>
         </div>
 
-        <label class="flex items-center gap-2 cursor-pointer select-none py-1">
-          <input type="checkbox" id="unavail-bulk-allday" class="accent-amber-400 w-4 h-4">
-          <span class="text-xs text-smoke/80">Día completo (12:00 AM – 11:59 PM)</span>
+        <label class="flex items-center gap-2 cursor-pointer select-none py-2">
+          <input type="checkbox" id="unavail-bulk-allday" class="accent-amber-400 w-5 h-5">
+          <span class="text-sm text-smoke/80">Día completo (12:00 AM – 11:59 PM)</span>
         </label>
 
         <div class="grid grid-cols-2 gap-3" id="unavail-bulk-hours">
@@ -505,7 +567,7 @@ function deleteBarber() {
 
         <div>
           <label class="admin-label">Aplicar a estos días</label>
-          <div class="grid grid-cols-7 gap-1.5 mt-1" id="unavail-bulk-weekdays">
+          <div class="grid grid-cols-7 gap-1.5 mt-1.5" id="unavail-bulk-weekdays">
             <button type="button" data-day="0" class="weekday-btn">L</button>
             <button type="button" data-day="1" class="weekday-btn">M</button>
             <button type="button" data-day="2" class="weekday-btn">X</button>
@@ -514,7 +576,7 @@ function deleteBarber() {
             <button type="button" data-day="5" class="weekday-btn">S</button>
             <button type="button" data-day="6" class="weekday-btn">D</button>
           </div>
-          <p class="text-[0.6rem] text-smoke/40 mt-1.5">Toca para desactivar un día (ej. tu día de descanso).</p>
+          <p class="text-[0.65rem] text-smoke/40 mt-2 leading-snug">Toca para desactivar un día (ej. tu día de descanso).</p>
         </div>
 
         <div>
@@ -522,19 +584,19 @@ function deleteBarber() {
           <input type="text" id="unavail-bulk-reason" class="admin-input" placeholder="Vacaciones, viaje, capacitación...">
         </div>
 
-        <div id="unavail-bulk-preview" class="bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-2 text-[0.7rem] text-amber-300">
-          Se bloquearán <span id="unavail-bulk-preview-count" class="font-bold">0</span> día(s).
+        <div id="unavail-bulk-preview" class="bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-2.5 text-sm text-amber-300 text-center sm:text-left">
+          Se bloquearán <span id="unavail-bulk-preview-count" class="font-bold text-amber-200">0</span> día(s).
         </div>
 
-        <div class="flex gap-2 pt-1">
-          <button type="submit" id="unavail-bulk-submit-btn" class="flex-1 py-2.5 rounded-md bg-amber-500 hover:bg-amber-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Bloquear rango</button>
-          <button type="button" onclick="closeUnavailabilityModal()" class="px-5 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+        <div class="unavail-actions flex flex-col sm:flex-row gap-2 pt-2">
+          <button type="submit" id="unavail-bulk-submit-btn" class="flex-1 rounded-md bg-amber-500 hover:bg-amber-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Bloquear rango</button>
+          <button type="button" onclick="closeUnavailabilityModal()" class="sm:px-5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
         </div>
       </form>
     </div>
 
     <!-- Lista de bloqueos existentes -->
-    <div class="px-6 py-4">
+    <div class="px-4 sm:px-6 py-4 pb-8 sm:pb-6 flex-1">
       <p class="text-[0.65rem] text-smoke/40 uppercase tracking-widest font-semibold mb-3">Bloqueos registrados</p>
       <div id="unavail-list" class="space-y-2">
         <div class="text-center text-smoke/30 text-xs py-4">Cargando...</div>
@@ -657,17 +719,19 @@ function loadUnavailabilities(barberId) {
         return;
       }
       list.innerHTML = items.map(u => `
-        <div class="flex items-center justify-between bg-jet rounded-lg px-4 py-3 border border-white/5">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              <span class="text-white text-xs font-semibold">${formatDate(u.date)}</span>
-              <span class="text-amber-400 text-xs font-mono">${formatTime12(u.start_time)} – ${formatTime12(u.end_time)}</span>
+        <div class="flex items-start justify-between gap-3 bg-jet rounded-lg px-3 sm:px-4 py-3 border border-white/5">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
+              <span class="text-white text-xs sm:text-sm font-semibold">${formatDate(u.date)}</span>
+              <span class="text-amber-400 text-xs font-mono whitespace-nowrap">${formatTime12(u.start_time)} – ${formatTime12(u.end_time)}</span>
             </div>
-            ${u.reason ? `<p class="text-smoke/40 text-[0.6rem] mt-1 ml-3.5">${u.reason}</p>` : ''}
+            ${u.reason ? `<p class="text-smoke/40 text-[0.65rem] mt-1.5 ml-3.5 break-words">${u.reason}</p>` : ''}
           </div>
-          <button onclick="deleteUnavailability(${u.id})" title="Eliminar bloqueo" class="ml-3 p-1.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button onclick="deleteUnavailability(${u.id})" title="Eliminar bloqueo"
+                  class="flex-shrink-0 w-9 h-9 sm:w-8 sm:h-8 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors flex items-center justify-center"
+                  style="touch-action:manipulation;">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       `).join('');
