@@ -646,6 +646,48 @@ def reject_sale_view(request, sale_id):
             booking.price = sale.base_price
             booking.save(update_fields=['status', 'completed_at', 'price'])
 
+        # Devolver al inventario lo que process_checkout descontó por esta
+        # reserva. Si no revertimos, el stock queda permanentemente bajo aunque
+        # la venta fue rechazada — y los pedidos a proveedor salen torcidos.
+        if booking:
+            from apps.inventory.models import InventoryMovement
+            consumptions = InventoryMovement.objects.filter(
+                booking=booking, movement_type='out'
+            ).select_related('item')
+            for mov in consumptions:
+                item = mov.item
+                if item is None:
+                    continue
+                qty_before = item.quantity
+                item.quantity = qty_before + mov.quantity
+                item.save(update_fields=['quantity'])
+                InventoryMovement.objects.create(
+                    item=item,
+                    movement_type='adjustment',
+                    quantity=mov.quantity,
+                    quantity_before=qty_before,
+                    quantity_after=item.quantity,
+                    booking=booking,
+                    performed_by=request.user,
+                    notes=(
+                        f'Reverso por rechazo de venta #{sale.id}: '
+                        f'se devuelve {mov.quantity} {item.unit}.'
+                    ),
+                )
+
+        # Si era un servicio manual de Frank, también se había generado un
+        # Expense "Materiales Servicio: <cliente>" en process_checkout. Lo
+        # eliminamos para no inflar los egresos del día con materiales que
+        # nunca se vendieron.
+        if booking:
+            from apps.cashflow.models import Expense
+            Expense.objects.filter(
+                description=f"Materiales Servicio: {booking.client_name}",
+                included_in_daily_close__isnull=True,
+                expense_type='variable',
+                created_at__gte=sale.created_at,
+            ).delete()
+
         # Eliminar la venta (que por cascada elimina la comisión)
         sale_id_num = sale.id
         sale.delete()
