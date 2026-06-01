@@ -10,8 +10,13 @@
   <!-- Header -->
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
+      {% if user_role == 'barber' %}
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Mi Dashboard</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Tu día de hoy — <span id="today-date-header"></span></p>
+      {% else %}
       <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Dashboard Diario</h1>
       <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Resumen del día — <span id="today-date-header"></span></p>
+      {% endif %}
     </div>
 
     <!-- Date Navigation Component -->
@@ -47,6 +52,29 @@
   </div>
 
   <!-- KPI Cards -->
+  {% if user_role == 'barber' %}
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="kpi-cards">
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Mis Ingresos Hoy</div>
+      <div class="text-xl font-bold text-gold" id="kpi-revenue-day">${{ today_revenue|floatformat:0 }}</div>
+      <div class="flex gap-1 mt-2">
+        <button class="kpi-toggle active" data-period="day">Día</button>
+        <button class="kpi-toggle" data-period="week">Sem</button>
+        <button class="kpi-toggle" data-period="month">Mes</button>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Mis Citas Hoy</div>
+      <div class="text-xl font-bold text-emerald-400">{{ today_completed }}<span class="text-smoke/40 text-sm"> / {{ today_completed|add:today_pending }}</span></div>
+      <div class="text-[0.55rem] text-smoke/30 mt-2">{{ today_pending }} pendiente(s) por completar</div>
+    </div>
+    <div class="kpi-card">
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Mis Propinas Hoy</div>
+      <div class="text-xl font-bold text-amber-400">${{ today_tips|floatformat:0 }}</div>
+      <div class="text-[0.55rem] text-smoke/30 mt-2">recibidas en tus servicios</div>
+    </div>
+  </div>
+  {% else %}
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-cards">
     <div class="kpi-card">
       <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Ingresos Hoy</div>
@@ -73,6 +101,7 @@
       <div class="text-[0.55rem] text-smoke/30 mt-2">distribuidas al equipo</div>
     </div>
   </div>
+  {% endif %}
 
   <!-- ═══ PANEL DE APROBACIONES ═══
        Siempre presente en el DOM — JS lo muestra/oculta según haya ventas pendientes.
@@ -99,7 +128,7 @@
   <!-- Today Kanban View -->
   <div class="bg-jet-card border border-white/5 rounded-xl p-6">
     <h2 class="text-xs tracking-[0.3em] uppercase text-smoke/40 font-semibold mb-4">
-      Agenda de Hoy — <span class="text-gold" id="kanban-date"></span>
+      {% if user_role == 'barber' %}Mi Agenda{% else %}Agenda de Hoy{% endif %} — <span class="text-gold" id="kanban-date"></span>
     </h2>
     <div id="kanban-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       <div class="text-center text-smoke/30 text-sm py-8 col-span-full">Cargando agenda...</div>

@@ -62,16 +62,20 @@ def admin_dashboard_view(request):
     is_today = (today == timezone.localtime(timezone.now()).date())
 
     base = Booking.objects.all()
-    if profile and profile.is_barber and not profile.is_admin:
-        barber = getattr(request.user, 'barber_profile', None)
-        base = base.filter(barber=barber) if barber else base.none()
+    is_barber_only = profile and profile.is_barber and not profile.is_admin
+    barber_profile = getattr(request.user, 'barber_profile', None) if is_barber_only else None
+    if is_barber_only:
+        base = base.filter(barber=barber_profile) if barber_profile else base.none()
 
     today_bookings = base.filter(date=today)
     today_completed = today_bookings.filter(status='completed').count()
     today_pending = today_bookings.filter(status__in=['pending', 'confirmed']).count()
 
-    # Revenue today from Sales model (more accurate)
+    # Revenue today from Sales model (more accurate).
+    # Para un barbero, restringir a sus propias ventas; el admin ve el total.
     today_sales = Sale.objects.filter(created_at__date=today)
+    if is_barber_only:
+        today_sales = today_sales.filter(barber=barber_profile) if barber_profile else today_sales.none()
     today_revenue = float(today_sales.aggregate(t=Sum('final_price'))['t'] or 0)
     today_tips = float(today_sales.aggregate(t=Sum('tip_amount'))['t'] or 0)
 
