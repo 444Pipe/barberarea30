@@ -12,7 +12,7 @@ COLOR_DEFAULTS = {
     'category': 'vip',
     'price': 0,
     'duration_minutes': 120,
-    'description': 'Color para hombres y mujeres. Precio y tiempo según largo y producto. A consulta — escríbenos por WhatsApp.',
+    'description': 'Coloración profesional para hombres y mujeres: tinte completo, retoque de raíz, mechas, reflejos o balayage. El precio y la duración dependen del largo del cabello y de la técnica elegida. Coordinamos cada detalle por WhatsApp para garantizarte un resultado a tu medida.',
     'features': ['Diagnóstico capilar', 'Color profesional', 'Producto premium'],
     'requires_consultation': True,
     'is_active': True,

@@ -281,10 +281,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let descHtml = '';
-        // Para servicios de consulta (Color), saltamos el render de bullets:
-        // su description está pensada para WhatsApp y al pasarla por el split
-        // queda mal cortada. El propio CTA del card explica el flujo.
-        if (s.description && !s.requires_consultation) {
+        // Servicios "a consulta" (Color) → párrafo descriptivo, no bullets:
+        // su description es prosa pensada para informar y al pasarla por el split
+        // queda mal cortada. El CTA abre WhatsApp.
+        if (s.description && s.requires_consultation) {
+          descHtml = `
+            <p class="text-smoke/70 text-[0.75rem] font-light leading-relaxed mt-4 pt-4 border-t border-white/5">
+              ${s.description}
+            </p>
+          `;
+        } else if (s.description) {
           const features = s.description
             .split(/[\n,]+|\s+y\s+/i)
             .map(item => item.trim())
