@@ -1,16 +1,19 @@
+import re
+
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 from django.core.signing import Signer
 
+
 def _send_html_email(subject, template_name, context, to_email):
     if not to_email:
         return
-        
+
     html_content = render_to_string(template_name, context)
     text_content = strip_tags(html_content)
-    
+
     msg = EmailMultiAlternatives(
         subject=subject,
         body=text_content,
@@ -19,6 +22,23 @@ def _send_html_email(subject, template_name, context, to_email):
     )
     msg.attach_alternative(html_content, "text/html")
     msg.send(fail_silently=True)
+
+
+def _whatsapp_url(phone):
+    """Construye un enlace wa.me/<digits> a partir del teléfono del cliente.
+
+    - Strip de todo lo que no sea dígito.
+    - Si el número quedó con 10 dígitos (formato local CO), antepone 57.
+    - Devuelve None si no hay teléfono utilizable.
+    """
+    if not phone:
+        return None
+    digits = re.sub(r'\D', '', phone)
+    if not digits:
+        return None
+    if len(digits) == 10 and not digits.startswith('57'):
+        digits = '57' + digits
+    return f'https://wa.me/{digits}'
 
 def send_booking_confirmation_email(booking):
     """Sends a confirmation email for an upcoming booking."""
@@ -57,14 +77,20 @@ def send_barber_cancellation_notification(booking):
     """Notifica al barbero que una reserva fue cancelada por el cliente."""
     if not booking.barber or not booking.barber.user or not booking.barber.user.email:
         return
-        
-    subject = f"Reserva Cancelada: {booking.client_name}"
+
+    subject = f"Cita cancelada: {booking.client_name} — {booking.date}"
     domain = getattr(settings, 'SITE_URL', 'http://localhost:8000')
     context = {
         'booking': booking,
-        'site_url': domain
+        'site_url': domain,
+        'whatsapp_url': _whatsapp_url(booking.client_phone),
     }
-    _send_html_email(subject, 'emails/barber_cancellation_notification.html', context, booking.barber.user.email)
+    _send_html_email(
+        subject,
+        'emails/barber_cancellation_notification.html',
+        context,
+        booking.barber.user.email,
+    )
 
 def send_admin_new_booking_notification(booking):
     """Notifica a los administradores que se ha creado una nueva reserva."""
@@ -98,34 +124,29 @@ def send_admin_new_booking_notification(booking):
         print("Error enviando notificación a admin:", e)
 
 def send_barber_new_booking_notification(booking):
-    """Notifica al barbero (si tiene correo) que se le ha asignado una nueva reserva."""
-    from django.core.mail import send_mail
-    from django.conf import settings as dj_settings
-    
+    """Notifica al barbero (si tiene correo) que se le ha asignado una nueva reserva.
+
+    Usa el mismo HTML de marca (black/gold) que el correo al cliente,
+    pero con el tono operacional propio del barbero: detalles de la cita,
+    contacto directo al cliente por WhatsApp y enlace a su agenda.
+    """
     if not booking.barber or not booking.barber.user or not booking.barber.user.email:
         return
-        
-    barber_email = booking.barber.user.email
-        
-    subject = f"Nueva Cita Asignada: {booking.client_name} - {booking.date}"
-    message = (
-        f"Hola {booking.barber.display_name},\n\n"
-        f"Se te ha agendado una nueva cita.\n\n"
-        f"Cliente: {booking.client_name}\n"
-        f"Teléfono: {booking.client_phone or 'No especificado'}\n"
-        f"Fecha: {booking.date}\n"
-        f"Hora: {booking.time}\n"
-        f"Servicio: {booking.service.name if booking.service else 'No especificado'}\n\n"
-        f"Por favor revisa tu agenda para más detalles."
-    )
-    
+
+    domain = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+    subject = f"Nueva cita: {booking.client_name} — {booking.date}"
+    context = {
+        'booking': booking,
+        'site_url': domain,
+        'agenda_url': f'{domain}/admin-panel/barbers/my-agenda/',
+        'whatsapp_url': _whatsapp_url(booking.client_phone),
+    }
     try:
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=dj_settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[barber_email],
-            fail_silently=True,
+        _send_html_email(
+            subject,
+            'emails/barber_new_booking_notification.html',
+            context,
+            booking.barber.user.email,
         )
     except Exception as e:
         print("Error enviando notificación al barbero:", e)
