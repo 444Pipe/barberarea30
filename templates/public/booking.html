@@ -281,7 +281,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let descHtml = '';
-        if (s.description) {
+        // Para servicios de consulta (Color), saltamos el render de bullets:
+        // su description está pensada para WhatsApp y al pasarla por el split
+        // queda mal cortada. El propio CTA del card explica el flujo.
+        if (s.description && !s.requires_consultation) {
           const features = s.description
             .split(/[\n,]+|\s+y\s+/i)
             .map(item => item.trim())

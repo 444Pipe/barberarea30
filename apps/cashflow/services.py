@@ -104,9 +104,12 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                     total_earnings=new_total
                 )
                 
-                # Crear Egreso para los materiales
+                # Crear Egreso para los materiales. Etiquetamos el id de la
+                # venta dentro de la descripción para que reject_sale_view
+                # pueda eliminar EXACTAMENTE este egreso (no el de otra venta
+                # del mismo cliente).
                 Expense.objects.create(
-                    description=f"Materiales Servicio: {booking.client_name}",
+                    description=f"Materiales Servicio: {booking.client_name} (venta #{sale.id})",
                     amount=Decimal(str(frank_materials_cost)),
                     expense_type='variable',
                     registered_by=confirmed_by

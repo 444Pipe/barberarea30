@@ -437,13 +437,20 @@ def admin_manual_service_view(request):
                     mat_price = float(mat.get('price', 0))
                     notes += f"\n- {mat.get('name', 'Material')}: ${mat_price:,.0f}".replace(',', '.')
 
+            # Frank ocupa 2h por servicio, sin importar lo que mande el form;
+            # el resto de barberos usa el valor enviado (o el del servicio).
+            effective_duration = (
+                barber.effective_duration_minutes(service)
+                if barber is not None else duration_minutes
+            )
+
             # Validar bloqueos del local y del barbero antes de crear.
             from apps.bookings.validators import check_booking_conflict
             err = check_booking_conflict(
                 barber=barber,
                 date=date,
                 time=time,
-                duration_minutes=duration_minutes,
+                duration_minutes=effective_duration,
             )
             if err:
                 return JsonResponse({'error': err}, status=409)
@@ -454,7 +461,7 @@ def admin_manual_service_view(request):
                 service=service,
                 date=date,
                 time=time,
-                duration_minutes=duration_minutes,
+                duration_minutes=effective_duration,
                 price=total_price,
                 manual_labor_cost=manual_labor_cost,
                 manual_materials_cost=manual_materials_cost,

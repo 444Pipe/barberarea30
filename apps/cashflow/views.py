@@ -683,16 +683,16 @@ def reject_sale_view(request, sale_id):
                 )
 
         # Si era un servicio manual de Frank, también se había generado un
-        # Expense "Materiales Servicio: <cliente>" en process_checkout. Lo
-        # eliminamos para no inflar los egresos del día con materiales que
-        # nunca se vendieron.
+        # Expense "Materiales Servicio: <cliente> (venta #<id>)" en
+        # process_checkout. Lo eliminamos vía el sale_id en la descripción
+        # — antes filtrábamos por description+created_at>=sale.created_at,
+        # lo que podía borrar el egreso de OTRA venta del mismo cliente.
         if booking:
             from apps.cashflow.models import Expense
             Expense.objects.filter(
-                description=f"Materiales Servicio: {booking.client_name}",
+                description__endswith=f'(venta #{sale.id})',
                 included_in_daily_close__isnull=True,
                 expense_type='variable',
-                created_at__gte=sale.created_at,
             ).delete()
 
         # Eliminar la venta (que por cascada elimina la comisión)
