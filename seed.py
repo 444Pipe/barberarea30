@@ -53,7 +53,21 @@ services_data = [
      'features': ['Diagnóstico capilar', 'Color profesional', 'Producto premium'],
      'requires_consultation': True},
     {'name': 'Silver premium + Barba', 'slug': 'silver-premium-barba', 'price': 40000,
-     'duration_minutes': 80, 'features': ['Silver Premium', 'Diseño de barba ritual']},
+     'duration_minutes': 80,
+     # Silver Premium (5 ítems) + ritual de barba (4 ítems) = 9 bullets.
+     # Las frases se escriben sin " y " para que la regex del wizard no las parta.
+     'description': 'Corte, Lavado con shampoo específico, Masaje capilar, Estilismo, Bebidas ilimitadas, Toalla caliente para preparar la piel, Diseño de barba ritual, Aceite o bálsamo hidratante, Cera fortalecedora',
+     'features': [
+         'Corte',
+         'Lavado con shampoo específico',
+         'Masaje capilar',
+         'Estilismo',
+         'Bebidas ilimitadas',
+         'Toalla caliente para preparar la piel',
+         'Diseño de barba ritual',
+         'Aceite o bálsamo hidratante',
+         'Cera fortalecedora',
+     ]},
     {'name': 'Servicio Gold Dama', 'slug': 'servicio-gold-dama', 'price': 50000,
      'duration_minutes': 90,
      'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar nutritivo, Masaje capilar, Masaje cervical, Estilismo, Diseño de cejas, Una bebida nacional',
