@@ -183,7 +183,7 @@ def dashboard_stats_view(request):
         barber_name = b.barber.display_name if b.barber else 'Sin asignar'
         kanban[barber_name].append({
             'id': b.id,
-            'time': b.time.strftime('%H:%M'),
+            'time': b.time.strftime('%I:%M %p'),
             'client': b.client_name,
             'service': b.service.name if b.service else '',
             'status': b.status,
@@ -272,7 +272,7 @@ def audit_log_api_view(request):
         msg = log.extra_data.get('msg', f'Realizó: {log.get_action_display()}')
         result.append({
             'id':          log.id,
-            'datetime':    tz.localtime(log.created_at).strftime('%d/%m/%Y  %H:%M:%S'),
+            'datetime':    tz.localtime(log.created_at).strftime('%d/%m/%Y  %I:%M:%S %p'),
             'user':        user_name,
             'action':      log.action,
             'model_name':  log.model_name,

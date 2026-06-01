@@ -456,7 +456,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
         </span>
       </td>
       <td class="px-4 py-3 text-smoke/60">${b.date}</td>
-      <td class="px-4 py-3 text-smoke/60">${b.time}</td>
+      <td class="px-4 py-3 text-smoke/60">${formatTime12(b.time)}</td>
       <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price || 0).toLocaleString('es-CO')}</td>
       <td class="px-4 py-3">${statusBadge[b.status] || statusBadge.pending}</td>
       <td class="px-4 py-3">
@@ -913,6 +913,17 @@ function escAttr(str) {
     .replace(/>/g, '&gt;');
 }
 
+function formatTime12(timeStr) {
+  if (!timeStr) return '';
+  const parts = String(timeStr).split(':');
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] || '00';
+  if (Number.isNaN(h)) return timeStr;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${suffix}`;
+}
+
 // ─── Dropdown de acciones ────────────────────────────────────────────────────
 function toggleActionsMenu(btn) {
   const menu = btn.nextElementSibling;
@@ -1160,7 +1171,7 @@ function openRescheduleModal(id, clientName, currentDate, currentTime) {
   const timeHHMM = (currentTime || '').substring(0, 5);
   document.getElementById('reschedule-booking-id').value = id;
   document.getElementById('reschedule-client-name').textContent = clientName;
-  document.getElementById('reschedule-current-datetime').textContent = `${currentDate} a las ${timeHHMM}`;
+  document.getElementById('reschedule-current-datetime').textContent = `${currentDate} a las ${formatTime12(timeHHMM)}`;
   document.getElementById('reschedule-date').value = currentDate;
   document.getElementById('reschedule-time').value = timeHHMM;
   document.getElementById('reschedule-error').classList.add('hidden');

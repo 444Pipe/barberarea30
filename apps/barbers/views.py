@@ -351,14 +351,14 @@ def barber_unavailability_list(request, barber_id):
     }
     if conflicting:
         detalles = ', '.join(
-            f'{bk.client_name} a las {bk.time.strftime("%H:%M")}'
+            f'{bk.client_name} a las {bk.time.strftime("%I:%M %p")}'
             for bk in conflicting
         )
         plural = 's' if len(conflicting) > 1 else ''
         response_data['warning'] = (
             f'Atención: ya hay {len(conflicting)} reserva{plural} agendada{plural} '
             f'con {barber.display_name} en esa franja '
-            f'({s.strftime("%H:%M")}–{e.strftime("%H:%M")} del {d.strftime("%Y-%m-%d")}): '
+            f'({s.strftime("%I:%M %p")}–{e.strftime("%I:%M %p")} del {d.strftime("%Y-%m-%d")}): '
             f'{detalles}. El bloqueo quedó aplicado, recuerda contactar al cliente '
             f'para reagendar.'
         )

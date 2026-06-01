@@ -159,7 +159,7 @@
               </td>
               <td class="py-3 px-2">{{ booking.service_name }}</td>
               <td class="py-3 px-2">{{ booking.date }}</td>
-              <td class="py-3 px-2">{{ booking.time }}</td>
+              <td class="py-3 px-2">{{ booking.time|time:"g:i A" }}</td>
               <td class="py-3 px-2 text-gold font-bold">${{ "{:,.0f}".format(booking.price) }}</td>
               <td class="py-3 px-2">
                 <span class="px-2 py-1 rounded-sm text-xs font-semibold
@@ -264,7 +264,12 @@
       },
       events: {{ calendar_events|tojson }},
       eventClick: function(info) {
-        alert(`Cita de ${info.event.extendedProps.name}\nServicio: ${info.event.extendedProps.service_name}\nHora: ${info.event.extendedProps.time}\nEstado: ${info.event.extendedProps.status}`);
+        const t = String(info.event.extendedProps.time || '');
+        const parts = t.split(':');
+        const h = parseInt(parts[0], 10);
+        const m = parts[1] || '00';
+        const timeLabel = Number.isNaN(h) ? t : `${(h%12)||12}:${m} ${h>=12?'PM':'AM'}`;
+        alert(`Cita de ${info.event.extendedProps.name}\nServicio: ${info.event.extendedProps.service_name}\nHora: ${timeLabel}\nEstado: ${info.event.extendedProps.status}`);
       }
     });
     calendar.render();

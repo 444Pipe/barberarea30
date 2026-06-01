@@ -39,7 +39,7 @@
                 <tbody class="divide-y divide-white/5">
                     {% for exp in expenses %}
                     <tr class="hover:bg-white/[0.02] transition-colors">
-                        <td class="px-5 py-4 text-sm text-smoke/80">{{ exp.created_at|date:"d M Y, H:i" }}</td>
+                        <td class="px-5 py-4 text-sm text-smoke/80">{{ exp.created_at|date:"d M Y, g:i A" }}</td>
                         <td class="px-5 py-4">
                             <div class="text-sm text-white font-medium">{{ exp.description }}</div>
                             {% if exp.notes %}<div class="text-[10px] text-smoke/40 mt-1">{{ exp.notes }}</div>{% endif %}

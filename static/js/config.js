@@ -5,13 +5,13 @@ export const businessConfig = {
   instagram: '@barberfreestyle5',
   instagramUrl: 'https://instagram.com/barberfreestyle5',
   hours: {
-    monday: '08:00 - 18:00',
-    tuesday: '08:00 - 18:00',
-    wednesday: '08:00 - 18:00',
-    thursday: '08:00 - 18:00',
-    friday: '08:00 - 18:00',
-    saturday: '08:00 - 18:00',
-    sunday: '08:00 - 18:00'
+    monday: '8:00 AM - 6:00 PM',
+    tuesday: '8:00 AM - 6:00 PM',
+    wednesday: '8:00 AM - 6:00 PM',
+    thursday: '8:00 AM - 6:00 PM',
+    friday: '8:00 AM - 6:00 PM',
+    saturday: '8:00 AM - 6:00 PM',
+    sunday: '8:00 AM - 6:00 PM'
   },
   description: 'Barbería profesional especializada en diseño freestyle, cortes explosivos, fades profesionales y color de alta calidad en Villavicencio, Colombia.',
   specialties: [

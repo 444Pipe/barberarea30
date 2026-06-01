@@ -480,7 +480,7 @@ function loadUnavailabilities(barberId) {
             <div class="flex items-center gap-2">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
               <span class="text-white text-xs font-semibold">${formatDate(u.date)}</span>
-              <span class="text-amber-400 text-xs font-mono">${u.start_time} – ${u.end_time}</span>
+              <span class="text-amber-400 text-xs font-mono">${formatTime12(u.start_time)} – ${formatTime12(u.end_time)}</span>
             </div>
             ${u.reason ? `<p class="text-smoke/40 text-[0.6rem] mt-1 ml-3.5">${u.reason}</p>` : ''}
           </div>
@@ -499,6 +499,17 @@ function formatDate(dateStr) {
   const [y, m, d] = dateStr.split('-');
   const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   return `${d} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function formatTime12(timeStr) {
+  if (!timeStr) return '';
+  const parts = String(timeStr).split(':');
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] || '00';
+  if (Number.isNaN(h)) return timeStr;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${suffix}`;
 }
 
 function deleteUnavailability(unavailId) {

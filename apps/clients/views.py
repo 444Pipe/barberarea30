@@ -79,7 +79,7 @@ def client_history_view(request, phone):
         history.append({
             'id': b.id,
             'date': str(b.date),
-            'time': b.time.strftime('%H:%M'),
+            'time': b.time.strftime('%I:%M %p'),
             'service': b.service.name if b.service else '',
             'barber': b.barber.display_name if b.barber else '',
             'price': b.price,

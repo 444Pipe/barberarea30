@@ -128,11 +128,16 @@
         eventDisplay: 'block',
         eventClick: function(info) {
           const evt = info.event.extendedProps;
+          const t = String(evt.time || '');
+          const parts = t.split(':');
+          const h = parseInt(parts[0], 10);
+          const m = parts[1] || '00';
+          const timeLabel = Number.isNaN(h) ? t : `${(h%12)||12}:${m} ${h>=12?'PM':'AM'}`;
           alert(
             `👤 Cliente: ${evt.name}\n` +
             `📞 Teléfono: ${evt.phone}\n` +
             `✂️ Servicio: ${evt.service_name}\n` +
-            `⏰ Hora: ${evt.time}\n` +
+            `⏰ Hora: ${timeLabel}\n` +
             `💰 Precio: $${evt.price.toLocaleString()}\n` +
             `📌 Estado: ${evt.status.toUpperCase()}`
           );

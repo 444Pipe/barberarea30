@@ -199,7 +199,7 @@ function openModal(data) {
   document.getElementById('modal-service').textContent = data.service_name || '';
   document.getElementById('modal-barber').textContent = data.barber_name || '';
   document.getElementById('modal-date').textContent = data.date;
-  document.getElementById('modal-time').textContent = data.time;
+  document.getElementById('modal-time').textContent = formatTime12(data.time);
   document.getElementById('modal-price').textContent = '$' + (data.price || 0).toLocaleString('es-CO');
   document.getElementById('modal-status').textContent = data.status;
   document.getElementById('booking-modal').classList.remove('hidden');
@@ -225,6 +225,17 @@ function updateBookingStatus(newStatus) {
 function getCSRF() {
   const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
   return cookie ? cookie.split('=')[1] : '';
+}
+
+function formatTime12(timeStr) {
+  if (!timeStr) return '';
+  const parts = String(timeStr).split(':');
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] || '00';
+  if (Number.isNaN(h)) return timeStr;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${suffix}`;
 }
 </script>
 {% endblock %}

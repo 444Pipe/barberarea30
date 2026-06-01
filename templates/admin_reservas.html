@@ -132,7 +132,7 @@
                 </td>
                 <td class="py-4 px-4 text-sm">{{ booking.service_name }}</td>
                 <td class="py-4 px-4 text-sm">{{ booking.date }}</td>
-                <td class="py-4 px-4 text-sm">{{ booking.time }}</td>
+                <td class="py-4 px-4 text-sm">{{ booking.time|time:"g:i A" }}</td>
                 <td class="py-4 px-4 text-gold font-bold">${{ "{:,.0f}".format(booking.price) }}</td>
                 <td class="py-4 px-4">
                   <span class="px-3 py-1 rounded-sm text-xs font-semibold

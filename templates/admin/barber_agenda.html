@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', function() {
         events: events,
         slotMinTime: '08:00:00',
         slotMaxTime: '21:00:00',
+        slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
+        eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
       });
       cal.render();
     });

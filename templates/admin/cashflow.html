@@ -412,7 +412,7 @@
         <div class="flex justify-between items-start mb-2">
           <div>
             <div class="text-white font-bold text-sm">{{ close.date|date:"d M Y" }}</div>
-            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest mt-0.5">{{ close.closed_at|date:"H:i" }} · {{ close.closed_by.username }}</div>
+            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest mt-0.5">{{ close.closed_at|date:"g:i A" }} · {{ close.closed_by.username }}</div>
           </div>
           <span class="px-2 py-0.5 bg-gold/10 text-gold text-[0.55rem] uppercase tracking-widest font-bold rounded">Cerrado</span>
         </div>
@@ -596,7 +596,7 @@ function setLastRefresh() {
   const el = document.getElementById('cf-last-refresh');
   if (!el) return;
   const d = new Date();
-  el.textContent = 'Actualizado ' + d.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+  el.textContent = 'Actualizado ' + d.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit', hour12: true});
 }
 
 // ═══ KPI INTERACCION ════════════════════════════════════

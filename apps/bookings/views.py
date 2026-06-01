@@ -177,9 +177,9 @@ def create_booking_view(request):
                         return Response({
                             'error': (
                                 f'{barber.display_name} está bloqueado de '
-                                f'{u_start.strftime("%H:%M")} a {u_end.strftime("%H:%M")} '
+                                f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
                                 f'el {date_val}. Tu reserva ({time_val} – '
-                                f'{req_e.strftime("%H:%M")}) se cruza con ese bloqueo. '
+                                f'{req_e.strftime("%I:%M %p")}) se cruza con ese bloqueo. '
                                 f'Por favor elige otra hora.'
                             )
                         }, status=409)
@@ -221,8 +221,8 @@ def create_booking_view(request):
                     'ok': False,
                     'error': (
                         f'El {requested_date} solo se atiende de '
-                        f'{blocked.start_time.strftime("%H:%M")} a '
-                        f'{blocked.end_time.strftime("%H:%M")}. '
+                        f'{blocked.start_time.strftime("%I:%M %p")} a '
+                        f'{blocked.end_time.strftime("%I:%M %p")}. '
                         f'El horario que elegiste no cabe en esa franja.'
                     )
                 }, status=409)
@@ -623,8 +623,8 @@ def admin_reschedule_booking_view(request, booking_id):
                 'ok': False,
                 'error': (
                     f'El {new_date} solo se atiende de '
-                    f'{blocked.start_time.strftime("%H:%M")} a '
-                    f'{blocked.end_time.strftime("%H:%M")}. '
+                    f'{blocked.start_time.strftime("%I:%M %p")} a '
+                    f'{blocked.end_time.strftime("%I:%M %p")}. '
                     f'El nuevo horario no cabe en esa franja.'
                 )
             }, status=409)
@@ -641,7 +641,7 @@ def admin_reschedule_booking_view(request, booking_id):
                     'ok': False,
                     'error': (
                         f'{booking.barber.display_name} tiene un bloqueo de inactividad '
-                        f'de {ur_start.strftime("%H:%M")} a {ur_end.strftime("%H:%M")} '
+                        f'de {ur_start.strftime("%I:%M %p")} a {ur_end.strftime("%I:%M %p")} '
                         f'el {new_date}. Por favor elige otra hora.'
                     )
                 }, status=409)
@@ -740,10 +740,10 @@ def admin_bookings_export_csv(request):
             b.service.name if b.service else '',
             b.barber.display_name if b.barber else '',
             b.date.strftime('%Y-%m-%d'),
-            b.time.strftime('%H:%M'),
+            b.time.strftime('%I:%M %p'),
             b.price,
             b.get_status_display(),
-            timezone.localtime(b.created_at).strftime('%Y-%m-%d %H:%M'),
+            timezone.localtime(b.created_at).strftime('%Y-%m-%d %I:%M %p'),
         ])
 
     return response

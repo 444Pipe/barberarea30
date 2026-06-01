@@ -89,7 +89,7 @@ class Booking(models.Model):
             if has_conflict:
                 raise ValidationError(
                     f'{self.barber.display_name} ya tiene una cita activa que se cruza con las '
-                    f'{self.time.strftime("%H:%M")} el {self.date.strftime("%d/%m/%Y")}. '
+                    f'{self.time.strftime("%I:%M %p")} el {self.date.strftime("%d/%m/%Y")}. '
                     f'Por favor elige otro horario.'
                 )
 

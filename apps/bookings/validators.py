@@ -75,8 +75,8 @@ def check_booking_conflict(
                 or req_end.date() != req_start.date():
             return (
                 f'El {d.strftime("%Y-%m-%d")} solo se atiende de '
-                f'{blocked.start_time.strftime("%H:%M")} a '
-                f'{blocked.end_time.strftime("%H:%M")}. '
+                f'{blocked.start_time.strftime("%I:%M %p")} a '
+                f'{blocked.end_time.strftime("%I:%M %p")}. '
                 f'El horario elegido no cabe en esa franja.'
             )
 
@@ -91,9 +91,9 @@ def check_booking_conflict(
                 name = getattr(barber, 'display_name', None) or 'El barbero'
                 return (
                     f'{name} está bloqueado de '
-                    f'{u_start.strftime("%H:%M")} a {u_end.strftime("%H:%M")} '
+                    f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
                     f'el {d.strftime("%Y-%m-%d")}. La reserva '
-                    f'({t.strftime("%H:%M")}–{req_end.strftime("%H:%M")}) '
+                    f'({t.strftime("%I:%M %p")}–{req_end.strftime("%I:%M %p")}) '
                     f'se cruza con ese bloqueo.'
                 )
 
@@ -111,7 +111,7 @@ def check_booking_conflict(
                 name = getattr(barber, 'display_name', None) or 'El barbero'
                 return (
                     f'{name} ya tiene una cita activa que se cruza con las '
-                    f'{t.strftime("%H:%M")} el {d.strftime("%Y-%m-%d")}. '
+                    f'{t.strftime("%I:%M %p")} el {d.strftime("%Y-%m-%d")}. '
                     f'Por favor elige otro horario.'
                 )
 
