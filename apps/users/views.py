@@ -381,12 +381,22 @@ def admin_manual_service_view(request):
             if not custom_service_name:
                 custom_service_name = 'Servicio Manual'
             
+            # Resolver el barbero a partir del id que mandó el frontend.
+            # Si el id no resuelve, NO caer silenciosamente a Frank — devolver
+            # un error explícito para que el operador corrija. Si no se mandó
+            # id, usar Frank por defecto (era la intención original).
             barber = None
             if barber_id:
                 barber = Barber.objects.filter(id=barber_id).first()
-                
-            if not barber:
-                # Find Frank as fallback
+                if not barber:
+                    return JsonResponse({
+                        'error': (
+                            f'No existe ningún barbero con id={barber_id}. '
+                            f'Refresca la página y vuelve a seleccionarlo en la lista.'
+                        )
+                    }, status=400)
+            else:
+                # Default histórico: Servicio Manual es de Frank.
                 barber = Barber.objects.filter(user__first_name__icontains='frank').first()
                 if not barber:
                     barber = Barber.objects.filter(display_name__icontains='frank').first()
