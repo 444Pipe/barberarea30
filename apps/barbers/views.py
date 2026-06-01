@@ -365,6 +365,155 @@ def barber_unavailability_list(request, barber_id):
     return Response(response_data, status=status.HTTP_201_CREATED)
 
 
+@api_view(['POST'])
+@permission_classes([IsAdminOrAbove])
+def barber_unavailability_bulk_create(request, barber_id):
+    """
+    POST /api/admin/barbers/{id}/unavailability/bulk/
+
+    Crea bloqueos en lote para un rango de fechas. Útil para
+    vacaciones, descansos largos o ausencias programadas.
+
+    Body JSON:
+      {
+        date_from: 'YYYY-MM-DD',         # inclusivo
+        date_to:   'YYYY-MM-DD',         # inclusivo
+        all_day:   true,                  # opcional, default false
+        start_time: 'HH:MM',              # requerido si !all_day
+        end_time:   'HH:MM',              # requerido si !all_day
+        weekdays:  [0,1,2,3,4,5,6],       # opcional, lunes=0 .. domingo=6
+        reason:    'Vacaciones',          # opcional
+      }
+
+    Devuelve: { created, total_conflicts, days_with_conflicts,
+                warnings: [string...], summary_warning?: string }.
+    """
+    barber = get_object_or_404(Barber, pk=barber_id)
+    payload = request.data
+
+    df_str = payload.get('date_from')
+    dt_str = payload.get('date_to')
+    all_day = bool(payload.get('all_day'))
+    weekdays = payload.get('weekdays')
+    reason = (payload.get('reason') or '').strip()
+
+    if not df_str or not dt_str:
+        return Response({'error': 'Faltan date_from y date_to.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        date_from = datetime.strptime(df_str, '%Y-%m-%d').date()
+        date_to = datetime.strptime(dt_str, '%Y-%m-%d').date()
+    except ValueError:
+        return Response({'error': 'Formato de fecha inválido (use YYYY-MM-DD).'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if date_from > date_to:
+        return Response({'error': 'La fecha inicial debe ser anterior o igual a la final.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if (date_to - date_from).days > 365:
+        return Response({'error': 'El rango no puede exceder 365 días.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if all_day:
+        from datetime import time as _time
+        s = _time(0, 0)
+        e = _time(23, 59)
+    else:
+        s_str = payload.get('start_time')
+        e_str = payload.get('end_time')
+        if not s_str or not e_str:
+            return Response({'error': 'Faltan start_time y end_time (o use all_day=true).'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            s = datetime.strptime(s_str, '%H:%M').time()
+            e = datetime.strptime(e_str, '%H:%M').time()
+        except ValueError:
+            return Response({'error': 'Formato de hora inválido (use HH:MM).'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if s >= e:
+            return Response({'error': 'La hora desde debe ser anterior a la hora hasta.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+    # Normalizar weekdays: si no viene o viene mal, asumir todos los días.
+    if not isinstance(weekdays, list) or not weekdays:
+        weekdays_set = {0, 1, 2, 3, 4, 5, 6}
+    else:
+        weekdays_set = set()
+        for w in weekdays:
+            try:
+                wi = int(w)
+                if 0 <= wi <= 6:
+                    weekdays_set.add(wi)
+            except (TypeError, ValueError):
+                continue
+        if not weekdays_set:
+            return Response({'error': 'Selecciona al menos un día de la semana.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+    # Iterar el rango y crear los bloqueos.
+    created_ids = []
+    conflicts_per_day = []
+    cur = date_from
+    one_day = timedelta(days=1)
+    block_start_template_min = s.hour * 60 + s.minute
+    block_end_template_min = e.hour * 60 + e.minute
+
+    while cur <= date_to:
+        if cur.weekday() not in weekdays_set:
+            cur += one_day
+            continue
+
+        block_start_dt = datetime.combine(cur, s)
+        block_end_dt = datetime.combine(cur, e)
+
+        day_conflicts = []
+        for bk in Booking.objects.filter(
+            barber=barber, date=cur, status__in=['pending', 'confirmed']
+        ):
+            bk_start = datetime.combine(cur, bk.time)
+            bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+            if block_start_dt < bk_end and block_end_dt > bk_start:
+                day_conflicts.append(bk)
+
+        u = BarberUnavailability.objects.create(
+            barber=barber, date=cur, start_time=s, end_time=e, reason=reason
+        )
+        created_ids.append(u.id)
+
+        if day_conflicts:
+            names = ', '.join(
+                f'{bk.client_name} ({bk.time.strftime("%I:%M %p")})'
+                for bk in day_conflicts
+            )
+            conflicts_per_day.append({
+                'date': cur.strftime('%d/%m/%Y'),
+                'count': len(day_conflicts),
+                'message': (
+                    f'{cur.strftime("%d/%m/%Y")} ({len(day_conflicts)}): {names}'
+                ),
+            })
+
+        cur += one_day
+
+    total_conflicts = sum(c['count'] for c in conflicts_per_day)
+
+    response_data = {
+        'created': len(created_ids),
+        'total_conflicts': total_conflicts,
+        'days_with_conflicts': len(conflicts_per_day),
+        'warnings': [c['message'] for c in conflicts_per_day],
+    }
+    if conflicts_per_day:
+        response_data['summary_warning'] = (
+            f'Se crearon {len(created_ids)} bloqueo(s). '
+            f'{total_conflicts} reserva(s) en '
+            f'{len(conflicts_per_day)} día(s) se cruzan con los bloqueos: contacta a los clientes para reagendar.'
+        )
+    return Response(response_data, status=status.HTTP_201_CREATED)
+
+
 @api_view(['DELETE'])
 @permission_classes([IsAdminOrAbove])
 def barber_unavailability_delete(request, barber_id, unavail_id):

@@ -386,6 +386,39 @@ function deleteBarber() {
   </div>
 </div>
 
+<style>
+  /* Tabs del modal de bloqueo */
+  .unavail-tab {
+    color: rgba(245, 245, 245, 0.55);
+  }
+  .unavail-tab:hover { color: white; }
+  .unavail-tab.is-active {
+    background: #f59e0b;
+    color: #0a0a0a;
+  }
+  /* Botones de día de la semana */
+  .weekday-btn {
+    padding: 0.55rem 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #0d0d0d;
+    color: rgba(245, 245, 245, 0.4);
+    transition: all .15s;
+    cursor: pointer;
+  }
+  .weekday-btn:hover {
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+  .weekday-btn.is-active {
+    background: #f59e0b;
+    color: #0a0a0a;
+    border-color: #fbbf24;
+  }
+</style>
+
 <!-- Modal Inactividad Temporal -->
 <div id="unavailability-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
   <div class="bg-jet-card border border-amber-400/20 rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -402,9 +435,17 @@ function deleteBarber() {
       <button onclick="closeUnavailabilityModal()" class="text-smoke/40 hover:text-white transition-colors">✕</button>
     </div>
 
-    <!-- Formulario nuevo bloqueo -->
-    <div class="px-6 py-5 border-b border-white/5">
-      <p class="text-[0.65rem] text-amber-400/70 uppercase tracking-widest font-semibold mb-3">⚠️ Nuevo bloqueo de emergencia</p>
+    <!-- Tabs -->
+    <div class="px-6 pt-5">
+      <div class="flex gap-1 bg-jet rounded-md p-1 border border-white/5">
+        <button type="button" data-tab="single" class="unavail-tab flex-1 py-2 text-[0.65rem] font-bold uppercase tracking-widest rounded transition-colors is-active">Un día</button>
+        <button type="button" data-tab="bulk" class="unavail-tab flex-1 py-2 text-[0.65rem] font-bold uppercase tracking-widest rounded transition-colors">Por rango</button>
+      </div>
+    </div>
+
+    <!-- Pane: Un día -->
+    <div class="px-6 py-5 border-b border-white/5 unavail-pane" data-pane="single">
+      <p class="text-[0.65rem] text-amber-400/70 uppercase tracking-widest font-semibold mb-3">⚠️ Bloqueo de un día</p>
       <form id="unavail-form" class="space-y-3">
         <div>
           <label class="admin-label">Fecha</label>
@@ -426,6 +467,67 @@ function deleteBarber() {
         </div>
         <div class="flex gap-2 pt-1">
           <button type="submit" id="unavail-submit-btn" class="flex-1 py-2.5 rounded-md bg-amber-500 hover:bg-amber-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Bloquear Horario</button>
+          <button type="button" onclick="closeUnavailabilityModal()" class="px-5 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Pane: Por rango -->
+    <div class="px-6 py-5 border-b border-white/5 unavail-pane hidden" data-pane="bulk">
+      <p class="text-[0.65rem] text-amber-400/70 uppercase tracking-widest font-semibold mb-3">⚠️ Bloqueo por rango de fechas</p>
+      <form id="unavail-bulk-form" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="admin-label">Fecha desde</label>
+            <input type="date" id="unavail-bulk-from" class="admin-input" required>
+          </div>
+          <div>
+            <label class="admin-label">Fecha hasta</label>
+            <input type="date" id="unavail-bulk-to" class="admin-input" required>
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 cursor-pointer select-none py-1">
+          <input type="checkbox" id="unavail-bulk-allday" class="accent-amber-400 w-4 h-4">
+          <span class="text-xs text-smoke/80">Día completo (12:00 AM – 11:59 PM)</span>
+        </label>
+
+        <div class="grid grid-cols-2 gap-3" id="unavail-bulk-hours">
+          <div>
+            <label class="admin-label">Hora desde</label>
+            <input type="time" id="unavail-bulk-start" class="admin-input">
+          </div>
+          <div>
+            <label class="admin-label">Hora hasta</label>
+            <input type="time" id="unavail-bulk-end" class="admin-input">
+          </div>
+        </div>
+
+        <div>
+          <label class="admin-label">Aplicar a estos días</label>
+          <div class="grid grid-cols-7 gap-1.5 mt-1" id="unavail-bulk-weekdays">
+            <button type="button" data-day="0" class="weekday-btn">L</button>
+            <button type="button" data-day="1" class="weekday-btn">M</button>
+            <button type="button" data-day="2" class="weekday-btn">X</button>
+            <button type="button" data-day="3" class="weekday-btn">J</button>
+            <button type="button" data-day="4" class="weekday-btn">V</button>
+            <button type="button" data-day="5" class="weekday-btn">S</button>
+            <button type="button" data-day="6" class="weekday-btn">D</button>
+          </div>
+          <p class="text-[0.6rem] text-smoke/40 mt-1.5">Toca para desactivar un día (ej. tu día de descanso).</p>
+        </div>
+
+        <div>
+          <label class="admin-label">Motivo (opcional)</label>
+          <input type="text" id="unavail-bulk-reason" class="admin-input" placeholder="Vacaciones, viaje, capacitación...">
+        </div>
+
+        <div id="unavail-bulk-preview" class="bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-2 text-[0.7rem] text-amber-300">
+          Se bloquearán <span id="unavail-bulk-preview-count" class="font-bold">0</span> día(s).
+        </div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="submit" id="unavail-bulk-submit-btn" class="flex-1 py-2.5 rounded-md bg-amber-500 hover:bg-amber-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Bloquear rango</button>
           <button type="button" onclick="closeUnavailabilityModal()" class="px-5 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
         </div>
       </form>
@@ -455,6 +557,23 @@ function openUnavailability(barberId, barberName) {
   document.getElementById('unavail-start').value = '';
   document.getElementById('unavail-end').value = '';
   document.getElementById('unavail-reason').value = '';
+
+  // Reset también el formulario de bulk
+  document.getElementById('unavail-bulk-from').min = today;
+  document.getElementById('unavail-bulk-from').value = today;
+  document.getElementById('unavail-bulk-to').min = today;
+  document.getElementById('unavail-bulk-to').value = today;
+  document.getElementById('unavail-bulk-start').value = '';
+  document.getElementById('unavail-bulk-end').value = '';
+  document.getElementById('unavail-bulk-reason').value = '';
+  document.getElementById('unavail-bulk-allday').checked = false;
+  document.getElementById('unavail-bulk-hours').classList.remove('hidden');
+  // Todos los días activos por defecto
+  document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
+  // Reset a la tab "Un día"
+  _setUnavailTab('single');
+  _refreshBulkPreview();
+
   document.getElementById('unavailability-modal').classList.remove('hidden');
   loadUnavailabilities(barberId);
 }
@@ -462,6 +581,69 @@ function openUnavailability(barberId, barberName) {
 function closeUnavailabilityModal() {
   document.getElementById('unavailability-modal').classList.add('hidden');
   currentUnavailBarberId = null;
+}
+
+// ─── Tabs del modal ───────────────────────────────────────
+function _setUnavailTab(name) {
+  document.querySelectorAll('.unavail-tab').forEach(t => {
+    t.classList.toggle('is-active', t.dataset.tab === name);
+  });
+  document.querySelectorAll('.unavail-pane').forEach(p => {
+    p.classList.toggle('hidden', p.dataset.pane !== name);
+  });
+}
+
+document.addEventListener('click', e => {
+  // Switch tab
+  const tab = e.target.closest('.unavail-tab');
+  if (tab) {
+    _setUnavailTab(tab.dataset.tab);
+    return;
+  }
+  // Toggle weekday button
+  const wd = e.target.closest('#unavail-bulk-weekdays .weekday-btn');
+  if (wd) {
+    wd.classList.toggle('is-active');
+    _refreshBulkPreview();
+    return;
+  }
+});
+
+// Mostrar/ocultar campos de hora cuando se marca "día completo"
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'unavail-bulk-allday') {
+    document.getElementById('unavail-bulk-hours').classList.toggle('hidden', e.target.checked);
+  }
+  if (e.target && (e.target.id === 'unavail-bulk-from' || e.target.id === 'unavail-bulk-to')) {
+    _refreshBulkPreview();
+  }
+});
+
+function _refreshBulkPreview() {
+  const fromStr = document.getElementById('unavail-bulk-from').value;
+  const toStr   = document.getElementById('unavail-bulk-to').value;
+  const countEl = document.getElementById('unavail-bulk-preview-count');
+  if (!countEl) return;
+  if (!fromStr || !toStr) { countEl.textContent = '0'; return; }
+  const from = new Date(fromStr + 'T00:00:00');
+  const to   = new Date(toStr + 'T00:00:00');
+  if (isNaN(from.getTime()) || isNaN(to.getTime()) || from > to) {
+    countEl.textContent = '0';
+    return;
+  }
+  const selected = new Set();
+  document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn.is-active').forEach(b => {
+    selected.add(parseInt(b.dataset.day, 10));
+  });
+  let count = 0;
+  const one = 24 * 60 * 60 * 1000;
+  // JS getDay(): 0=Sunday..6=Saturday. Convertir a ISO: 0=Mon..6=Sun
+  for (let d = new Date(from); d <= to; d = new Date(d.getTime() + one)) {
+    const jsDay = d.getDay();
+    const isoDay = (jsDay + 6) % 7;
+    if (selected.has(isoDay)) count++;
+  }
+  countEl.textContent = count;
 }
 
 function loadUnavailabilities(barberId) {
@@ -575,6 +757,108 @@ document.getElementById('unavail-form').addEventListener('submit', function(e) {
   .finally(() => {
     btn.disabled = false;
     btn.textContent = 'Bloquear Horario';
+  });
+});
+
+// ─── Submit BULK (por rango) ──────────────────────────────
+document.getElementById('unavail-bulk-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  if (!currentUnavailBarberId) return;
+  const btn      = document.getElementById('unavail-bulk-submit-btn');
+  const dateFrom = document.getElementById('unavail-bulk-from').value;
+  const dateTo   = document.getElementById('unavail-bulk-to').value;
+  const allDay   = document.getElementById('unavail-bulk-allday').checked;
+  const start    = document.getElementById('unavail-bulk-start').value;
+  const end      = document.getElementById('unavail-bulk-end').value;
+  const reason   = document.getElementById('unavail-bulk-reason').value.trim();
+
+  if (!dateFrom || !dateTo) {
+    alert('Por favor completa las fechas desde y hasta.');
+    return;
+  }
+  if (dateFrom > dateTo) {
+    alert('La fecha desde debe ser anterior o igual a la fecha hasta.');
+    return;
+  }
+  if (!allDay && (!start || !end)) {
+    alert('Indica hora desde y hora hasta, o marca "Día completo".');
+    return;
+  }
+  if (!allDay && start >= end) {
+    alert('La hora de inicio debe ser anterior a la hora de fin.');
+    return;
+  }
+
+  const weekdays = [];
+  document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn.is-active').forEach(b => {
+    weekdays.push(parseInt(b.dataset.day, 10));
+  });
+  if (weekdays.length === 0) {
+    alert('Selecciona al menos un día de la semana.');
+    return;
+  }
+
+  const previewCount = parseInt(document.getElementById('unavail-bulk-preview-count').textContent, 10) || 0;
+  if (previewCount === 0) {
+    alert('El rango con los días seleccionados no cubre ninguna fecha.');
+    return;
+  }
+  if (previewCount >= 14 && !confirm(`Vas a crear ${previewCount} bloqueos. ¿Confirmas?`)) {
+    return;
+  }
+
+  const payload = {
+    date_from: dateFrom,
+    date_to: dateTo,
+    weekdays,
+    reason,
+    all_day: allDay,
+  };
+  if (!allDay) {
+    payload.start_time = start;
+    payload.end_time = end;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  fetch(`/api/admin/barbers/${currentUnavailBarberId}/unavailability/bulk/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCSRF(),
+    },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json().then(data => ({ ok: r.ok, data })))
+  .then(({ ok, data }) => {
+    if (!ok) {
+      alert('Error: ' + (data.error || JSON.stringify(data)));
+      return;
+    }
+    let msg = `Se crearon ${data.created} bloqueo(s).`;
+    if (data.summary_warning) {
+      msg += '\n\n' + data.summary_warning;
+      if (data.warnings && data.warnings.length) {
+        const sample = data.warnings.slice(0, 5).join('\n');
+        msg += '\n\nDías afectados:\n' + sample;
+        if (data.warnings.length > 5) msg += `\n…y ${data.warnings.length - 5} más.`;
+      }
+    }
+    alert(msg);
+    document.getElementById('unavail-bulk-form').reset();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('unavail-bulk-from').value = today;
+    document.getElementById('unavail-bulk-to').value = today;
+    document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
+    document.getElementById('unavail-bulk-hours').classList.remove('hidden');
+    _refreshBulkPreview();
+    loadUnavailabilities(currentUnavailBarberId);
+  })
+  .catch(() => alert('Error de conexión'))
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Bloquear rango';
   });
 });
 </script>
