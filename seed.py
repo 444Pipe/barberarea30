@@ -33,7 +33,17 @@ services_data = [
     {'name': 'Silver Premium', 'slug': 'silver-premium', 'price': 30000,
      'duration_minutes': 60, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Estilismo', 'Bebidas ilimitadas']},
     {'name': 'Servicio Silver Dama', 'slug': 'servicio-silver-dama', 'price': 35000,
-     'duration_minutes': 60, 'features': ['Corte sencillo', 'Despunte recto', 'En forma de U o V']},
+     'duration_minutes': 60,
+     # description es lo que el wizard splittea para los bullets (por coma o " y ").
+     # features se queda como referencia interna; el endpoint público usa description.
+     'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Masaje capilar, Estilismo, Bebidas ilimitadas',
+     'features': [
+         'Corte sencillo (despunte recto, en forma de U o V)',
+         'Lavado con shampoo específico',
+         'Masaje capilar',
+         'Estilismo y peinado final',
+         'Bebidas ilimitadas',
+     ]},
     # ─── Color a consulta — hombres y mujeres ──────────────────────
     # No es reservable online; el wizard abre WhatsApp. Es CRÍTICO que
     # aparezca aquí también o seed.py lo desactiva en cada boot.
@@ -45,11 +55,31 @@ services_data = [
     {'name': 'Silver premium + Barba', 'slug': 'silver-premium-barba', 'price': 40000,
      'duration_minutes': 80, 'features': ['Silver Premium', 'Diseño de barba ritual']},
     {'name': 'Servicio Gold Dama', 'slug': 'servicio-gold-dama', 'price': 50000,
-     'duration_minutes': 90, 'features': ['Corte sencillo', 'Despunte recto', 'En forma de U o V', 'Shampoo', 'Tratamiento', 'Masaje capilar']},
+     'duration_minutes': 90,
+     'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar nutritivo, Masaje capilar, Masaje cervical, Estilismo, Diseño de cejas, Una bebida nacional',
+     'features': [
+         'Corte sencillo (despunte recto, en forma de U o V)',
+         'Lavado con shampoo específico',
+         'Tratamiento capilar nutritivo',
+         'Masaje capilar',
+         'Masaje cervical',
+         'Estilismo y peinado final',
+         'Diseño de cejas',
+         'Una (1) bebida nacional',
+     ]},
     {'name': 'Gold Exclusive', 'slug': 'gold-exclusive', 'price': 65000,
      'duration_minutes': 90, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Masaje cervical', 'Estilismo', 'Arreglo de barba o diseño de cejas', 'Una (1) bebida nacional']},
     {'name': 'Servicio Diamond VIP Dama', 'slug': 'servicio-diamond-vip-dama', 'price': 70000,
-     'duration_minutes': 120, 'features': ['Servicio Gold Dama', 'Tratamientos extra']},
+     'duration_minutes': 120,
+     'description': 'Todo lo del Servicio Gold Dama, Brushing especial de salida, Tratamiento de hidratación intensiva, Ritual de aromaterapia, Acceso a beneficios Diamond Club, Bebida premium de cortesía',
+     'features': [
+         'Todo lo del Servicio Gold Dama',
+         'Brushing o peinado especial de salida',
+         'Tratamiento de hidratación intensiva',
+         'Ritual de aromaterapia',
+         'Acceso a beneficios Diamond Club',
+         'Una bebida premium de cortesía',
+     ]},
     {'name': 'Diamond VIP', 'slug': 'diamond-vip', 'price': 115000,
      'duration_minutes': 120, 'features': ['Gold Exclusive', 'Beneficios Diamond']},
 ]
