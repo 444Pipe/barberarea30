@@ -16,9 +16,24 @@ class Command(BaseCommand):
         # fila visible del wizard, no enterrado al fondo de la grilla.
         services_data = [
             {'name': 'Diseño de cejas', 'slug': 'diseno-de-cejas', 'price': 5000,
-             'duration_minutes': 15, 'features': []},
+             'duration_minutes': 15,
+             'description': 'Asesoría de forma según rostro, Limpieza con cera o pinza, Perfilado milimétrico, Hidratación final',
+             'features': [
+                 'Asesoría de forma según rostro',
+                 'Limpieza con cera o pinza',
+                 'Perfilado milimétrico',
+                 'Hidratación final',
+             ]},
             {'name': 'Diseño de barba', 'slug': 'diseno-de-barba', 'price': 15000,
-             'duration_minutes': 20, 'features': []},
+             'duration_minutes': 20,
+             'description': 'Asesoría de forma, Toalla caliente preparatoria, Perfilado con navaja, Diseño milimétrico, Aceite o bálsamo hidratante',
+             'features': [
+                 'Asesoría de forma',
+                 'Toalla caliente preparatoria',
+                 'Perfilado con navaja',
+                 'Diseño milimétrico',
+                 'Aceite o bálsamo hidratante',
+             ]},
             {'name': 'Silver Premium', 'slug': 'silver-premium', 'price': 30000,
              'duration_minutes': 60, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Estilismo', 'Bebidas ilimitadas']},
             {'name': 'Servicio Silver Dama', 'slug': 'servicio-silver-dama', 'price': 35000,
