@@ -21,7 +21,10 @@ shop, _ = Barbershop.objects.get_or_create(
 
 from django.utils.text import slugify
 
-# Crear/Actualizar servicios oficiales
+# Crear/Actualizar servicios oficiales.
+# IMPORTANTE: este listado tiene que estar sincronizado con
+# apps/services/management/commands/seed_services.py — son la fuente de la
+# verdad para los servicios activos. Si agregás uno acá, agregalo también allá.
 services_data = [
     {'name': 'Diseño de cejas', 'slug': 'diseno-de-cejas', 'price': 5000,
      'duration_minutes': 15, 'features': []},
@@ -31,6 +34,14 @@ services_data = [
      'duration_minutes': 60, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Estilismo', 'Bebidas ilimitadas']},
     {'name': 'Servicio Silver Dama', 'slug': 'servicio-silver-dama', 'price': 35000,
      'duration_minutes': 60, 'features': ['Corte sencillo', 'Despunte recto', 'En forma de U o V']},
+    # ─── Color a consulta — hombres y mujeres ──────────────────────
+    # No es reservable online; el wizard abre WhatsApp. Es CRÍTICO que
+    # aparezca aquí también o seed.py lo desactiva en cada boot.
+    {'name': 'Color', 'slug': 'color-cabello',
+     'category': 'vip', 'price': 0, 'duration_minutes': 120,
+     'description': 'Color para hombres y mujeres. Precio y tiempo según largo y producto. A consulta — escríbenos por WhatsApp.',
+     'features': ['Diagnóstico capilar', 'Color profesional', 'Producto premium'],
+     'requires_consultation': True},
     {'name': 'Silver premium + Barba', 'slug': 'silver-premium-barba', 'price': 40000,
      'duration_minutes': 80, 'features': ['Silver Premium', 'Diseño de barba ritual']},
     {'name': 'Servicio Gold Dama', 'slug': 'servicio-gold-dama', 'price': 50000,
