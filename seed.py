@@ -84,7 +84,7 @@ services_data = [
      ]},
     {'name': 'Servicio Gold Dama', 'slug': 'servicio-gold-dama', 'price': 50000,
      'duration_minutes': 90,
-     'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar nutritivo, Masaje capilar, Masaje cervical, Estilismo, Diseño de cejas, Una bebida nacional',
+     'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar nutritivo, Masaje capilar, Masaje cervical, Estilismo, Servicio de definición opcional (valor agregado a consultar con el estilista)',
      'features': [
          'Corte sencillo (despunte recto, en forma de U o V)',
          'Lavado con shampoo específico',
@@ -92,8 +92,7 @@ services_data = [
          'Masaje capilar',
          'Masaje cervical',
          'Estilismo y peinado final',
-         'Diseño de cejas',
-         'Una (1) bebida nacional',
+         'Servicio de definición opcional (valor agregado a consultar con el estilista)',
      ]},
     {'name': 'Gold Exclusive', 'slug': 'gold-exclusive', 'price': 65000,
      'duration_minutes': 90, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Masaje cervical', 'Estilismo', 'Arreglo de barba o diseño de cejas', 'Una (1) bebida nacional']},
@@ -101,7 +100,7 @@ services_data = [
      'duration_minutes': 120,
      # Espejado del Diamond VIP de hombres: "arreglo de barba" se reemplaza
      # por "hidratación profunda" (equivalente premium para cabello dama).
-     'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar, Masaje ocular, Masaje capilar, Masaje cervical, Hidratación profunda, Diseño de cejas, Limpieza facial, Estilismo, Una bebida importada',
+     'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar, Masaje ocular, Masaje capilar, Masaje cervical, Hidratación profunda, Estilismo, Servicio de definición opcional (valor agregado a consultar con el estilista)',
      'features': [
          'Corte sencillo (despunte recto, en U o V)',
          'Lavado con shampoo específico',
@@ -110,10 +109,8 @@ services_data = [
          'Masaje capilar',
          'Masaje cervical',
          'Hidratación profunda (en vez de arreglo de barba)',
-         'Diseño de cejas',
-         'Limpieza facial',
          'Estilismo',
-         'Una (1) bebida importada',
+         'Servicio de definición opcional (valor agregado a consultar con el estilista)',
      ]},
     {'name': 'Diamond VIP', 'slug': 'diamond-vip', 'price': 115000,
      'duration_minutes': 120, 'features': ['Gold Exclusive', 'Beneficios Diamond']},
