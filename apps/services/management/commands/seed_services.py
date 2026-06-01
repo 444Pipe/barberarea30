@@ -12,6 +12,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # ─── Services ──────────────────────────
+        # Color va en posición 4 para que aparezca en la primera o segunda
+        # fila visible del wizard, no enterrado al fondo de la grilla.
         services_data = [
             {'name': 'Diseño de cejas', 'slug': 'diseno-de-cejas', 'price': 5000,
              'duration_minutes': 15, 'features': []},
@@ -21,6 +23,15 @@ class Command(BaseCommand):
              'duration_minutes': 60, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Estilismo', 'Bebidas ilimitadas']},
             {'name': 'Servicio Silver Dama', 'slug': 'servicio-silver-dama', 'price': 35000,
              'duration_minutes': 60, 'features': ['Corte sencillo', 'Despunte recto', 'En forma de U o V']},
+            # ─── Color a consulta — hombres y mujeres ──────────────────────
+            # Precio variable según largo y producto; el cliente DEBE escribir
+            # por WhatsApp para acordar antes de reservar. requires_consultation
+            # hace que el botón abra wa.me en lugar del wizard.
+            {'name': 'Color', 'slug': 'color-cabello',
+             'category': 'vip', 'price': 0, 'duration_minutes': 120,
+             'description': 'Color para hombres y mujeres. Precio y tiempo según largo y producto. A consulta — escríbenos por WhatsApp.',
+             'features': ['Diagnóstico capilar', 'Color profesional', 'Producto premium'],
+             'requires_consultation': True},
             {'name': 'Silver premium + Barba', 'slug': 'silver-premium-barba', 'price': 40000,
              'duration_minutes': 80, 'features': ['Silver Premium', 'Diseño de barba ritual']},
             {'name': 'Servicio Gold Dama', 'slug': 'servicio-gold-dama', 'price': 50000,
@@ -31,15 +42,6 @@ class Command(BaseCommand):
              'duration_minutes': 120, 'features': ['Servicio Gold Dama', 'Tratamientos extra']},
             {'name': 'Diamond VIP', 'slug': 'diamond-vip', 'price': 115000,
              'duration_minutes': 120, 'features': ['Gold Exclusive', 'Beneficios Diamond']},
-            # ─── Color a consulta — hombres y mujeres ──────────────────────
-            # Precio variable según largo y producto; el cliente DEBE escribir
-            # por WhatsApp para acordar antes de reservar. requires_consultation
-            # hace que el botón abra wa.me en lugar del wizard.
-            {'name': 'Color', 'slug': 'color-cabello',
-             'category': 'vip', 'price': 0, 'duration_minutes': 120,
-             'description': 'Color para hombres y mujeres. Precio y tiempo según largo y producto. A consulta — escríbenos por WhatsApp.',
-             'features': ['Diagnóstico capilar', 'Color profesional', 'Producto premium'],
-             'requires_consultation': True},
         ]
 
         # Deactivate all existing services first
