@@ -70,7 +70,7 @@ class Command(BaseCommand):
              ]},
             {'name': 'Servicio Gold Dama', 'slug': 'servicio-gold-dama', 'price': 50000,
              'duration_minutes': 90,
-             'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar nutritivo, Masaje capilar, Masaje cervical, Estilismo, Servicio de definición opcional (valor agregado a consultar con el estilista)',
+             'description': 'Corte sencillo, Despunte recto en U o V, Lavado con shampoo específico, Tratamiento capilar nutritivo, Masaje capilar, Masaje cervical, Estilismo',
              'features': [
                  'Corte sencillo (despunte recto, en forma de U o V)',
                  'Lavado con shampoo específico',
@@ -78,7 +78,6 @@ class Command(BaseCommand):
                  'Masaje capilar',
                  'Masaje cervical',
                  'Estilismo y peinado final',
-                 'Servicio de definición opcional (valor agregado a consultar con el estilista)',
              ]},
             {'name': 'Gold Exclusive', 'slug': 'gold-exclusive', 'price': 65000,
              'duration_minutes': 90, 'features': ['Corte', 'Lavado con shampoo específico', 'Masaje capilar', 'Masaje cervical', 'Estilismo', 'Arreglo de barba o diseño de cejas', 'Una (1) bebida nacional']},
