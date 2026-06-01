@@ -28,11 +28,10 @@ from django.utils.text import slugify
 services_data = [
     {'name': 'Diseño de cejas', 'slug': 'diseno-de-cejas', 'price': 5000,
      'duration_minutes': 15,
-     # Trabajado 100% a navaja — sin cera ni pinza.
-     'description': 'Asesoría de forma según rostro, Trabajo a pura navaja (sin cera ni pinza), Perfilado milimétrico',
+     'description': 'Asesoría de forma según rostro, A navaja, Perfilado milimétrico',
      'features': [
          'Asesoría de forma según rostro',
-         'Trabajo a pura navaja (sin cera ni pinza)',
+         'A navaja',
          'Perfilado milimétrico',
      ]},
     {'name': 'Diseño de barba', 'slug': 'diseno-de-barba', 'price': 15000,
