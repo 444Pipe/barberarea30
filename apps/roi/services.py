@@ -224,6 +224,47 @@ def _get_partner_investment_balance(partner: Partner, up_to_snapshot_id=None) ->
     return max(balance, Decimal('0'))
 
 
+def get_investment_summary() -> dict:
+    """
+    Resumen de inversión por socio + totales globales.
+
+    Es la ÚNICA fuente de verdad para las cifras de "Inversión Total",
+    "Recuperado" y "Saldo Pendiente": todo se deriva agregando
+    `PartnerInvestment.amount` por socio y restando lo ya amortizado.
+
+    Por eso, al crear/editar/eliminar un aporte basta con tocar la fila
+    `PartnerInvestment` — al volver a llamar aquí, los totales se recalculan
+    automáticamente. Lo usan tanto el dashboard como las respuestas JSON del
+    CRUD de aportes (para refrescar los KPI en vivo sin recargar la página).
+    """
+    partners = Partner.objects.filter(is_active=True).prefetch_related('investments')
+    partner_data = []
+    total_invested = Decimal('0')
+    total_pending = Decimal('0')
+
+    for partner in partners:
+        invested = _D(partner.investments.aggregate(t=Sum('amount'))['t'])
+        pending = _get_partner_investment_balance(partner)
+        recovered = invested - pending
+        total_invested += invested
+        total_pending += pending
+
+        partner_data.append({
+            'partner': partner,
+            'total_invested': invested,
+            'total_recovered': recovered,
+            'pending_balance': pending,
+            'recovery_pct': int((recovered / invested * 100).quantize(Decimal('1'))) if invested > 0 else 0,
+        })
+
+    return {
+        'partners': partner_data,
+        'total_invested': total_invested,
+        'total_recovered': total_invested - total_pending,
+        'total_pending': total_pending,
+    }
+
+
 # ─────────────────────────────────────────────────────────
 # Consolidación del Mes (botón "Consolidar Mes")
 # ─────────────────────────────────────────────────────────
@@ -381,28 +422,12 @@ def get_dashboard_context(selected_year: int = None, selected_month: int = None)
     can_go_next = (next_y, next_m) <= (now.year, now.month)
     is_current_month = (sel_year, sel_month) == (now.year, now.month)
 
-    # ── Inversión Global ──
-    partners = Partner.objects.filter(is_active=True).prefetch_related('investments')
-    partner_data = []
-    total_invested = Decimal('0')
-    current_total_pending = Decimal('0')
-
-    for partner in partners:
-        invested = _D(partner.investments.aggregate(t=Sum('amount'))['t'])
-        pending = _get_partner_investment_balance(partner)
-        recovered = invested - pending
-        total_invested += invested
-        current_total_pending += pending
-
-        partner_data.append({
-            'partner': partner,
-            'total_invested': invested,
-            'total_recovered': recovered,
-            'pending_balance': pending,
-            'recovery_pct': int((recovered / invested * 100).quantize(Decimal('1'))) if invested > 0 else 0,
-        })
-
-    total_recovered = total_invested - current_total_pending
+    # ── Inversión Global (fuente de verdad compartida con el CRUD de aportes) ──
+    inv = get_investment_summary()
+    partner_data = inv['partners']
+    total_invested = inv['total_invested']
+    current_total_pending = inv['total_pending']
+    total_recovered = inv['total_recovered']
 
     # ── Mes seleccionado: usar snapshot si está consolidado, sino calcular en vivo ──
     selected_snapshot = MonthlyROISnapshot.objects.filter(

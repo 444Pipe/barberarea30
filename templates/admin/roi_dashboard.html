@@ -127,6 +127,11 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
         Limpiar Snapshots
       </button>
+      <button onclick="ROIHistory.open()"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/15 text-smoke/80 text-xs font-bold tracking-widest uppercase hover:bg-white/10 hover:text-white transition-colors shadow-lg">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Ver Historial de Aportes
+      </button>
       <button onclick="document.getElementById('modal-investment').classList.remove('hidden')"
               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold tracking-widest uppercase hover:bg-blue-600/30 transition-colors shadow-lg">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
@@ -146,17 +151,17 @@
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
     <div class="roi-card animate-in">
       <div class="stat-label">Inversión Total</div>
-      <div class="stat-value gold-glow">${{ total_invested|intcomma }} <span class="text-base text-smoke/40 font-sans">COP</span></div>
+      <div class="stat-value gold-glow">$<span data-kpi="total_invested">{{ total_invested|intcomma }}</span> <span class="text-base text-smoke/40 font-sans">COP</span></div>
       <p class="text-xs text-smoke/40 mt-2">Capital total aportado por los socios</p>
     </div>
     <div class="roi-card animate-in">
       <div class="stat-label">Recuperado</div>
-      <div class="stat-value text-emerald-400">${{ total_recovered|intcomma }} <span class="text-base text-smoke/40 font-sans">COP</span></div>
+      <div class="stat-value text-emerald-400">$<span data-kpi="total_recovered">{{ total_recovered|intcomma }}</span> <span class="text-base text-smoke/40 font-sans">COP</span></div>
       <p class="text-xs text-smoke/40 mt-2">Amortizado contra ganancias netas</p>
     </div>
     <div class="roi-card animate-in">
       <div class="stat-label">Saldo Pendiente</div>
-      <div class="stat-value text-amber-400">${{ total_pending|intcomma }} <span class="text-base text-smoke/40 font-sans">COP</span></div>
+      <div class="stat-value text-amber-400">$<span data-kpi="total_pending">{{ total_pending|intcomma }}</span> <span class="text-base text-smoke/40 font-sans">COP</span></div>
       <p class="text-xs text-smoke/40 mt-2">Aún por recuperar entre los socios</p>
     </div>
   </div>
@@ -166,7 +171,7 @@
     <h2 class="text-xs font-bold tracking-[0.3em] uppercase text-smoke/50 mb-4">Estado por Socio</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
       {% for pd in partners %}
-      <div class="roi-card partner-card animate-in">
+      <div class="roi-card partner-card animate-in" data-partner-card="{{ pd.partner.id }}">
         <div class="flex items-start justify-between mb-4">
           <div>
             <div class="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 font-serif font-bold text-lg mb-2">
@@ -177,7 +182,7 @@
           </div>
           <div class="text-right">
             <div class="stat-label">Pendiente</div>
-            <div class="text-xl font-bold text-amber-400">${{ pd.pending_balance|intcomma }}</div>
+            <div class="text-xl font-bold text-amber-400">$<span data-field="pending_balance">{{ pd.pending_balance|intcomma }}</span></div>
           </div>
         </div>
 
@@ -185,10 +190,10 @@
         <div class="mb-3">
           <div class="flex justify-between text-xs text-smoke/40 mb-1">
             <span>Recuperación</span>
-            <span>{{ pd.recovery_pct }}%</span>
+            <span data-field="recovery_pct">{{ pd.recovery_pct }}%</span>
           </div>
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width: {{ pd.recovery_pct }}%"></div>
+            <div class="progress-bar-fill" data-field="recovery_bar" style="width: {{ pd.recovery_pct }}%"></div>
           </div>
         </div>
 
@@ -196,11 +201,11 @@
         <div class="grid grid-cols-2 gap-3 pt-3 border-t border-white/5">
           <div>
             <div class="stat-label">Invertido</div>
-            <div class="text-sm font-semibold text-white">${{ pd.total_invested|intcomma }}</div>
+            <div class="text-sm font-semibold text-white">$<span data-field="total_invested">{{ pd.total_invested|intcomma }}</span></div>
           </div>
           <div>
             <div class="stat-label">Recuperado</div>
-            <div class="text-sm font-semibold text-emerald-400">${{ pd.total_recovered|intcomma }}</div>
+            <div class="text-sm font-semibold text-emerald-400">$<span data-field="total_recovered">{{ pd.total_recovered|intcomma }}</span></div>
           </div>
         </div>
       </div>
@@ -679,6 +684,96 @@
     </form>
   </div>
 </div>
+
+<!-- ══ MODAL: Historial de Aportes ══ -->
+<div id="modal-history" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-jet-card border border-white/10 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[88vh] flex flex-col">
+    <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
+      <div>
+        <h3 class="font-serif font-bold text-white tracking-wide">Historial de Aportes</h3>
+        <p class="text-xs text-smoke/40 mt-0.5">Cada aporte registrado, editable y eliminable individualmente</p>
+      </div>
+      <button onclick="document.getElementById('modal-history').classList.add('hidden')"
+              class="text-smoke/40 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="px-6 py-4 overflow-y-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-[0.65rem] uppercase tracking-widest text-smoke/40 border-b border-white/5">
+            <th class="py-2 pr-3 font-bold">Fecha</th>
+            <th class="py-2 pr-3 font-bold">Socio</th>
+            <th class="py-2 pr-3 font-bold text-right">Monto</th>
+            <th class="py-2 pr-3 font-bold">Concepto</th>
+            <th class="py-2 font-bold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody" class="divide-y divide-white/5">
+          <tr><td colspan="5" class="py-8 text-center text-smoke/40">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Editar Aporte ══ -->
+<div id="modal-edit-investment" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+  <div class="bg-jet-card border border-gold/20 rounded-2xl w-full max-w-md shadow-2xl">
+    <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+      <div>
+        <h3 class="font-serif font-bold text-white tracking-wide">Editar Aporte</h3>
+        <p class="text-xs text-smoke/40 mt-0.5">Los totales se recalculan automáticamente al guardar</p>
+      </div>
+      <button onclick="document.getElementById('modal-edit-investment').classList.add('hidden')"
+              class="text-smoke/40 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="edit-investment-form" class="px-6 py-5 space-y-4">
+      <input type="hidden" name="investment_id" id="edit-investment-id">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="stat-label block mb-1">Socio</label>
+          <select name="partner_id" id="edit-partner-id" required class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+            {% for pd in partners %}
+              <option value="{{ pd.partner.id }}">{{ pd.partner.display_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="stat-label block mb-1">Fecha</label>
+          <input type="date" name="date" id="edit-date"
+                 class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+        </div>
+      </div>
+      <div>
+        <label class="stat-label block mb-1">Monto de Inversión (COP)</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gold font-bold">$</span>
+          <input type="number" name="amount" id="edit-amount" required min="1" step="1" placeholder="0"
+                 class="w-full bg-jet-lighter border border-white/10 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+        </div>
+      </div>
+      <div>
+        <label class="stat-label block mb-1">Descripción / Concepto</label>
+        <input type="text" name="description" id="edit-description" placeholder="Ej: Aporte inicial, compra de espejos..."
+               class="w-full bg-jet-lighter border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold/50 focus:outline-none">
+      </div>
+      <p id="edit-investment-error" class="hidden text-xs text-red-300/90 bg-red-900/20 border border-red-500/20 rounded-lg px-3 py-2"></p>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="document.getElementById('modal-edit-investment').classList.add('hidden')"
+                class="flex-1 px-4 py-2 rounded-lg border border-white/10 text-smoke/60 text-xs uppercase tracking-widest hover:bg-white/5 transition-colors">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="flex-1 px-4 py-2 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest hover:bg-gold-light transition-colors shadow-lg shadow-gold/20">
+          Guardar Cambios
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -748,4 +843,180 @@
 })();
 </script>
 {% endif %}
+
+<!-- ══ Historial de Aportes — CRUD (listar / editar / eliminar) ══ -->
+<script>
+const ROIHistory = (function () {
+  const URLS = {
+    list:   "{% url 'roi_api_investments' %}",
+    update: "{% url 'roi_update_investment' 0 %}",   // el 0 se reemplaza por el id real
+    remove: "{% url 'roi_delete_investment' 0 %}",
+  };
+
+  function csrf() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function fmt(n) {
+    return Number(n || 0).toLocaleString('es-CO');
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  // Aportes en memoria (para poblar el modal de edición sin volver a pedir al server)
+  let cache = [];
+
+  // ── Refresca los KPI globales y las tarjetas por socio con los totales recalculados ──
+  function applySummary(summary) {
+    if (!summary) return;
+    document.querySelectorAll('[data-kpi]').forEach(el => {
+      const key = el.getAttribute('data-kpi');
+      if (summary[key] != null) el.textContent = fmt(summary[key]);
+    });
+    (summary.partners || []).forEach(p => {
+      const card = document.querySelector(`[data-partner-card="${p.id}"]`);
+      if (!card) return;
+      const set = (field, val) => {
+        const node = card.querySelector(`[data-field="${field}"]`);
+        if (node) node.textContent = val;
+      };
+      set('pending_balance', fmt(p.pending_balance));
+      set('total_invested', fmt(p.total_invested));
+      set('total_recovered', fmt(p.total_recovered));
+      set('recovery_pct', p.recovery_pct + '%');
+      const bar = card.querySelector('[data-field="recovery_bar"]');
+      if (bar) bar.style.width = p.recovery_pct + '%';
+    });
+  }
+
+  function rowHtml(inv) {
+    const fecha = new Date(inv.date + 'T00:00:00').toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+    return `
+      <tr data-row="${inv.id}">
+        <td class="py-3 pr-3 text-smoke/70 whitespace-nowrap">${esc(fecha)}</td>
+        <td class="py-3 pr-3 text-white font-medium">${esc(inv.partner_name)}</td>
+        <td class="py-3 pr-3 text-right text-gold font-bold whitespace-nowrap">$${fmt(inv.amount)}</td>
+        <td class="py-3 pr-3 text-smoke/60">${esc(inv.description) || '<span class="text-smoke/25">—</span>'}</td>
+        <td class="py-3 text-right whitespace-nowrap">
+          <button onclick="ROIHistory.edit(${inv.id})"
+                  class="px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-smoke/70 text-xs hover:bg-gold/15 hover:text-gold hover:border-gold/30 transition-colors">
+            Editar
+          </button>
+          <button onclick="ROIHistory.remove(${inv.id})"
+                  class="ml-1 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-smoke/70 text-xs hover:bg-red-600/20 hover:text-red-300 hover:border-red-500/30 transition-colors">
+            Eliminar
+          </button>
+        </td>
+      </tr>`;
+  }
+
+  function render() {
+    const tbody = document.getElementById('history-tbody');
+    if (!cache.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-smoke/40">Aún no hay aportes registrados.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = cache.map(rowHtml).join('');
+  }
+
+  function load() {
+    const tbody = document.getElementById('history-tbody');
+    tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-smoke/40">Cargando…</td></tr>`;
+    return fetch(URLS.list, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.json())
+      .then(data => {
+        cache = data.investments || [];
+        render();
+        applySummary(data.summary);
+      })
+      .catch(() => {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-300/80">Error al cargar el historial.</td></tr>`;
+      });
+  }
+
+  function open() {
+    document.getElementById('modal-history').classList.remove('hidden');
+    load();
+  }
+
+  function edit(id) {
+    const inv = cache.find(x => x.id === id);
+    if (!inv) return;
+    document.getElementById('edit-investment-id').value = inv.id;
+    document.getElementById('edit-partner-id').value = inv.partner_id;
+    document.getElementById('edit-amount').value = inv.amount;
+    document.getElementById('edit-description').value = inv.description;
+    document.getElementById('edit-date').value = inv.date;
+    document.getElementById('edit-investment-error').classList.add('hidden');
+    document.getElementById('modal-edit-investment').classList.remove('hidden');
+  }
+
+  function remove(id) {
+    const inv = cache.find(x => x.id === id);
+    const label = inv ? `el aporte de $${fmt(inv.amount)} de ${inv.partner_name}` : 'este aporte';
+    if (!confirm(`¿Eliminar ${label}? El monto se descontará de los totales. Esta acción no se puede deshacer.`)) return;
+
+    fetch(URLS.remove.replace('/0/', '/' + id + '/'), {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) { alert(data.error || 'No se pudo eliminar.'); return; }
+        cache = cache.filter(x => x.id !== id);
+        render();
+        applySummary(data.summary);   // recalcula global + por socio en vivo
+      })
+      .catch(() => alert('Error de red al eliminar.'));
+  }
+
+  function submitEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-investment-id').value;
+    const errEl = document.getElementById('edit-investment-error');
+    errEl.classList.add('hidden');
+
+    const body = new URLSearchParams();
+    body.append('partner_id', document.getElementById('edit-partner-id').value);
+    body.append('amount', document.getElementById('edit-amount').value);
+    body.append('description', document.getElementById('edit-description').value);
+    body.append('date', document.getElementById('edit-date').value);
+
+    fetch(URLS.update.replace('/0/', '/' + id + '/'), {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest' },
+      body,
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) {
+          errEl.textContent = data.error || 'No se pudo guardar.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        document.getElementById('modal-edit-investment').classList.add('hidden');
+        applySummary(data.summary);   // recalcula totales con la diferencia ajustada
+        load();                        // refresca la tabla con los datos actualizados
+      })
+      .catch(() => {
+        errEl.textContent = 'Error de red al guardar.';
+        errEl.classList.remove('hidden');
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('edit-investment-form');
+    if (form) form.addEventListener('submit', submitEdit);
+  });
+
+  return { open, edit, remove };
+})();
+</script>
 {% endblock %}
