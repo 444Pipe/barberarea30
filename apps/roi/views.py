@@ -15,6 +15,7 @@ from .services import (
     get_dashboard_context,
     generate_monthly_snapshot,
     delete_snapshots,
+    get_investment_summary,
 )
 from .models import MonthlyROISnapshot, Partner, PartnerInvestment
 
@@ -223,3 +224,119 @@ def roi_add_investment_view(request):
         messages.error(request, f'❌ Error al registrar inversión: {e}')
 
     return redirect('roi_dashboard')
+
+
+# ─────────────────────────────────────────────────────────
+# Historial de Aportes — CRUD (listar / editar / eliminar)
+# ─────────────────────────────────────────────────────────
+
+def _investment_summary_payload():
+    """Totales recalculados (globales + por socio) para refrescar los KPI en vivo."""
+    summary = get_investment_summary()
+    return {
+        'total_invested': int(summary['total_invested']),
+        'total_recovered': int(summary['total_recovered']),
+        'total_pending': int(summary['total_pending']),
+        'partners': [
+            {
+                'id': pd['partner'].id,
+                'name': pd['partner'].display_name,
+                'total_invested': int(pd['total_invested']),
+                'total_recovered': int(pd['total_recovered']),
+                'pending_balance': int(pd['pending_balance']),
+                'recovery_pct': pd['recovery_pct'],
+            }
+            for pd in summary['partners']
+        ],
+    }
+
+
+@superadmin_required
+def roi_api_investments(request):
+    """GET: Lista todos los aportes individuales para el modal de historial."""
+    investments = (
+        PartnerInvestment.objects
+        .select_related('partner', 'registered_by')
+        .order_by('-date', '-id')
+    )
+    items = [
+        {
+            'id': inv.id,
+            'partner_id': inv.partner_id,
+            'partner_name': inv.partner.display_name,
+            'amount': int(inv.amount),
+            'description': inv.description or '',
+            'date': inv.date.isoformat(),
+            'registered_by': (
+                inv.registered_by.get_full_name() or inv.registered_by.username
+            ) if inv.registered_by else '—',
+        }
+        for inv in investments
+    ]
+    return JsonResponse({'investments': items, 'summary': _investment_summary_payload()})
+
+
+@superadmin_required
+def roi_update_investment_view(request, investment_id):
+    """
+    POST: Edita un aporte (socio, monto, concepto, fecha).
+
+    Como los totales son derivados (se agregan desde PartnerInvestment), basta
+    con guardar la fila: el "Saldo Pendiente", la "Inversión Total" global y el
+    total por socio se recalculan solos. Devolvemos el resumen ya recalculado
+    para que el front actualice los KPI sin recargar.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+
+    try:
+        inv = PartnerInvestment.objects.get(pk=investment_id)
+    except PartnerInvestment.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Aporte no encontrado.'}, status=404)
+
+    try:
+        partner_id = request.POST.get('partner_id')
+        amount = request.POST.get('amount')
+        description = request.POST.get('description', '').strip()
+        date_str = request.POST.get('date')
+
+        if not partner_id or not amount:
+            raise ValueError('Socio y monto son obligatorios.')
+
+        amount_val = int(float(amount))
+        if amount_val <= 0:
+            raise ValueError('El monto debe ser mayor a 0.')
+
+        inv.partner = Partner.objects.get(pk=partner_id)
+        inv.amount = amount_val
+        inv.description = description
+        if date_str:
+            inv.date = date_str  # 'YYYY-MM-DD' → Django lo parsea al guardar
+        inv.save()
+    except Partner.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Socio no encontrado.'}, status=404)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Error inesperado: {e}'}, status=500)
+
+    return JsonResponse({'ok': True, 'summary': _investment_summary_payload()})
+
+
+@superadmin_required
+def roi_delete_investment_view(request, investment_id):
+    """
+    POST: Elimina un aporte. El monto se descuenta automáticamente de la
+    Inversión Total global, del Saldo Pendiente y del total del socio, porque
+    todos esos valores se derivan al recalcular get_investment_summary().
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+
+    try:
+        inv = PartnerInvestment.objects.get(pk=investment_id)
+    except PartnerInvestment.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Aporte no encontrado.'}, status=404)
+
+    inv.delete()
+    return JsonResponse({'ok': True, 'summary': _investment_summary_payload()})
