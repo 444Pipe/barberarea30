@@ -476,7 +476,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
             </button>
             <div class="actions-menu hidden absolute right-0 top-full mt-1 w-44 bg-jet-card border border-white/10 rounded-lg shadow-2xl z-30 overflow-hidden py-1">
               <!-- Cambiar estado -->
-              ${userIsSuperAdmin && b.status !== 'completed' ? `
+              ${userCanEdit && b.status !== 'completed' ? `
               <div class="px-2 py-1.5 border-b border-white/5">
                 <p class="text-[0.55rem] text-smoke/30 uppercase tracking-widest mb-1 px-1">Estado</p>
                 <select onchange="quickStatus(${b.id}, this.value); closeAllMenus();" class="quick-status-select w-full text-[0.6rem] rounded">

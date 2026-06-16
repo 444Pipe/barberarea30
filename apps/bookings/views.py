@@ -502,8 +502,13 @@ def admin_booking_detail_view(request, booking_id):
                 return Response({'error': 'Esta reserva ya está pagada y bloqueada. No se permiten cambios.'}, status=403)
 
         if new_status != old_status:
-            if not (profile and profile.is_superadmin):
-                return Response({'error': 'Solo los super administradores y soporte técnico pueden cambiar el estado de la reserva.'}, status=403)
+            # Cancelar/reactivar reservas: superadmin y admin operativo (Frank).
+            # Marcar como completada queda reservado a superadmin (ligado a ventas/comisiones).
+            can_change_status = profile and (profile.is_superadmin or profile.is_operational_admin)
+            if not can_change_status:
+                return Response({'error': 'Solo los super administradores y el admin operativo pueden cambiar el estado de la reserva.'}, status=403)
+            if new_status == 'completed' and not profile.is_superadmin:
+                return Response({'error': 'Solo los super administradores pueden marcar una reserva como completada.'}, status=403)
 
         if new_status == 'completed' and old_status != 'completed':
             booking.completed_at = timezone.now()
