@@ -640,6 +640,25 @@ def reservas_generales(request):
 
 
 @login_required
+def pagos_vales(request):
+    """Apartado para el admin operativo (Frank): gestionar pagos y vales/adelantos
+    de los barberos desde el área de barbero (sin entrar al panel admin completo).
+
+    Reutiliza los endpoints de /api/admin/cashflow/barber-payments/ (que ya permiten
+    al operational_admin ver, dar vales, anularlos y liquidar). Acceso solo para el
+    admin operativo o superadmin; cualquier otro barbero es redirigido a su agenda.
+    """
+    profile = getattr(request.user, 'profile', None)
+    if not (profile and profile.role in ('operational_admin', 'superadmin')):
+        return redirect('barbers_pages:dashboard_barbero')
+
+    barbero = getattr(request.user, 'barber_profile', None)
+    return render(request, 'barberos/pagos_vales.html', {
+        'barbero': barbero,
+    })
+
+
+@login_required
 @require_POST
 def finalizar_cita(request):
     """Endpoint llamado por el dashboard del barbero al finalizar una cita."""
