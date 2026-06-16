@@ -63,7 +63,7 @@
         <p class="text-[0.65rem] tracking-[0.2em] uppercase text-gold/80">Barber Club</p>
       </div>
     </div>
-    <form method="post" action="{% url 'barbero_logout' %}" class="inline">
+    <form method="post" action="{% url 'barbers_pages:barbero_logout' %}" class="inline">
       {% csrf_token %}
       <button type="submit" class="text-xs uppercase tracking-widest text-smoke/50 hover:text-gold transition-colors">
         Salir
@@ -73,6 +73,20 @@
 
   <!-- Contenido -->
   <main class="max-w-xl mx-auto px-4 py-8">
+    {% if es_operativo %}
+    <a href="{% url 'barbers_pages:reservas_generales' %}"
+       class="flex items-center justify-between gap-3 mb-6 p-4 rounded-sm border border-gold/30 bg-gold/5 hover:bg-gold/10 transition-colors group">
+      <div class="flex items-center gap-3">
+        <svg class="w-6 h-6 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        <div>
+          <p class="text-sm font-serif text-white">Reservas Generales</p>
+          <p class="text-[0.65rem] uppercase tracking-widest text-gold/70">Todos los barberos · cancelar y reagendar</p>
+        </div>
+      </div>
+      <svg class="w-5 h-5 text-gold/60 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
+    {% endif %}
+
     <div class="flex items-center justify-between mb-8">
       <h2 class="text-xl font-serif text-white">Mi Agenda</h2>
       <span class="text-xs tracking-widest uppercase text-smoke/40">{{ citas|length }} citas</span>

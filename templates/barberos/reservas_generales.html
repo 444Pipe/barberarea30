@@ -1,0 +1,319 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/favicon30.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'images/favicon30.png' %}">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservas Generales | Área 30</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
+            smoke: '#F5F5F5'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="bg-jet text-smoke font-sans antialiased min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="sticky top-0 z-40 bg-jet border-b border-gold/20 flex items-center justify-between px-4 py-4">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'barbers_pages:dashboard_barbero' %}" class="text-gold/60 hover:text-gold transition-colors" title="Volver a Mi Agenda">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <div>
+        <h1 class="text-lg font-serif font-bold text-white tracking-wide">Reservas Generales</h1>
+        <p class="text-[0.65rem] tracking-[0.2em] uppercase text-gold/80">Todos los barberos</p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'barbers_pages:barbero_logout' %}" class="inline">
+      {% csrf_token %}
+      <button type="submit" class="text-xs uppercase tracking-widest text-smoke/50 hover:text-gold transition-colors">Salir</button>
+    </form>
+  </nav>
+
+  <main class="max-w-2xl mx-auto px-4 py-6">
+
+    <!-- Filtros -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+      <div>
+        <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Barbero</label>
+        <select id="f-barber" onchange="loadBookings()" class="w-full bg-jet-card border border-white/10 text-white text-sm rounded px-2 py-2 focus:border-gold outline-none">
+          <option value="">Todos</option>
+          {% for b in barbers %}
+          <option value="{{ b.id }}">{{ b.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Estado</label>
+        <select id="f-status" onchange="renderFromCache()" class="w-full bg-jet-card border border-white/10 text-white text-sm rounded px-2 py-2 focus:border-gold outline-none">
+          <option value="activas" selected>Activas</option>
+          <option value="pending">Pendiente</option>
+          <option value="confirmed">Confirmado</option>
+          <option value="cancelled">Cancelado</option>
+          <option value="completed">Completado</option>
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Desde</label>
+        <input type="date" id="f-date-from" onchange="loadBookings()" class="w-full bg-jet-card border border-white/10 text-white text-sm rounded px-2 py-2 focus:border-gold outline-none">
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mb-4">
+      <span id="count-label" class="text-xs tracking-widest uppercase text-smoke/40">Cargando…</span>
+      <button onclick="loadBookings()" class="text-[0.65rem] uppercase tracking-widest text-gold/70 hover:text-gold flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Actualizar
+      </button>
+    </div>
+
+    <div id="list" class="space-y-3">
+      <div class="text-center text-smoke/40 py-12 text-sm">Cargando reservas…</div>
+    </div>
+  </main>
+
+  <!-- Modal: Reagendar -->
+  <div id="reschedule-modal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl w-full max-w-sm">
+      <div class="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white tracking-widest uppercase">Reagendar cita</h3>
+        <button onclick="closeReschedule()" class="text-smoke/40 hover:text-white">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="r-id">
+        <div>
+          <p id="r-client" class="text-white font-semibold text-sm"></p>
+          <p class="text-[0.65rem] text-smoke/40 mt-1">Actual: <span id="r-current" class="text-smoke/60"></span></p>
+        </div>
+        <div>
+          <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Nueva fecha</label>
+          <input type="date" id="r-date" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        </div>
+        <div>
+          <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Nueva hora</label>
+          <input type="time" id="r-time" class="w-full bg-jet border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-gold outline-none">
+        </div>
+        <div id="r-error" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2"></div>
+      </div>
+      <div class="px-5 pb-4 flex gap-2 justify-end">
+        <button onclick="closeReschedule()" class="px-4 py-2 text-xs uppercase tracking-widest text-smoke border border-white/10 rounded">Cancelar</button>
+        <button id="r-submit" onclick="submitReschedule()" class="px-5 py-2 bg-gold text-jet font-bold text-xs tracking-widest uppercase rounded hover:brightness-110">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CSRF = '{{ csrf_token }}';
+    let cache = [];
+
+    const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtMoney = n => '$' + (Number(n) || 0).toLocaleString('es-CO');
+
+    function localToday() {
+      const d = new Date();
+      const off = d.getTimezoneOffset();
+      return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+    }
+
+    function formatTime12(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':');
+      let hh = parseInt(h, 10);
+      const ap = hh >= 12 ? 'PM' : 'AM';
+      hh = hh % 12 || 12;
+      return `${hh}:${m} ${ap}`;
+    }
+
+    function formatDateNice(ds) {
+      const today = localToday();
+      const d = new Date(ds + 'T00:00:00');
+      const t = new Date(today + 'T00:00:00');
+      const diff = Math.round((d - t) / 86400000);
+      const label = d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (diff === 0) return 'Hoy · ' + label;
+      if (diff === 1) return 'Mañana · ' + label;
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+
+    const statusBadge = {
+      pending: '<span class="px-2 py-0.5 rounded-full bg-gold/15 text-gold text-[0.6rem] uppercase tracking-wider">Pendiente</span>',
+      confirmed: '<span class="px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 text-[0.6rem] uppercase tracking-wider">Confirmado</span>',
+      completed: '<span class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 text-[0.6rem] uppercase tracking-wider">Completado</span>',
+      cancelled: '<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 text-[0.6rem] uppercase tracking-wider">Cancelado</span>',
+    };
+
+    function loadBookings() {
+      const list = document.getElementById('list');
+      list.innerHTML = '<div class="text-center text-smoke/40 py-12 text-sm">Cargando reservas…</div>';
+      const params = new URLSearchParams();
+      const barber = document.getElementById('f-barber').value;
+      const dateFrom = document.getElementById('f-date-from').value;
+      if (barber) params.set('barber', barber);
+      if (dateFrom) params.set('date_from', dateFrom);
+
+      fetch('/api/admin/bookings/?' + params.toString(), { headers: { 'X-CSRFToken': CSRF } })
+        .then(r => r.json())
+        .then(data => {
+          cache = Array.isArray(data) ? data : [];
+          renderFromCache();
+        })
+        .catch(() => {
+          list.innerHTML = '<div class="text-center text-red-400 py-12 text-sm">Error al cargar reservas.</div>';
+        });
+    }
+    window.loadBookings = loadBookings;
+
+    function renderFromCache() {
+      const list = document.getElementById('list');
+      const status = document.getElementById('f-status').value;
+
+      let rows = cache.slice();
+      if (status === 'activas') rows = rows.filter(b => b.status === 'pending' || b.status === 'confirmed');
+      else if (status) rows = rows.filter(b => b.status === status);
+
+      rows.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+      document.getElementById('count-label').textContent = rows.length + (rows.length === 1 ? ' reserva' : ' reservas');
+
+      if (rows.length === 0) {
+        list.innerHTML = '<div class="border border-white/5 bg-jet-card rounded-sm p-10 text-center"><p class="text-sm text-smoke/50">No hay reservas con estos filtros.</p></div>';
+        return;
+      }
+
+      let html = '';
+      let currentDate = null;
+      rows.forEach(b => {
+        if (b.date !== currentDate) {
+          currentDate = b.date;
+          html += `<div class="pt-3 pb-1 text-[0.7rem] font-serif text-gold tracking-widest uppercase">${escH(formatDateNice(b.date))}</div>`;
+        }
+        html += renderCard(b);
+      });
+      list.innerHTML = html;
+    }
+    window.renderFromCache = renderFromCache;
+
+    function renderCard(b) {
+      const manageable = b.status !== 'completed' && b.status !== 'cancelled';
+      const timeHHMM = (b.time || '').slice(0, 5);
+      const safeName = (b.client_name || '').replace(/'/g, "\\'");
+      return `
+      <div class="border border-white/5 bg-jet-lighter rounded-sm p-4">
+        <div class="flex justify-between items-start gap-3">
+          <div class="min-w-0">
+            <h3 class="font-serif text-white text-base truncate">${escH(b.client_name)}</h3>
+            <p class="text-[0.7rem] text-gold uppercase tracking-wider">${escH(b.service_name || 'Servicio general')}</p>
+            <div class="flex items-center gap-1.5 mt-1.5 text-[0.7rem] text-smoke/60">
+              <span class="w-2 h-2 rounded-full" style="background:${b.barber_color || '#D4AF37'}"></span>
+              <span>${escH(b.barber_name || 'Sin barbero')}</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-semibold text-white">${fmtMoney(b.price)}</div>
+            <div class="mt-1">${statusBadge[b.status] || statusBadge.pending}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 mt-3 text-[0.7rem] text-smoke/60">
+          <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gold/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>${b.date}</span>
+          <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-gold/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>${formatTime12(b.time)}</span>
+        </div>
+        ${manageable ? `
+        <div class="flex gap-2 mt-4">
+          <button onclick="openReschedule(${b.id}, '${safeName}', '${b.date}', '${timeHHMM}')"
+            class="flex-1 py-2 bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 text-[0.65rem] font-bold uppercase tracking-widest rounded transition-colors">🗓️ Reagendar</button>
+          <button onclick="cancelBooking(${b.id}, '${safeName}')"
+            class="flex-1 py-2 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-[0.65rem] font-bold uppercase tracking-widest rounded transition-colors">✕ Cancelar</button>
+        </div>` : ''}
+      </div>`;
+    }
+
+    window.cancelBooking = function(id, name) {
+      if (!confirm(`¿Cancelar la reserva de ${name}? El barbero quedará con ese horario libre.`)) return;
+      fetch(`/api/admin/bookings/${id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ status: 'cancelled' })
+      })
+      .then(r => r.json().then(d => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (ok && !d.error) loadBookings();
+        else alert(d.error || 'No se pudo cancelar la reserva.');
+      })
+      .catch(() => alert('Error de conexión.'));
+    };
+
+    window.openReschedule = function(id, name, date, timeHHMM) {
+      document.getElementById('r-id').value = id;
+      document.getElementById('r-client').textContent = name;
+      document.getElementById('r-current').textContent = `${date} a las ${formatTime12(timeHHMM)}`;
+      document.getElementById('r-date').value = date;
+      document.getElementById('r-time').value = timeHHMM;
+      const err = document.getElementById('r-error');
+      err.classList.add('hidden'); err.textContent = '';
+      document.getElementById('reschedule-modal').classList.remove('hidden');
+    };
+    window.closeReschedule = function() {
+      document.getElementById('reschedule-modal').classList.add('hidden');
+    };
+    window.submitReschedule = function() {
+      const id = document.getElementById('r-id').value;
+      const btn = document.getElementById('r-submit');
+      const errEl = document.getElementById('r-error');
+      const newDate = document.getElementById('r-date').value;
+      const newTime = document.getElementById('r-time').value;
+      errEl.classList.add('hidden');
+      if (!newDate || !newTime) {
+        errEl.textContent = 'Selecciona fecha y hora.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      fetch(`/api/admin/bookings/${id}/reschedule/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ date: newDate, time: newTime })
+      })
+      .then(r => r.json().then(d => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (ok && d.ok) {
+          closeReschedule();
+          loadBookings();
+        } else {
+          errEl.textContent = d.error || d.detail || 'No se pudo reagendar.';
+          errEl.classList.remove('hidden');
+        }
+      })
+      .catch(() => { errEl.textContent = 'Error de conexión.'; errEl.classList.remove('hidden'); })
+      .finally(() => { btn.disabled = false; btn.textContent = 'Confirmar'; });
+    };
+
+    // Init
+    document.getElementById('f-date-from').value = localToday();
+    loadBookings();
+  </script>
+</body>
+</html>

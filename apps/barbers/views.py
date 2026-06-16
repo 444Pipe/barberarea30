@@ -9,7 +9,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin, IsAdminOrAboveWithWriteBatman
@@ -607,9 +607,35 @@ def dashboard_barbero(request):
         status__in=['pending', 'confirmed']
     ).order_by('date', 'time')
 
+    profile = getattr(request.user, 'profile', None)
+    es_operativo = bool(profile and profile.role in ('operational_admin', 'superadmin'))
+
     return render(request, 'barberos/dashboard.html', {
         'barbero': barbero,
         'citas': citas,
+        'es_operativo': es_operativo,
+    })
+
+
+@login_required
+def reservas_generales(request):
+    """Apartado para el admin operativo (Frank): ver TODAS las reservas de todos
+    los barberos y poder cancelarlas o reagendarlas.
+
+    Reutiliza los endpoints existentes de /api/admin/bookings/ (que ya permiten al
+    operational_admin ver todo, cancelar y reagendar). Acceso solo para el admin
+    operativo o superadmin; cualquier otro barbero es redirigido a su agenda.
+    """
+    profile = getattr(request.user, 'profile', None)
+    if not (profile and profile.role in ('operational_admin', 'superadmin')):
+        return redirect('barbers_pages:dashboard_barbero')
+
+    barbero = getattr(request.user, 'barber_profile', None)
+    barbers = Barber.objects.all().order_by('display_name')
+
+    return render(request, 'barberos/reservas_generales.html', {
+        'barbero': barbero,
+        'barbers': barbers,
     })
 
 
