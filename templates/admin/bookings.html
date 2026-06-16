@@ -509,6 +509,12 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
                 data-time="${b.time}">
                 🗓️ Reagendar
               </button>
+              ${b.status !== 'cancelled' ? `
+              <button onclick="cancelBookingRow(${b.id}, '${(b.client_name||'').replace(/'/g, "\\'")}'); closeAllMenus();"
+                class="w-full text-left px-3 py-2 text-[0.65rem] text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
+                ✕ Cancelar reserva
+              </button>
+              ` : ''}
               ` : ''}
               <!-- Borrar -->
               ${userIsSuperAdmin ? `
@@ -554,6 +560,22 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       body: JSON.stringify({ status: newStatus })
     }).then(() => loadBookings());
   }
+
+  function cancelBookingRow(id, name) {
+    if (!confirm(`¿Cancelar la reserva de ${name}? El barbero quedará con ese horario libre.`)) return;
+    fetch(`/api/admin/bookings/${id}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body: JSON.stringify({ status: 'cancelled' })
+    })
+    .then(r => r.json().then(d => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (ok && !d.error) loadBookings();
+      else alert(d.error || 'No se pudo cancelar la reserva.');
+    })
+    .catch(() => alert('Error de conexión.'));
+  }
+  window.cancelBookingRow = cancelBookingRow;
 
   function exportCSV() {
     const params = new URLSearchParams();
