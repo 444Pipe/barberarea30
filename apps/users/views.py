@@ -142,6 +142,27 @@ def admin_bookings_view(request):
     return render(request, 'admin/bookings.html', context)
 
 
+@staff_required
+def admin_mis_reservas_view(request):
+    """Reservas Personales: reutiliza la página de reservas pero pre-filtrada al
+    perfil de barbero del usuario (Frank). Solo muestra sus propias citas."""
+    payment_methods = PaymentMethod.objects.filter(is_active=True)
+    profile = getattr(request.user, 'profile', None)
+    try:
+        my_barber_id = request.user.barber_profile.id
+    except Exception:
+        my_barber_id = 0  # sin perfil de barbero → no muestra ninguna reserva
+    context = {
+        'user_role': profile.role if profile else '',
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'mis_reservas',
+        'payment_methods': payment_methods,
+        'only_my_bookings': True,
+        'my_barber_id': my_barber_id,
+    }
+    return render(request, 'admin/bookings.html', context)
+
+
 @admin_required
 def admin_barbers_view(request):
     context = {

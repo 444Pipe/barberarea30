@@ -16,6 +16,7 @@ urlpatterns = [
     path('', views.admin_dashboard_view, name='admin_dashboard'),
     path('calendar/', views.admin_calendar_view, name='admin_calendar'),
     path('bookings/', views.admin_bookings_view, name='admin_bookings'),
+    path('mis-reservas/', views.admin_mis_reservas_view, name='admin_mis_reservas'),
     path('barbers/', views.admin_barbers_view, name='admin_barbers'),
     path('barbers/my-agenda/', views.admin_barber_agenda_view, name='admin_barber_agenda'),
     path('clients/', views.admin_clients_view, name='admin_clients'),
