@@ -892,13 +892,19 @@ def create_inventory_sale_view(request):
 @api_view(['GET'])
 @permission_classes([IsOperationalAdminOrAbove])
 def unpaid_commissions_view(request):
-    """GET /api/admin/cashflow/barber-payments/ - Obtiene el saldo pendiente por pagar a cada barbero."""
-    from apps.cashflow.models import Commission
+    """GET /api/admin/cashflow/barber-payments/ - Saldo pendiente por pagar a cada barbero.
+
+    Acumulado = comisiones + propinas (de ventas aprobadas, no pagadas).
+    A ese acumulado se le restan los vales/adelantos pendientes para obtener el
+    neto realmente liquidable.
+    """
+    from apps.cashflow.models import Commission, BarberAdvance
     from apps.barbers.models import Barber
     from django.db.models import Sum
-    
-    # Solo tomamos las comisiones de ventas que estén APROBADAS y no pagadas
-    # Excluimos a Frank porque su pago se automatiza en el cierre diario
+    from django.db.models.functions import TruncDate
+
+    # Comisiones aprobadas y no pagadas, agrupadas por barbero.
+    # Excluimos a Frank porque su pago se automatiza en el cierre diario.
     unpaid_commissions = Commission.objects.filter(
         is_paid=False,
         sale__approval_status='approved'
@@ -909,95 +915,236 @@ def unpaid_commissions_view(request):
         total_tips=Sum('tip_amount'),
         total_earnings=Sum('total_earnings')
     )
-    
-    barbers = Barber.objects.in_bulk()
-    
-    from django.db.models.functions import TruncDate
+    comm_by_barber = {c['barber_id']: c for c in unpaid_commissions}
+
+    # Vales/adelantos pendientes de descontar, agrupados por barbero.
+    unsettled_advances = BarberAdvance.objects.filter(
+        is_settled=False
+    ).exclude(
+        barber__display_name__icontains='frank'
+    ).values('barber_id').annotate(
+        total_advances=Sum('amount')
+    )
+    adv_by_barber = {a['barber_id']: a for a in unsettled_advances}
+
+    # Mostramos a cualquier barbero con comisiones pendientes O con vales pendientes.
+    barber_ids = set(comm_by_barber) | set(adv_by_barber)
+    barbers = Barber.objects.in_bulk(barber_ids)
 
     data = []
-    for item in unpaid_commissions:
-        barber = barbers.get(item['barber_id'])
-        if barber:
-            # Desglose por día
-            daily_breakdown = Commission.objects.filter(
-                barber_id=barber.id,
-                is_paid=False,
-                sale__approval_status='approved'
-            ).annotate(
-                date=TruncDate('created_at')
-            ).values('date').annotate(
-                daily_total=Sum('total_earnings'),
-                daily_commissions=Sum('commission_amount'),
-                daily_tips=Sum('tip_amount')
-            ).order_by('-date')
+    for barber_id in barber_ids:
+        barber = barbers.get(barber_id)
+        if not barber:
+            continue
 
-            history = []
-            for day in daily_breakdown:
-                if day['date']:
-                    history.append({
-                        'date': day['date'].strftime('%Y-%m-%d'),
-                        'total': float(day['daily_total'] or 0),
-                        'commissions': float(day['daily_commissions'] or 0),
-                        'tips': float(day['daily_tips'] or 0)
-                    })
+        comm = comm_by_barber.get(barber_id, {})
+        total_commissions = float(comm.get('total_commissions') or 0)
+        total_tips = float(comm.get('total_tips') or 0)
+        total_earnings = float(comm.get('total_earnings') or 0)
+        total_advances = float(adv_by_barber.get(barber_id, {}).get('total_advances') or 0)
+        net_payable = total_earnings - total_advances
 
-            data.append({
-                'barber_id': barber.id,
-                'barber_name': barber.display_name,
-                'total_commissions': float(item['total_commissions'] or 0),
-                'total_tips': float(item['total_tips'] or 0),
-                'total_earnings': float(item['total_earnings'] or 0),
-                'history': history
-            })
-            
+        # Desglose diario de las ganancias (comisiones + propinas).
+        daily_breakdown = Commission.objects.filter(
+            barber_id=barber_id,
+            is_paid=False,
+            sale__approval_status='approved'
+        ).annotate(
+            date=TruncDate('created_at')
+        ).values('date').annotate(
+            daily_total=Sum('total_earnings'),
+            daily_commissions=Sum('commission_amount'),
+            daily_tips=Sum('tip_amount')
+        ).order_by('-date')
+
+        history = []
+        for day in daily_breakdown:
+            if day['date']:
+                history.append({
+                    'date': day['date'].strftime('%Y-%m-%d'),
+                    'total': float(day['daily_total'] or 0),
+                    'commissions': float(day['daily_commissions'] or 0),
+                    'tips': float(day['daily_tips'] or 0)
+                })
+
+        # Vales/adelantos pendientes (el "historial de vales" que se descuenta).
+        advances_qs = BarberAdvance.objects.filter(
+            barber_id=barber_id, is_settled=False
+        ).select_related('created_by').order_by('-created_at')
+        advances = [{
+            'id': adv.id,
+            'amount': float(adv.amount),
+            'reason': adv.reason,
+            'date': adv.created_at.strftime('%Y-%m-%d'),
+            'by': (adv.created_by.get_full_name() or adv.created_by.username) if adv.created_by else '—',
+        } for adv in advances_qs]
+
+        data.append({
+            'barber_id': barber.id,
+            'barber_name': barber.display_name,
+            'total_commissions': total_commissions,
+            'total_tips': total_tips,
+            'total_earnings': total_earnings,
+            'total_advances': total_advances,
+            'net_payable': net_payable,
+            'history': history,
+            'advances': advances,
+        })
+
     # Ordenar por nombre
     data.sort(key=lambda x: x['barber_name'])
-    
+
     return Response({'payments': data})
+
 
 @api_view(['POST'])
 @permission_classes([IsOperationalAdminOrAbove])
-def pay_barber_view(request, barber_id):
-    """POST /api/admin/cashflow/barber-payments/<id>/pay/ - Marca como pagado el saldo acumulado de un barbero."""
-    from apps.cashflow.models import Commission
+def register_barber_advance_view(request, barber_id):
+    """POST /api/admin/cashflow/barber-payments/<id>/advance/ - Registra un vale/adelanto.
+
+    El barbero pide prestado parte de lo que ha hecho. El monto no puede superar el
+    saldo disponible (acumulado pendiente menos vales ya pendientes).
+    """
+    from apps.cashflow.models import Commission, BarberAdvance
     from apps.barbers.models import Barber
-    from django.utils import timezone
-    from django.db import transaction
-    
+    from django.db.models import Sum
+    from decimal import Decimal, InvalidOperation
+
     try:
         barber = Barber.objects.get(id=barber_id)
     except Barber.DoesNotExist:
         return Response({'error': 'Barbero no encontrado'}, status=404)
-        
+
+    raw_amount = request.data.get('amount')
+    reason = (request.data.get('reason') or '').strip()
+    try:
+        amount = Decimal(str(raw_amount)).quantize(Decimal('1'))
+    except (InvalidOperation, TypeError, ValueError):
+        return Response({'error': 'Monto inválido.'}, status=400)
+    if amount <= 0:
+        return Response({'error': 'El monto del vale debe ser mayor a cero.'}, status=400)
+
+    # Saldo disponible = comisiones+propinas no pagadas − vales pendientes.
+    earnings = Commission.objects.filter(
+        barber_id=barber_id, is_paid=False, sale__approval_status='approved'
+    ).aggregate(t=Sum('total_earnings'))['t'] or Decimal('0')
+    outstanding = BarberAdvance.objects.filter(
+        barber_id=barber_id, is_settled=False
+    ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
+    available = Decimal(earnings) - Decimal(outstanding)
+
+    if amount > available:
+        return Response({
+            'error': f'El vale (${amount:,.0f}) supera el saldo disponible del barbero (${available:,.0f}).'
+        }, status=400)
+
+    advance = BarberAdvance.objects.create(
+        barber=barber, amount=amount, reason=reason, created_by=request.user
+    )
+
+    log_audit(
+        user=request.user,
+        action='create',
+        obj=advance,
+        changes={'amount': float(amount)},
+        request=request,
+        extra_data={'msg': f"Registró un vale/adelanto de ${amount:,.0f} a {barber.display_name}" + (f" — {reason}" if reason else "")}
+    )
+
+    return Response({
+        'ok': True,
+        'message': f'Vale de ${amount:,.0f} registrado para {barber.display_name}.'
+    }, status=201)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsOperationalAdminOrAbove])
+def delete_barber_advance_view(request, advance_id):
+    """DELETE /api/admin/cashflow/barber-payments/advance/<id>/ - Anula un vale pendiente."""
+    from apps.cashflow.models import BarberAdvance
+
+    try:
+        advance = BarberAdvance.objects.select_related('barber').get(id=advance_id)
+    except BarberAdvance.DoesNotExist:
+        return Response({'error': 'Vale no encontrado.'}, status=404)
+
+    if advance.is_settled:
+        return Response({'error': 'No se puede anular un vale ya liquidado.'}, status=400)
+
+    barber_name = advance.barber.display_name if advance.barber else '?'
+    amount = float(advance.amount)
+    advance.delete()
+
+    log_audit(
+        user=request.user,
+        action='delete',
+        obj=None,
+        changes={},
+        request=request,
+        extra_data={'msg': f"Anuló un vale/adelanto de ${amount:,.0f} de {barber_name}"}
+    )
+    return Response({'ok': True, 'message': 'Vale anulado.'})
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def pay_barber_view(request, barber_id):
+    """POST /api/admin/cashflow/barber-payments/<id>/pay/ - Liquida el saldo de un barbero.
+
+    Marca como pagadas las comisiones pendientes y como liquidados los vales/adelantos
+    pendientes. El monto que recibe el barbero es el neto (acumulado − vales).
+    """
+    from apps.cashflow.models import Commission, BarberAdvance
+    from apps.barbers.models import Barber
+    from django.utils import timezone
+    from django.db import transaction
+    from django.db.models import Sum
+    from decimal import Decimal
+
+    try:
+        barber = Barber.objects.get(id=barber_id)
+    except Barber.DoesNotExist:
+        return Response({'error': 'Barbero no encontrado'}, status=404)
+
     with transaction.atomic():
         unpaid = Commission.objects.filter(
             barber_id=barber_id,
             is_paid=False,
             sale__approval_status='approved'
         )
-        
-        # Calcular totales antes de actualizar
-        from django.db.models import Sum
-        totals = unpaid.aggregate(total=Sum('total_earnings'))
-        total_amount = float(totals['total'] or 0)
-        
-        if total_amount == 0:
+        advances = BarberAdvance.objects.filter(barber_id=barber_id, is_settled=False)
+
+        earnings = Decimal(unpaid.aggregate(total=Sum('total_earnings'))['total'] or 0)
+        total_advances = Decimal(advances.aggregate(total=Sum('amount'))['total'] or 0)
+        net_amount = earnings - total_advances
+
+        if earnings == 0 and total_advances == 0:
             return Response({'error': 'El barbero no tiene saldo pendiente por pagar.'}, status=400)
-            
-        unpaid.update(is_paid=True, paid_at=timezone.now())
-        
+
+        if net_amount < 0:
+            return Response({
+                'error': f'Los vales pendientes (${total_advances:,.0f}) superan el acumulado (${earnings:,.0f}). Anula algún vale antes de liquidar.'
+            }, status=400)
+
+        now = timezone.now()
+        unpaid.update(is_paid=True, paid_at=now)
+        advances.update(is_settled=True, settled_at=now)
+
+        msg = f"Liquidó a {barber.display_name}: ${net_amount:,.0f} neto (acumulado ${earnings:,.0f}"
+        if total_advances > 0:
+            msg += f" − vales ${total_advances:,.0f}"
+        msg += ")"
         log_audit(
             user=request.user,
             action='update',
             obj=None,
             changes={'is_paid': True},
             request=request,
-            extra_data={'msg': f"Pagó a {barber.display_name} un total de ${total_amount:,.0f} (Comisiones y Propinas)"}
+            extra_data={'msg': msg}
         )
-        
+
     return Response({
         'ok': True,
-        'message': f'Pago de ${total_amount:,.0f} registrado para {barber.display_name}.'
+        'message': f'Liquidación de ${net_amount:,.0f} netos registrada para {barber.display_name} (acumulado ${earnings:,.0f}, vales ${total_advances:,.0f}).'
     })
 
 

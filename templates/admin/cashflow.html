@@ -487,6 +487,36 @@
   </div>
 </div>
 
+<!-- Modal: Vale / Adelanto a barbero -->
+<div id="cf-modal-advance" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeAdvanceModal()"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-amber-500/30 rounded-md shadow-2xl">
+      <div class="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white tracking-widest uppercase">Vale / Adelanto</h3>
+        <button onclick="closeAdvanceModal()" class="text-smoke/40 hover:text-white">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="text-xs text-smoke/70">Préstamo a <strong class="text-white" id="cf-advance-barber-name"></strong>. Se descuenta de su acumulado de la quincena.</div>
+        <div class="text-[0.7rem] text-smoke/50">Saldo disponible: <strong class="text-gold" id="cf-advance-available"></strong></div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Monto del vale</label>
+          <input type="number" id="cf-advance-amount" min="1" step="1000" placeholder="0" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-amber-400 outline-none">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Motivo (opcional)</label>
+          <input type="text" id="cf-advance-reason" maxlength="255" placeholder="Ej: adelanto personal" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-amber-400 outline-none">
+        </div>
+        <div id="cf-advance-error" class="hidden p-2 bg-red-500/20 border border-red-500/40 text-red-400 text-xs rounded"></div>
+      </div>
+      <div class="px-5 pb-4 flex gap-2 justify-end">
+        <button onclick="closeAdvanceModal()" class="px-4 py-2 text-xs uppercase tracking-widest text-smoke border border-white/10 rounded">Cancelar</button>
+        <button id="cf-btn-confirm-advance" onclick="submitAdvance()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-widest rounded">Registrar vale</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Detalle cierre histórico -->
 <div id="modal-close-detail" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('modal-close-detail').classList.add('hidden')"></div>
@@ -1064,6 +1094,8 @@ async function submitInventorySale() {
 }
 
 // ═══ PAGOS A BARBEROS ═══════════════════════════════════
+const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
 function fetchBarberPayments() {
   const container = document.getElementById('barber-payments-container');
   container.innerHTML = '<div class="cf-empty col-span-full">Cargando pagos...</div>';
@@ -1077,15 +1109,23 @@ function fetchBarberPayments() {
           </div>`;
         return;
       }
-      container.innerHTML = data.payments.map(p => `
+      container.innerHTML = data.payments.map(p => {
+        const hasAdvances = (p.total_advances || 0) > 0;
+        const safeName = (p.barber_name || '').replace(/'/g, "\\'");
+        return `
         <div class="bg-jet-card border border-gold/20 rounded-md p-4 flex flex-col">
           <div class="flex items-baseline justify-between mb-3">
-            <h3 class="text-white font-serif text-base">${p.barber_name}</h3>
-            <span class="text-gold font-bold text-base">${fmt(p.total_earnings)}</span>
+            <h3 class="text-white font-serif text-base">${escH(p.barber_name)}</h3>
+            <span class="text-gold font-bold text-base">${fmt(p.net_payable)}</span>
           </div>
           <div class="space-y-1 text-[0.7rem]">
             <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-white">${fmt(p.total_commissions)}</span></div>
             <div class="flex justify-between"><span class="text-smoke/50">Propinas</span><span class="text-emerald-400">+${fmt(p.total_tips)}</span></div>
+            <div class="flex justify-between border-t border-white/5 pt-1"><span class="text-smoke/50">Acumulado</span><span class="text-white">${fmt(p.total_earnings)}</span></div>
+            ${hasAdvances ? `
+            <div class="flex justify-between"><span class="text-amber-400/80">Vales / adelantos</span><span class="text-amber-400">-${fmt(p.total_advances)}</span></div>
+            <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-gold uppercase tracking-widest text-[0.6rem]">Neto a pagar</span><span class="text-gold">${fmt(p.net_payable)}</span></div>
+            ` : ''}
           </div>
           ${p.history && p.history.length > 0 ? `
             <details class="mt-2">
@@ -1095,19 +1135,42 @@ function fetchBarberPayments() {
               </div>
             </details>
           ` : ''}
-          <button onclick="payBarber(${p.barber_id}, '${(p.barber_name||'').replace(/'/g,"\\'")}', ${p.total_earnings})" class="mt-auto pt-3 w-full">
-            <span class="block py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-widest text-[0.7rem] uppercase rounded transition-colors">Marcar pagado</span>
-          </button>
+          ${hasAdvances ? `
+            <details class="mt-2" open>
+              <summary class="text-[0.6rem] text-amber-400/60 uppercase tracking-widest cursor-pointer hover:text-amber-400">Vales / adelantos (${p.advances.length})</summary>
+              <div class="mt-2 space-y-1 max-h-40 overflow-y-auto text-[0.65rem]">
+                ${p.advances.map(a => `
+                  <div class="flex justify-between items-center bg-amber-500/[0.06] border border-amber-500/20 p-1.5 rounded gap-2">
+                    <div class="min-w-0">
+                      <div class="text-amber-300 font-medium">${fmt(a.amount)}</div>
+                      <div class="text-smoke/40 text-[0.58rem] truncate">${a.date}${a.reason ? ' · ' + escH(a.reason) : ''} · ${escH(a.by)}</div>
+                    </div>
+                    <button onclick="deleteAdvance(${a.id})" class="text-red-400/60 hover:text-red-400 shrink-0 px-1 text-sm leading-none" title="Anular vale">✕</button>
+                  </div>
+                `).join('')}
+              </div>
+            </details>
+          ` : ''}
+          <div class="mt-auto pt-3 flex gap-2">
+            <button onclick="openAdvanceModal(${p.barber_id}, '${safeName}', ${p.net_payable})"
+              class="flex-1 py-2 bg-amber-600/15 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 font-bold tracking-widest text-[0.65rem] uppercase rounded transition-colors">
+              Dar vale
+            </button>
+            <button onclick="payBarber(${p.barber_id}, '${safeName}', ${p.net_payable})"
+              class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-widest text-[0.65rem] uppercase rounded transition-colors">
+              Marcar pagado
+            </button>
+          </div>
         </div>
-      `).join('');
+      `;}).join('');
     })
     .catch(() => {
       container.innerHTML = '<div class="cf-empty col-span-full text-red-400">Error al cargar pagos.</div>';
     });
 }
 window.fetchBarberPayments = fetchBarberPayments;
-window.payBarber = function(barberId, barberName, amount) {
-  if (!confirm(`Marcar como PAGADO ${fmt(amount)} a ${barberName}?`)) return;
+window.payBarber = function(barberId, barberName, netAmount) {
+  if (!confirm(`Liquidar ${fmt(netAmount)} (neto, ya descontados los vales) a ${barberName}?`)) return;
   fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': CSRF }
@@ -1120,6 +1183,68 @@ window.payBarber = function(barberId, barberName, amount) {
     } else {
       alert(data.error || 'Error.');
     }
+  })
+  .catch(() => alert('Error de conexión.'));
+};
+
+// ═══ VALES / ADELANTOS A BARBEROS ═══════════════════════
+let cfAdvanceBarberId = null;
+window.openAdvanceModal = function(barberId, barberName, available) {
+  cfAdvanceBarberId = barberId;
+  document.getElementById('cf-advance-barber-name').textContent = barberName;
+  document.getElementById('cf-advance-available').textContent = fmt(available);
+  document.getElementById('cf-advance-amount').value = '';
+  document.getElementById('cf-advance-reason').value = '';
+  const err = document.getElementById('cf-advance-error');
+  err.classList.add('hidden'); err.textContent = '';
+  document.getElementById('cf-modal-advance').classList.remove('hidden');
+  setTimeout(() => document.getElementById('cf-advance-amount').focus(), 50);
+};
+window.closeAdvanceModal = function() {
+  document.getElementById('cf-modal-advance').classList.add('hidden');
+  cfAdvanceBarberId = null;
+};
+window.submitAdvance = function() {
+  if (!cfAdvanceBarberId) return;
+  const amount = parseInt(document.getElementById('cf-advance-amount').value, 10);
+  const reason = document.getElementById('cf-advance-reason').value.trim();
+  const errEl = document.getElementById('cf-advance-error');
+  const btn = document.getElementById('cf-btn-confirm-advance');
+  errEl.classList.add('hidden');
+  if (!amount || amount <= 0) {
+    errEl.textContent = 'Ingresa un monto válido.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Registrando...';
+  fetch(`/api/admin/cashflow/barber-payments/${cfAdvanceBarberId}/advance/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ amount, reason })
+  })
+  .then(r => r.json().then(d => ({ ok: r.ok, d })))
+  .then(({ ok, d }) => {
+    if (ok && d.ok) {
+      closeAdvanceModal();
+      fetchBarberPayments();
+    } else {
+      errEl.textContent = d.error || 'No se pudo registrar el vale.';
+      errEl.classList.remove('hidden');
+    }
+  })
+  .catch(() => { errEl.textContent = 'Error de conexión.'; errEl.classList.remove('hidden'); })
+  .finally(() => { btn.disabled = false; btn.textContent = 'Registrar vale'; });
+};
+window.deleteAdvance = function(advanceId) {
+  if (!confirm('¿Anular este vale/adelanto? El monto se devuelve al acumulado del barbero.')) return;
+  fetch(`/api/admin/cashflow/barber-payments/advance/${advanceId}/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': CSRF }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) { fetchBarberPayments(); }
+    else { alert(data.error || 'No se pudo anular el vale.'); }
   })
   .catch(() => alert('Error de conexión.'));
 };

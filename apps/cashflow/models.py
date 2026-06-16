@@ -161,6 +161,43 @@ class Commission(models.Model):
         super().save(*args, **kwargs)
 
 
+class BarberAdvance(models.Model):
+    """Adelanto / vale de préstamo a un barbero contra sus ganancias acumuladas.
+
+    Cuando un barbero pide prestado parte de lo que ha hecho en la quincena, se
+    registra aquí como un "vale". El monto se descuenta del acumulado pendiente
+    al momento de liquidar (marcar pagado). Mientras no haya saldo a favor que
+    cubra los vales, estos quedan pendientes (`is_settled=False`) y la deuda se
+    arrastra automáticamente a la siguiente liquidación.
+    """
+    barber = models.ForeignKey(
+        'barbers.Barber', on_delete=models.CASCADE, related_name='advances'
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=0)
+    reason = models.CharField(
+        max_length=255, blank=True, help_text='Motivo del préstamo / vale'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='barber_advances_given'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Liquidación: se marca cuando el vale ya fue descontado en un pago.
+    is_settled = models.BooleanField(
+        default=False, help_text='¿Ya fue descontado en una liquidación al barbero?'
+    )
+    settled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Adelanto / Vale de Barbero'
+        verbose_name_plural = 'Adelantos / Vales de Barberos'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        name = self.barber.display_name if self.barber else '?'
+        return f'Vale ${self.amount:,.0f} — {name}'
+
+
 class InventorySale(models.Model):
     """Venta directa de un producto de inventario (Ej. Bebidas)."""
     item = models.ForeignKey(

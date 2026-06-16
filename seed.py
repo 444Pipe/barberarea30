@@ -216,6 +216,19 @@ except Exception:
     except Exception as e:
         print("⚠ No se pudieron crear las columnas de ROI manualmente:", e)
 
+# --- Autocuración para la tabla cashflow_barberadvance (vales/adelantos) ---
+from apps.cashflow.models import BarberAdvance as _BarberAdvance
+try:
+    _BarberAdvance.objects.exists()
+except Exception:
+    print("⚠ Tabla 'cashflow_barberadvance' no encontrada. Intentando crearla...")
+    try:
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(_BarberAdvance)
+        print("✓ Tabla de BarberAdvance creada limpiamente vía Schema Editor")
+    except Exception as e:
+        print("⚠ No se pudo crear la tabla de BarberAdvance manualmente:", e)
+
 from apps.cashflow.models import PaymentMethod
 
 pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 'Efectivo', 'is_active': True, 'requires_reference': False})
