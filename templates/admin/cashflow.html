@@ -1151,13 +1151,13 @@ function fetchBarberPayments() {
               </div>
             </details>
           ` : ''}
-          <div class="mt-auto pt-3 flex gap-2">
+          <div class="mt-auto pt-3 flex flex-wrap gap-2">
             <button onclick="openAdvanceModal(${p.barber_id}, '${safeName}', ${p.net_payable})"
-              class="flex-1 py-2 bg-amber-600/15 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 font-bold tracking-widest text-[0.65rem] uppercase rounded transition-colors">
+              class="flex-1 min-w-[7rem] py-2 bg-amber-600/15 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 font-bold tracking-wider text-[0.65rem] uppercase rounded transition-colors whitespace-nowrap">
               Dar vale
             </button>
             <button onclick="payBarber(${p.barber_id}, '${safeName}', ${p.net_payable})"
-              class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-widest text-[0.65rem] uppercase rounded transition-colors">
+              class="flex-1 min-w-[7rem] py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-wider text-[0.65rem] uppercase rounded transition-colors whitespace-nowrap">
               Marcar pagado
             </button>
           </div>
