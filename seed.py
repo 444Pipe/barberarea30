@@ -229,6 +229,23 @@ except Exception:
     except Exception as e:
         print("⚠ No se pudo crear la tabla de BarberAdvance manualmente:", e)
 
+# --- Normalizar duración de las citas ACTIVAS de Frank a 2h (regla de negocio) ---
+# Frank ocupa siempre 2h; citas antiguas pudieron quedar con 30/60 min y eso
+# permitía agendar otra cita pegada. Se corrige de forma idempotente.
+try:
+    from apps.bookings.models import Booking as _Bk
+    from apps.barbers.models import Barber as _Barber
+    _frank_ids = list(_Barber.objects.filter(display_name__icontains='frank').values_list('id', flat=True))
+    if _frank_ids:
+        _fixed = _Bk.objects.filter(
+            barber_id__in=_frank_ids,
+            status__in=['pending', 'confirmed'],
+        ).exclude(duration_minutes=120).update(duration_minutes=120)
+        if _fixed:
+            print(f"✓ Normalizadas {_fixed} citas activas de Frank a 120 min")
+except Exception as _e:
+    print("⚠ No se pudo normalizar la duración de citas de Frank:", _e)
+
 from apps.cashflow.models import PaymentMethod
 
 pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 'Efectivo', 'is_active': True, 'requires_reference': False})

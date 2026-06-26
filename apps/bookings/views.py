@@ -132,7 +132,7 @@ def create_booking_view(request):
                     barber=b, date=date_val, status__in=['pending', 'confirmed']
                 ).values_list('time', 'duration_minutes'):
                     bk_start = _dt.combine(req_d, bk_time)
-                    bk_end = bk_start + timedelta(minutes=bk_duration or 60)
+                    bk_end = bk_start + timedelta(minutes=b.occupied_minutes(bk_duration))
                     if req_start < bk_end and req_end > bk_start:
                         conflicts = True
                         break
@@ -253,8 +253,8 @@ def create_booking_view(request):
         duplicate = False
         for bk_time, bk_duration in existing_bookings:
             bk_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), bk_time)
-            bk_end = bk_start + timedelta(minutes=bk_duration or 60)
-            
+            bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk_duration))
+
             if req_start < bk_end and req_end > bk_start:
                 duplicate = True
                 break
@@ -626,7 +626,8 @@ def admin_reschedule_booking_view(request, booking_id):
             raise ValueError(f'Hora inválida: {new_time}')
         req_date = _dt.strptime(new_date, '%Y-%m-%d').date()
         req_start = _dt.combine(req_date, req_time)
-        req_end = req_start + timedelta(minutes=booking.duration_minutes or 60)
+        _req_dur = booking.barber.occupied_minutes(booking.duration_minutes) if booking.barber else (booking.duration_minutes or 60)
+        req_end = req_start + timedelta(minutes=_req_dur)
     except (ValueError, TypeError) as e:
         return Response({'error': f'Formato de fecha u hora inválido: {e}'}, status=400)
 
@@ -689,7 +690,7 @@ def admin_reschedule_booking_view(request, booking_id):
             bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
 
             bk_start = _dt.combine(bk_d, bk_t)
-            bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+            bk_end = bk_start + timedelta(minutes=booking.barber.occupied_minutes(bk.duration_minutes))
             if req_start < bk_end and req_end > bk_start:
                 return Response({
                     'ok': False,

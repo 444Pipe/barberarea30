@@ -116,7 +116,7 @@ def barber_availability_view(request, barber_id):
     booked_ranges = []
     for bk_time, bk_duration in booked:
         bk_start = datetime.combine(target_date, bk_time)
-        bk_end = bk_start + timedelta(minutes=bk_duration or SLOT_SIZE)
+        bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk_duration))
         booked_ranges.append((bk_start, bk_end))
 
     # Get barber-specific unavailability blocks for this date
@@ -340,7 +340,7 @@ def barber_unavailability_list(request, barber_id):
         barber=barber, date=d, status__in=['pending', 'confirmed']
     ).select_related('service'):
         bk_start = datetime.combine(d, bk.time)
-        bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+        bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk.duration_minutes))
         if block_start_dt < bk_end and block_end_dt > bk_start:
             conflicting.append(bk)
 
@@ -482,7 +482,7 @@ def barber_unavailability_bulk_create(request, barber_id):
             barber=barber, date=cur, status__in=['pending', 'confirmed']
         ):
             bk_start = datetime.combine(cur, bk.time)
-            bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+            bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk.duration_minutes))
             if block_start_dt < bk_end and block_end_dt > bk_start:
                 day_conflicts.append(bk)
 

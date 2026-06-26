@@ -85,6 +85,19 @@ class Barber(models.Model):
             return 60
         return service.duration_minutes or 60
 
+    def occupied_minutes(self, stored_duration_minutes):
+        """Minutos que realmente ocupa una cita de ESTE barbero al detectar
+        solapamientos.
+
+        Frank ocupa 2h aunque la reserva se haya guardado con otra duración
+        (datos antiguos o creados por flujos que no aplicaron la regla). Esto
+        hace que la detección de cruces sea correcta sin depender del valor
+        guardado en `duration_minutes`.
+        """
+        if self.is_frank:
+            return 120
+        return stored_duration_minutes or 60
+
 
 class BarberUnavailability(models.Model):
     """Bloqueo temporal de un barbero en una fecha y rango de hora."""

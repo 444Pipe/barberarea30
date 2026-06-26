@@ -54,7 +54,11 @@ def check_booking_conflict(
     except ValueError as exc:
         return str(exc)
 
-    dur = int(duration_minutes or 60)
+    # Frank ocupa 2h reales aunque se pida con otra duración.
+    if barber is not None:
+        dur = barber.occupied_minutes(duration_minutes)
+    else:
+        dur = int(duration_minutes or 60)
     req_start = datetime.combine(d, t)
     req_end = req_start + timedelta(minutes=dur)
 
@@ -106,7 +110,7 @@ def check_booking_conflict(
             qs = qs.exclude(pk=exclude_booking_id)
         for bk_time, bk_duration in qs.values_list('time', 'duration_minutes'):
             bk_start = datetime.combine(d, bk_time)
-            bk_end = bk_start + timedelta(minutes=bk_duration or 60)
+            bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk_duration))
             if req_start < bk_end and req_end > bk_start:
                 name = getattr(barber, 'display_name', None) or 'El barbero'
                 return (

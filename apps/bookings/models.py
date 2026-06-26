@@ -68,8 +68,8 @@ class Booking(models.Model):
         if self.barber and self.date and self.time:
             from datetime import datetime, timedelta
             req_start = datetime.combine(self.date, self.time)
-            req_end = req_start + timedelta(minutes=self.duration_minutes or 60)
-            
+            req_end = req_start + timedelta(minutes=self.barber.occupied_minutes(self.duration_minutes))
+
             conflict_qs = Booking.objects.filter(
                 barber=self.barber,
                 date=self.date,
@@ -77,11 +77,11 @@ class Booking(models.Model):
             )
             if self.pk:  # Excluir la propia instancia en caso de edición
                 conflict_qs = conflict_qs.exclude(pk=self.pk)
-            
+
             has_conflict = False
             for bk in conflict_qs:
                 bk_start = datetime.combine(bk.date, bk.time)
-                bk_end = bk_start + timedelta(minutes=bk.duration_minutes or 60)
+                bk_end = bk_start + timedelta(minutes=self.barber.occupied_minutes(bk.duration_minutes))
                 if req_start < bk_end and req_end > bk_start:
                     has_conflict = True
                     break
