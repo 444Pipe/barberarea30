@@ -62,6 +62,10 @@ def create_booking_view(request):
     data = request.data
     
     is_walk_in = str(data.get('is_walk_in', '')).lower() == 'true'
+    # En walk-in (presencial) el barbero/admin puede forzar el agendamiento sobre
+    # su propio bloqueo de inactividad, con confirmación previa (force=true).
+    force = str(data.get('force', '')).lower() == 'true'
+    override_block_note = None
     if is_walk_in:
         data['client_name'] = data.get('client_name') or 'Cliente General'
         data['privacy_accepted'] = True  # Admin creating walk-ins overrides this
@@ -189,14 +193,24 @@ def create_booking_view(request):
                     u_s = _dt.combine(req_d, u_start)
                     u_e = _dt.combine(req_d, u_end)
                     if u_s < req_e and u_e > req_s:
+                        warning_msg = (
+                            f'{barber.display_name} está bloqueado de '
+                            f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
+                            f'el {date_val}. La reserva ({time_val} – '
+                            f'{req_e.strftime("%I:%M %p")}) se cruza con ese bloqueo.'
+                        )
+                        # Walk-in: el barbero/admin puede forzar sobre su bloqueo.
+                        if is_walk_in and force:
+                            override_block_note = warning_msg
+                            break
+                        if is_walk_in:
+                            return Response({
+                                'ok': False,
+                                'requires_override': True,
+                                'warning': warning_msg + ' ¿Deseas agendarlo de todos modos?',
+                            }, status=409)
                         return Response({
-                            'error': (
-                                f'{barber.display_name} está bloqueado de '
-                                f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
-                                f'el {date_val}. Tu reserva ({time_val} – '
-                                f'{req_e.strftime("%I:%M %p")}) se cruza con ese bloqueo. '
-                                f'Por favor elige otra hora.'
-                            )
+                            'error': warning_msg + ' Por favor elige otra hora.',
                         }, status=409)
         except Barber.DoesNotExist:
             return Response({'error': 'Barbero no disponible'}, status=400)
@@ -285,6 +299,12 @@ def create_booking_view(request):
             price=data.get('price', service.price),
             duration_minutes=effective_duration,
         )
+
+        # Si se agendó forzando sobre un bloqueo de inactividad, dejar constancia.
+        if override_block_note:
+            extra = '⚠ Agendado manualmente sobre un bloqueo de inactividad del barbero.'
+            booking.notes = f'{booking.notes}\n{extra}'.strip() if booking.notes else extra
+            booking.save(update_fields=['notes'])
 
         import threading
         def send_emails_async():

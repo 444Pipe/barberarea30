@@ -884,7 +884,13 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
 
   function submitWalkin(e) {
     e.preventDefault();
-    const btn = e.target.querySelector('[type="submit"]');
+    doWalkin(false);
+  }
+
+  function doWalkin(force) {
+    const form = document.getElementById('walkin-form');
+    const btn = form.querySelector('[type="submit"]');
+    const resetBtn = () => { btn.disabled = false; btn.textContent = 'Agendar'; };
     btn.disabled = true;
     btn.textContent = 'Agendando...';
 
@@ -902,7 +908,8 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       time: document.getElementById('walkin-time').value,
       price: servicePrice,
       is_walk_in: true,
-      privacy_accepted: true
+      privacy_accepted: true,
+      force: !!force
     };
 
     fetch('/api/bookings/', {
@@ -912,18 +919,24 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     })
       .then(res => res.json().then(data => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
-        if (!ok) {
-          alert('Error: ' + (data.error || JSON.stringify(data.errors) || 'Error al agendar'));
-        } else {
+        if (ok) {
           closeWalkinModal();
           loadBookings();
+          return;
         }
+        // El barbero está bloqueado en ese rango → permitir forzar con confirmación.
+        if (data.requires_override) {
+          if (confirm(data.warning || 'El barbero está bloqueado en este rango. ¿Agendar de todos modos?')) {
+            doWalkin(true);
+            return;
+          }
+          resetBtn();
+          return;
+        }
+        alert('Error: ' + (data.error || JSON.stringify(data.errors) || 'Error al agendar'));
+        resetBtn();
       })
-      .catch(err => alert('Error: ' + err))
-      .finally(() => {
-        btn.disabled = false;
-        btn.textContent = 'Agendar';
-      });
+      .catch(err => { alert('Error: ' + err); resetBtn(); });
   }
 
 
