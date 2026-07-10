@@ -296,7 +296,7 @@ def create_booking_view(request):
         booking = serializer.save(
             barber=barber,
             service=service,
-            price=data.get('price', service.price),
+            price=service.price,
             duration_minutes=effective_duration,
         )
 
@@ -340,13 +340,23 @@ def create_booking_view(request):
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
-def cancel_booking_view(request, booking_id):
-    """POST /api/bookings/{id}/cancel/ - Endpoint público para cancelar cita si faltan > 2 horas."""
+def cancel_booking_view(request, signed_id):
+    """POST /api/bookings/{token}/cancel/ - Cancela una cita si faltan > 2 horas.
+
+    El identificador debe venir firmado (Signer) para impedir que se adivinen
+    IDs secuenciales y se cancelen reservas ajenas.
+    """
+    signer = Signer()
+    try:
+        booking_id = signer.unsign(signed_id)
+    except BadSignature:
+        return Response({'error': 'Enlace inválido o caducado.'}, status=404)
+
     try:
         booking = Booking.objects.get(pk=booking_id)
     except Booking.DoesNotExist:
         return Response({'error': 'Reserva no encontrada'}, status=404)
-        
+
     if not booking.can_cancel:
         return Response({'error': 'No se puede cancelar la cita con menos de 2 horas de anticipación.'}, status=400)
         
@@ -359,10 +369,20 @@ def cancel_booking_view(request, booking_id):
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
-def add_review_view(request, booking_id):
-    """POST /api/bookings/{id}/review/ - Envia calificación de 1 a 5 para barbero y local."""
+def add_review_view(request, signed_id):
+    """POST /api/bookings/{token}/review/ - Envia calificación de 1 a 5 para barbero y local.
+
+    El identificador debe venir firmado (Signer) para impedir que se inyecten
+    reseñas en reservas ajenas iterando IDs secuenciales.
+    """
     from .models import Review
     from django.db.models import Avg
+
+    signer = Signer()
+    try:
+        booking_id = signer.unsign(signed_id)
+    except BadSignature:
+        return Response({'error': 'Enlace inválido o caducado.'}, status=404)
 
     try:
         booking = Booking.objects.get(pk=booking_id)
@@ -375,8 +395,14 @@ def add_review_view(request, booking_id):
     if hasattr(booking, 'review'):
         return Response({'error': 'Esta reserva ya tiene una calificación.'}, status=400)
 
-    barber_rating = int(request.data.get('barber_rating', 5))
-    shop_rating = int(request.data.get('shop_rating', 5))
+    def _clamp_rating(value, default=5):
+        try:
+            return max(1, min(5, int(value)))
+        except (TypeError, ValueError):
+            return default
+
+    barber_rating = _clamp_rating(request.data.get('barber_rating', 5))
+    shop_rating = _clamp_rating(request.data.get('shop_rating', 5))
     comment = request.data.get('comment', '')
 
     review = Review.objects.create(

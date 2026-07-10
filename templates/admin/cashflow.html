@@ -799,8 +799,8 @@ function renderRow(it) {
         <div><span class="lbl">Propina</span><span class="val">${r.tip_amount > 0 ? '+'+fmt(r.tip_amount) : '$0'}</span></div>
         <div><span class="lbl">Final cobrado</span><span class="val">${fmt(r.final_price + r.tip_amount)}</span></div>
         <div><span class="lbl">Comisión ${r.commission_percentage ? r.commission_percentage+'%' : ''}</span><span class="val text-red-400">-${fmt(r.commission_amount)}</span></div>
-        <div><span class="lbl">Método</span><span class="val">${r.payment_method}</span></div>
-        <div><span class="lbl">Confirmó</span><span class="val">${r.approved_by}</span></div>
+        <div><span class="lbl">Método</span><span class="val">${escH(r.payment_method)}</span></div>
+        <div><span class="lbl">Confirmó</span><span class="val">${escH(r.approved_by)}</span></div>
       </div>
       <div class="cf-row-actions">
         <button onclick="cfOpenEditPaymentModal(${r.id}, 'service', '${(r.payment_method||'').replace(/'/g,"\\'")}')" class="cf-cta-secondary text-[0.65rem]">Cambiar método</button>
@@ -810,8 +810,8 @@ function renderRow(it) {
     const r = it.raw;
     detail = `
       <div class="cf-detail-grid">
-        <div><span class="lbl">Método</span><span class="val">${r.payment_method}</span></div>
-        <div><span class="lbl">Vendido por</span><span class="val">${r.approved_by}</span></div>
+        <div><span class="lbl">Método</span><span class="val">${escH(r.payment_method)}</span></div>
+        <div><span class="lbl">Vendido por</span><span class="val">${escH(r.approved_by)}</span></div>
       </div>
       <div class="cf-row-actions">
         <button onclick="cfOpenEditPaymentModal(${r.id}, 'inventory', '${(r.payment_method||'').replace(/'/g,"\\'")}')" class="cf-cta-secondary text-[0.65rem]">Cambiar método</button>
@@ -825,22 +825,22 @@ function renderRow(it) {
         <div><span class="lbl">Porcentaje</span><span class="val">${r.commission_percentage || '—'}%</span></div>
         <div><span class="lbl">Comisión</span><span class="val text-red-400">-${fmt(r.commission_amount)}</span></div>
         <div><span class="lbl">Propina (100%)</span><span class="val text-emerald-400">+${fmt(r.tip_amount)}</span></div>
-        <div><span class="lbl">Venta de</span><span class="val">${r.client_name}</span></div>
-        <div><span class="lbl">Servicio</span><span class="val">${r.service_name}</span></div>
+        <div><span class="lbl">Venta de</span><span class="val">${escH(r.client_name)}</span></div>
+        <div><span class="lbl">Servicio</span><span class="val">${escH(r.service_name)}</span></div>
       </div>
     `;
   } else if (it.kind === 'expense') {
     detail = `
       <div class="cf-detail-grid">
-        <div><span class="lbl">Categoría</span><span class="val">${it.subtitle}</span></div>
+        <div><span class="lbl">Categoría</span><span class="val">${escH(it.subtitle)}</span></div>
       </div>
     `;
   } else if (it.kind === 'pending') {
     const r = it.raw;
     detail = `
       <div class="cf-detail-grid">
-        <div><span class="lbl">Servicio</span><span class="val">${r.service_name}</span></div>
-        <div><span class="lbl">Cliente</span><span class="val">${r.client_name}</span></div>
+        <div><span class="lbl">Servicio</span><span class="val">${escH(r.service_name)}</span></div>
+        <div><span class="lbl">Cliente</span><span class="val">${escH(r.client_name)}</span></div>
         <div><span class="lbl">Final</span><span class="val">${fmt(r.final_price)}</span></div>
         <div><span class="lbl">Propina</span><span class="val">${r.tip_amount > 0 ? '+'+fmt(r.tip_amount) : '$0'}</span></div>
       </div>
@@ -857,9 +857,9 @@ function renderRow(it) {
     <div class="cf-row" data-kind="${it.kind}">
       <div class="cf-row-top">
         <div class="cf-row-left">
-          <div class="cf-row-time">${it.time}</div>
-          <div class="cf-row-title">${badge}${it.title}</div>
-          <div class="cf-row-sub">${it.subtitle}</div>
+          <div class="cf-row-time">${escH(it.time)}</div>
+          <div class="cf-row-title">${badge}${escH(it.title)}</div>
+          <div class="cf-row-sub">${escH(it.subtitle)}</div>
         </div>
         <div>
           <div class="cf-row-amount ${amountClass}">${sign}${fmt(it.amount)}</div>

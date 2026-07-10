@@ -66,14 +66,14 @@ function loadClients() {
       const tbody = document.getElementById('clients-table');
       tbody.innerHTML = clients.map(c => `
         <tr class="hover:bg-white/[0.02]">
-          <td class="px-4 py-3 text-white font-medium">${c.name}</td>
-          <td class="px-4 py-3 text-smoke/60">${c.phone}</td>
-          <td class="px-4 py-3 text-smoke/80">${c.total_visits}</td>
+          <td class="px-4 py-3 text-white font-medium">${esc(c.name)}</td>
+          <td class="px-4 py-3 text-smoke/60">${esc(c.phone)}</td>
+          <td class="px-4 py-3 text-smoke/80">${esc(c.total_visits)}</td>
           <td class="px-4 py-3 text-emerald-400 font-medium">$${(c.total_spent||0).toLocaleString('es-CO')}</td>
-          <td class="px-4 py-3 text-smoke/60">${c.last_visit}</td>
-          <td class="px-4 py-3 text-gold">${c.preferred_barber}</td>
+          <td class="px-4 py-3 text-smoke/60">${esc(c.last_visit)}</td>
+          <td class="px-4 py-3 text-gold">${esc(c.preferred_barber)}</td>
           <td class="px-4 py-3">
-            <button onclick="viewHistory('${c.phone}')" class="text-[0.65rem] text-smoke/50 hover:text-gold tracking-wider uppercase transition-colors">Ver historial</button>
+            <button data-phone="${esc(c.phone)}" onclick="viewHistory(this.dataset.phone)" class="text-[0.65rem] text-smoke/50 hover:text-gold tracking-wider uppercase transition-colors">Ver historial</button>
           </td>
         </tr>
       `).join('');
@@ -87,13 +87,13 @@ function viewHistory(phone) {
       document.getElementById('client-modal-name').textContent = data.name;
       const container = document.getElementById('client-history');
       container.innerHTML = `
-        <div class="text-xs text-smoke/40 mb-2">${data.phone} · ${data.total_visits} visitas</div>
+        <div class="text-xs text-smoke/40 mb-2">${esc(data.phone)} · ${esc(data.total_visits)} visitas</div>
         ${data.history.map(h => `
           <div class="flex items-center justify-between py-2 border-b border-white/5 text-xs">
             <div>
-              <span class="text-white">${h.date}</span>
-              <span class="text-smoke/40 ml-2">${h.time}</span>
-              <span class="text-smoke/60 ml-2">${h.service}</span>
+              <span class="text-white">${esc(h.date)}</span>
+              <span class="text-smoke/40 ml-2">${esc(h.time)}</span>
+              <span class="text-smoke/60 ml-2">${esc(h.service)}</span>
             </div>
             <span class="text-emerald-400">$${(h.price||0).toLocaleString('es-CO')}</span>
           </div>

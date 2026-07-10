@@ -223,8 +223,6 @@ textarea:focus {
 .social-item:hover::after {
   opacity: 1;
 }
-<<<<<<< HEAD
-=======
 
 /* Ajustes responsive para móvil */
 @media (max-width: 640px) {
@@ -253,4 +251,3 @@ textarea:focus {
     display: none;
   }
 }
->>>>>>> 33d633d7e30239bdfeb32aca0e3c8201c45d5fc6

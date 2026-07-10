@@ -1195,15 +1195,21 @@
           return;
         }
 
+        // Escapa datos provenientes del cliente (nombre/comentario) antes de
+        // inyectarlos como HTML para evitar XSS almacenado.
+        const esc = (s) => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
         track.style.display = 'grid';
         track.innerHTML = reviews.map((r, i) => {
           const stars = Array.from({ length: 5 }, (_, idx) =>
             `<svg class="w-4 h-4 ${idx < r.barber_rating ? 'text-gold' : 'text-white/10'}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`
           ).join('');
 
-          const initial = r.client_name ? r.client_name.charAt(0).toUpperCase() : '?';
+          const initial = r.client_name ? esc(r.client_name.charAt(0).toUpperCase()) : '?';
           const commentHtml = r.comment
-            ? `<p class="text-smoke/60 text-sm font-light leading-relaxed italic flex-1">"${r.comment}"</p>`
+            ? `<p class="text-smoke/60 text-sm font-light leading-relaxed italic flex-1">"${esc(r.comment)}"</p>`
             : `<p class="text-smoke/25 text-xs italic flex-1">Sin comentario adicional.</p>`;
 
           return `
@@ -1214,10 +1220,10 @@
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center text-gold font-bold text-sm flex-shrink-0">${initial}</div>
                 <div class="min-w-0">
-                  <p class="text-white text-sm font-semibold truncate">${r.client_name}</p>
-                  <p class="text-smoke/30 text-[0.65rem] truncate">${r.service_name || ''}${r.barber_name ? ' &bull; <span class=\'text-gold/50\'>' + r.barber_name + '</span>' : ''}</p>
+                  <p class="text-white text-sm font-semibold truncate">${esc(r.client_name)}</p>
+                  <p class="text-smoke/30 text-[0.65rem] truncate">${esc(r.service_name || '')}${r.barber_name ? ' &bull; <span class=\'text-gold/50\'>' + esc(r.barber_name) + '</span>' : ''}</p>
                 </div>
-                <span class="ml-auto text-smoke/20 text-[0.6rem] flex-shrink-0">${r.date}</span>
+                <span class="ml-auto text-smoke/20 text-[0.6rem] flex-shrink-0">${esc(r.date)}</span>
               </div>
             </div>`;
         }).join('');

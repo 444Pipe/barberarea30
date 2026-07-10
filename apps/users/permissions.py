@@ -1,5 +1,5 @@
 """Role-based permissions for DRF views."""
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
 class IsSuperAdmin(BasePermission):
@@ -9,6 +9,22 @@ class IsSuperAdmin(BasePermission):
             return False
         profile = getattr(request.user, 'profile', None)
         return profile and profile.is_superadmin
+
+
+class IsSuperAdminOrReadOnly(BasePermission):
+    """Lectura pública; escritura (POST/PUT/PATCH/DELETE) solo para superadmin.
+
+    Para endpoints como el catálogo de servicios: cualquiera puede leer los
+    precios, pero solo un superadmin puede crearlos/modificarlos/borrarlos
+    (regla de negocio `can_modify_prices`).
+    """
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        if not request.user.is_authenticated:
+            return False
+        profile = getattr(request.user, 'profile', None)
+        return bool(profile and profile.is_superadmin)
 
 
 class IsBatmanOrSuperadmin(BasePermission):

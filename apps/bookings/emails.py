@@ -67,9 +67,10 @@ def send_post_sale_survey_email(booking):
     """Sends a post-sale survey email to the client after the appointment is complete."""
     subject = f"Encuesta de Satisfacción - Barbería Área 30"
     domain = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+    signed_id = Signer().sign(booking.id)
     context = {
         'booking': booking,
-        'survey_url': f"{domain}/rate/{booking.id}/"
+        'survey_url': f"{domain}/rate/{signed_id}/"
     }
     _send_html_email(subject, 'emails/post_sale_survey.html', context, booking.client_email)
 

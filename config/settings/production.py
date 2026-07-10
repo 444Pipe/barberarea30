@@ -15,7 +15,15 @@ def _split_env(value: str) -> list:
 
 # ── Core ─────────────────────────────────────────────────────────
 IS_LOCAL = not os.environ.get('DATABASE_URL')
-SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)            # noqa: F405
+# En producción real (con DATABASE_URL) la SECRET_KEY es obligatoria: nunca
+# arrancar con la clave de desarrollo del repo, o se podrían falsificar los
+# enlaces firmados (Signer), cookies de sesión y tokens.
+SECRET_KEY = os.environ.get('SECRET_KEY') or (SECRET_KEY if IS_LOCAL else None)   # noqa: F405
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "La variable de entorno SECRET_KEY es obligatoria en producción."
+    )
 DEBUG = os.environ.get('DEBUG', 'True' if IS_LOCAL else 'False').lower() == 'true'
 
 ALLOWED_HOSTS = _split_env(os.environ.get(

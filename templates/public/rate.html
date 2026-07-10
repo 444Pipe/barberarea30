@@ -119,17 +119,17 @@
       e.preventDefault();
       
       const parts = window.location.pathname.split('/').filter(Boolean);
-      const bookingId = parts[parts.length - 1]; // /rate/123/ -> 123
-      
+      const token = parts[parts.length - 1]; // /rate/<token firmado>/ -> token
+
       const barberRating = document.getElementById('barber_rating').value;
       const shopRating = document.getElementById('shop_rating').value;
       const comment = document.getElementById('comment').value;
-      
+
       const btn = e.target.querySelector('button[type="submit"]');
       const originalText = btn.innerHTML;
       btn.innerHTML = 'Enviando...';
-      
-      fetch(`/api/bookings/${bookingId}/review/`, {
+
+      fetch(`/api/bookings/${token}/review/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
