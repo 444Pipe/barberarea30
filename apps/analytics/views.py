@@ -18,9 +18,15 @@ def revenue_stats_view(request):
     """
     GET /api/admin/stats/revenue/?period=month&barber=1
     Ingresos por período, filtrable por barbero.
+
+    El ingreso se basa en Sale.final_price de ventas APROBADAS (misma
+    dimensión que usan Caja y el dashboard). Antes se sumaba Booking.price de
+    reservas 'completed', lo que producía cifras distintas a las de caja.
     """
+    from apps.cashflow.models import Sale
+
     profile = getattr(request.user, 'profile', None)
-    queryset = Booking.objects.filter(status='completed')
+    queryset = Sale.objects.filter(approval_status=Sale.STATUS_APPROVED)
 
     # Barbers can only see their own stats
     if profile and profile.is_barber and not profile.is_admin:
@@ -31,11 +37,11 @@ def revenue_stats_view(request):
     if barber_id:
         queryset = queryset.filter(barber_id=barber_id)
 
-    # Group by month
+    # Group by month (dimensión temporal: fecha de la venta)
     monthly = defaultdict(int)
-    for b in queryset:
-        key = b.date.strftime('%Y-%m')
-        monthly[key] += int(b.price)
+    for s in queryset:
+        key = tz.localtime(s.created_at).strftime('%Y-%m')
+        monthly[key] += int(s.final_price)
 
     sorted_keys = sorted(monthly.keys())
     result = [{'month': k, 'revenue': monthly[k]} for k in sorted_keys]
@@ -327,13 +333,17 @@ def monthly_report_view(request):
         total_discounts=Sum('discount_amount'),
     )
 
-    # Commissions: Frank ya está contabilizado como Expense diaria
-    # ("Pago Diario: Franko"); si sumamos también su Commission.commission_amount
-    # acá lo estaríamos contando dos veces en el net_income.
+    # Comisiones. Para el net_income seguimos el MISMO criterio robusto que el
+    # panel ROI (apps/roi/services.py): SIEMPRE contar la Commission de Frank
+    # como costo y EXCLUIR el Expense "Pago Diario: Franko" del cómputo (ese
+    # gasto solo existe tras el cierre diario; contarlo además de la comisión
+    # duplicaría el costo, y para ventas del mes aún no cerradas ni siquiera
+    # existe → antes se subestimaba el costo de Frank y se sobreestimaba el net).
+    from apps.roi.services import FRANK_DAILY_EXPENSE_DESC
     commissions = Commission.objects.filter(sale__in=sales)
     non_frank_commissions = commissions.exclude(barber__display_name__icontains='frank')
     total_commissions = non_frank_commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
-    # Para mostrar la "torta total" sí sumamos todas
+    # Para mostrar la "torta total" (y para el net) sí sumamos TODAS, Frank incluido.
     total_commissions_all = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
 
     # Expenses in range
@@ -341,20 +351,26 @@ def monthly_report_view(request):
     total_expenses = expenses.aggregate(t=Sum('amount'))['t'] or 0
 
     # Las propinas que Frank cobra dentro de su "Pago Diario" son pass-through
-    # (cliente→barbero), no son gasto de la empresa. Las restamos del total
-    # antes de calcular el net para no inflar el costo.
+    # (cliente→barbero), no son gasto de la empresa.
     frank_commissions_qs = commissions.filter(barber__display_name__icontains='frank')
     frank_tips = frank_commissions_qs.aggregate(t=Sum('tip_amount'))['t'] or 0
     frank_comm_only = frank_commissions_qs.aggregate(t=Sum('commission_amount'))['t'] or 0
     # Pago diario que se le hace a Frank vía Expense (comisión + propinas).
     frank_payout = float(frank_comm_only) + float(frank_tips)
-    expenses_for_net = float(total_expenses) - float(frank_tips)
+
+    # Egresos para el net: EXCLUIR el "Pago Diario: Franko" (evita doble-conteo
+    # con la Commission de Frank, que sí cargamos abajo). Igual que ROI.
+    expenses_for_net = float(
+        expenses.exclude(description__iexact=FRANK_DAILY_EXPENSE_DESC)
+        .aggregate(t=Sum('amount'))['t'] or 0
+    )
     # Egresos NO relacionados con el pago a Frank (más útil para el KPI).
     expenses_non_frank = float(total_expenses) - frank_payout
 
-    # Net income
+    # Net income — criterio ROI: bruto − TODAS las comisiones (Frank incluido)
+    # − egresos sin el "Pago Diario: Franko".
     total_income = float(totals['total_sales'] or 0)
-    net_income = total_income - float(total_commissions) - expenses_for_net
+    net_income = total_income - float(total_commissions_all) - expenses_for_net
 
     # Daily closes for the month
     daily_closes = DailyClose.objects.filter(date__gte=first_day, date__lte=last_day).order_by('date')

@@ -1,5 +1,6 @@
 """Bookings views — public creation and admin CRUD with filters."""
 import csv
+import logging
 from datetime import datetime
 
 from django.http import HttpResponse, Http404
@@ -22,6 +23,8 @@ from apps.services.models import Service
 from .models import Booking, BlockedDate
 from .serializers import BookingCreateSerializer, BookingAdminSerializer, BlockedDateSerializer
 
+logger = logging.getLogger(__name__)
+
 
 # ─── Public ──────────────────────────────────────────────
 from django.views.generic import TemplateView
@@ -42,16 +45,19 @@ class HomeView(TemplateView):
 def public_blocked_dates_list(request):
     """GET /api/blocked-dates/ — listar fechas bloqueadas para el frontend."""
     try:
-        blocked = BlockedDate.objects.filter(date__gte=timezone.now().date())
+        # BIZ-11: usar la fecha local (America/Bogota), no la UTC. Con timezone.now()
+        # la fecha "avanzaba" de noche y el bloqueo de "hoy" desaparecía del listado.
+        blocked = BlockedDate.objects.filter(date__gte=timezone.localdate())
         serializer = BlockedDateSerializer(blocked, many=True)
         return Response(serializer.data)
-    except Exception as e:
-        import traceback
+    except Exception:
+        # SEC-11: no exponer el traceback en la respuesta. Se registra en el log
+        # del servidor y al cliente se le devuelve un mensaje genérico.
         from django.http import JsonResponse
+        logger.exception('Error al listar fechas bloqueadas públicas')
         return JsonResponse({
-            'ok': False, 
-            'error': str(e), 
-            'trace': traceback.format_exc()
+            'ok': False,
+            'error': 'No se pudieron cargar las fechas bloqueadas.',
         }, status=500)
 
 
@@ -60,8 +66,11 @@ def public_blocked_dates_list(request):
 @permission_classes([AllowAny])
 def create_booking_view(request):
     """POST /api/bookings/ — crear nueva reserva desde el frontend público."""
-    data = request.data
-    
+    # BIZ-17: request.data puede ser un QueryDict inmutable (form-data), y más abajo
+    # mutamos claves en el flujo walk-in. Copiamos a un dict mutable para evitar el
+    # AttributeError ('QueryDict instance is immutable') preservando el comportamiento.
+    data = request.data.copy()
+
     is_walk_in = str(data.get('is_walk_in', '')).lower() == 'true'
     # En walk-in (presencial) el barbero/admin puede forzar el agendamiento sobre
     # su propio bloqueo de inactividad, con confirmación previa (force=true).
@@ -497,25 +506,32 @@ def admin_bookings_list_view(request):
             queryset = queryset.none()
 
     # Filters
+    has_filters = False
+
     barber_id = request.query_params.get('barber')
     if barber_id:
         queryset = queryset.filter(barber_id=barber_id)
+        has_filters = True
 
     status_filter = request.query_params.get('status')
     if status_filter:
         queryset = queryset.filter(status=status_filter)
+        has_filters = True
 
     service_id = request.query_params.get('service')
     if service_id:
         queryset = queryset.filter(service_id=service_id)
+        has_filters = True
 
     date_from = request.query_params.get('date_from')
     if date_from:
         queryset = queryset.filter(date__gte=date_from)
+        has_filters = True
 
     date_to = request.query_params.get('date_to')
     if date_to:
         queryset = queryset.filter(date__lte=date_to)
+        has_filters = True
 
     search = request.query_params.get('search')
     if search:
@@ -523,8 +539,16 @@ def admin_bookings_list_view(request):
         queryset = queryset.filter(
             Q(client_name__icontains=search) | Q(client_phone__icontains=search)
         )
+        has_filters = True
 
-    serializer = BookingAdminSerializer(queryset[:200], many=True)
+    # ADM-09: antes se truncaba siempre a 200 (queryset[:200]) perdiendo histórico
+    # en silencio. Si hay CUALQUIER filtro aplicado devolvemos todo lo que matchea
+    # (el usuario ya acotó la búsqueda); sin filtros elevamos el tope a 500. Se
+    # mantiene una lista JSON plana para no romper el frontend (sin paginación DRF).
+    if has_filters:
+        serializer = BookingAdminSerializer(queryset, many=True)
+    else:
+        serializer = BookingAdminSerializer(queryset[:500], many=True)
     return Response(serializer.data)
 
 
@@ -809,8 +833,10 @@ def admin_bookings_export_csv(request):
     """GET /api/admin/bookings/export/ — exportar a CSV."""
     bookings = Booking.objects.select_related('barber', 'service').all()
 
+    # BIZ-17: incluir 'operational_admin' (Frank) junto a admin/superadmin para que
+    # exporte todo lo que ve en el listado JSON (allí ya ve todas las reservas).
     profile = getattr(request.user, 'profile', None)
-    if profile and profile.role not in ('admin', 'superadmin'):
+    if profile and profile.role not in ('admin', 'superadmin', 'operational_admin'):
         barber_profile = getattr(request.user, 'barber_profile', None)
         if barber_profile:
             bookings = bookings.filter(barber=barber_profile)

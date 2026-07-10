@@ -1,8 +1,12 @@
+import logging
+
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from django.http import JsonResponse
 from .models import Service
 from .serializers import ServiceSerializer
+
+logger = logging.getLogger(__name__)
 
 
 from django.utils.text import slugify
@@ -43,6 +47,6 @@ def obtener_servicios_nativos(request):
             'exclusive_barber_id', 'requires_consultation',
         ))
         return JsonResponse({'servicios': servicios}, safe=False, encoder=DjangoJSONEncoder)
-    except Exception as e:
-        import traceback
-        return JsonResponse({'error': str(e), 'trace': traceback.format_exc()}, status=500)
+    except Exception:
+        logger.exception('Error al obtener los servicios nativos')
+        return JsonResponse({'error': 'No se pudieron obtener los servicios.'}, status=500)

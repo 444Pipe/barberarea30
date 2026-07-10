@@ -16,7 +16,9 @@ def admin_login_view(request):
     error = None
     if request.method == 'POST':
         username = request.POST.get('username', '').strip().lower()
-        password = request.POST.get('password', '').strip()
+        # No manipular la contraseña: un .strip() rechazaría claves que empiezan
+        # o terminan con espacios (válidas). Se toma tal cual la ingresa el usuario.
+        password = request.POST.get('password', '')
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
@@ -273,8 +275,23 @@ def admin_cashflow_view(request):
     # Comisiones parciales
     commissions = Commission.objects.filter(sale__in=approved_sales)
     total_commissions = commissions.aggregate(t=Sum('commission_amount'))['t'] or 0
-    
-    net_income = total_sales + total_inventory_sales - total_commissions - total_expenses
+
+    # Ingreso neto con la fórmula ÚNICA (cashflow.services) para que coincida
+    # con el detalle en vivo y el cierre diario. La comisión de Frank se
+    # descuenta por separado (su propina es pass-through, no afecta el neto).
+    from apps.cashflow import services as cashflow_services
+    frank_commission = commissions.filter(
+        barber__display_name__icontains='frank'
+    ).aggregate(t=Sum('commission_amount'))['t'] or 0
+    non_frank_commissions = total_commissions - frank_commission
+
+    net_income = cashflow_services.compute_live_net_income(
+        service_revenue=total_sales,
+        inventory_revenue=total_inventory_sales,
+        non_frank_commissions=non_frank_commissions,
+        real_expenses=total_expenses,
+        frank_commission=frank_commission,
+    )
 
     recent_closes = DailyClose.objects.all().order_by('-date', '-closed_at')[:10]
     

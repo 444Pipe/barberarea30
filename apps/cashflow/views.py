@@ -31,6 +31,32 @@ def checkout_booking_view(request, booking_id):
 
     data = request.data
 
+    # ── Control de acceso (SEC-08) ──────────────────────────────────────────
+    # Un barbero "puro" (sin rol admin) solo puede hacer checkout de SUS propias
+    # reservas; de lo contrario podría facturar la agenda de otro (IDOR).
+    profile = getattr(request.user, 'profile', None)
+    request_barber = getattr(request.user, 'barber_profile', None)
+    is_pure_barber = bool(profile and profile.is_barber and not profile.is_admin)
+    if is_pure_barber:
+        if request_barber is None or booking.barber_id != request_barber.id:
+            return Response(
+                {'error': 'No puedes hacer checkout de una reserva que no es tuya.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+    # Los costos de materiales/mano de obra de Frank reemplazan el base_price,
+    # así que solo pueden enviarlos los admins o el propio Frank. Un barbero
+    # normal no debe poder inflar/alterar la base de la venta.
+    can_send_frank_costs = bool(profile and profile.is_admin) or (
+        request_barber is not None and request_barber.is_frank
+    )
+    if can_send_frank_costs:
+        frank_materials_cost = _safe_decimal(data.get('frank_materials_cost'), 0)
+        frank_labor_cost = _safe_decimal(data.get('frank_labor_cost'), 0)
+    else:
+        frank_materials_cost = Decimal(0)
+        frank_labor_cost = Decimal(0)
+
     # Tomar la comisión configurada en el perfil del barbero. Si no hay barbero
     # o el valor no es válido, caer a un default razonable (40% / 50% Frank).
     barber_name = booking.barber.display_name.lower() if booking.barber else ''
@@ -52,8 +78,8 @@ def checkout_booking_view(request, booking_id):
             added_value_description=data.get('added_value_description', ''),
             commission_percentage=comm_percentage,
             notes=data.get('notes', ''),
-            frank_materials_cost=_safe_decimal(data.get('frank_materials_cost'), 0),
-            frank_labor_cost=_safe_decimal(data.get('frank_labor_cost'), 0),
+            frank_materials_cost=frank_materials_cost,
+            frank_labor_cost=frank_labor_cost,
             request=request,
         )
     except ValueError as e:
@@ -90,10 +116,6 @@ def daily_close_view(request):
     from django.utils import timezone
 
     today = timezone.localtime(timezone.now()).date()
-    
-    # Solo un cierre por día
-    if DailyClose.objects.filter(date=today).exists():
-        return Response({'error': 'El cierre de caja para el día de hoy ya fue generado.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Buscar ventas que no estén en un cierre
     pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
@@ -111,7 +133,12 @@ def daily_close_view(request):
     pending_sales = pending_sales.filter(approval_status=Sale.STATUS_APPROVED)
 
     with transaction.atomic():
-        total_sales = pending_sales.aggregate(total=Sum('base_price'))['total'] or 0
+        # Solo un cierre por día. El chequeo va DENTRO del atomic (junto a la
+        # creación) para cerrar la ventana de carrera entre exists() y create();
+        # el UniqueConstraint sobre `date` es el respaldo definitivo en BD.
+        if DailyClose.objects.filter(date=today).exists():
+            return Response({'error': 'El cierre de caja para el día de hoy ya fue generado.'}, status=status.HTTP_400_BAD_REQUEST)
+
         total_tips = pending_sales.aggregate(total=Sum('tip_amount'))['total'] or 0
         
         # Ventas de inventario
@@ -152,13 +179,20 @@ def daily_close_view(request):
         # quede artificialmente más bajo.
         pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
         total_expenses = pending_expenses.aggregate(total=Sum('amount'))['total'] or 0
-        expenses_for_net = total_expenses - frank_total_tips
 
-        # Ingreso neto: revenue de servicios + inventario - comisiones de los
-        # demás barberos (no Frank — su comisión ya está en Expense) - egresos
-        # reales (excluyendo el componente de propina del pago a Frank).
+        # Ingreso neto (fórmula única centralizada en cashflow.services). El
+        # `total_expenses` almacenado incluye el "Pago Diario: Franko" (comisión
+        # + propina); para el neto pasamos el gasto REAL de la empresa, es decir
+        # sin ese rubro, y aportamos la comisión de Frank por separado.
         total_final_prices = pending_sales.aggregate(total=Sum('final_price'))['total'] or 0
-        net_income = total_final_prices + total_inventory_sales - total_commissions - expenses_for_net
+        real_expenses = total_expenses - frank_pay
+        net_income = cashflow_services.compute_live_net_income(
+            service_revenue=total_final_prices,
+            inventory_revenue=total_inventory_sales,
+            non_frank_commissions=total_commissions,
+            real_expenses=real_expenses,
+            frank_commission=frank_total_comm,
+        )
 
         daily_close = DailyClose.objects.create(
             date=today,
@@ -190,16 +224,6 @@ def daily_close_view(request):
         'message': 'Cierre de caja exitoso',
         'close_id': daily_close.id,
         'net_income': daily_close.net_income,
-        'debug': {
-            'total_final_prices': float(total_final_prices),
-            'total_inventory_sales': float(total_inventory_sales),
-            'total_commissions': float(total_commissions),
-            'total_expenses': float(total_expenses),
-            'total_tips': float(total_tips),
-            'ventas_ids': list(pending_sales.values_list('id', flat=True)),
-            'inventory_sales_ids': list(pending_inventory_sales.values_list('id', flat=True)),
-            'egresos_ids': list(pending_expenses.values_list('id', flat=True)),
-        }
     })
 
 @api_view(['GET'])
@@ -294,7 +318,7 @@ def daily_close_detail_view(request, close_id):
     return Response({
         'id': daily_close.id,
         'date': daily_close.date.strftime('%Y-%m-%d'),
-        'closed_at': daily_close.closed_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'closed_at': timezone.localtime(daily_close.closed_at).strftime('%Y-%m-%d %H:%M:%S'),
         'closed_by': daily_close.closed_by.username,
         'total_sales': float(daily_close.total_sales),
         'total_inventory_sales': float(daily_close.total_inventory_sales),
@@ -493,11 +517,20 @@ def live_cashflow_detail_view(request):
         })
         total_expenses_overall += frank_pay_live
 
-    # Restar el componente de propina de los gastos al calcular net_income:
-    # la propina entró como cash y sale como cash (pass-through), no afecta
-    # la utilidad real de la empresa.
-    expenses_for_net = total_expenses_overall - frank_tips_live
-    net_income = total_sales_overall + total_inventory_sales_overall - total_commissions_overall - expenses_for_net
+    # Ingreso neto con la fórmula única (cashflow.services). `frank_pay_live`
+    # (comisión + propina de Frank) se agregó como rubro sintético a
+    # `total_expenses_overall`; para el neto pasamos el gasto REAL (sin ese
+    # rubro) y la comisión de Frank por separado. La propina de Frank es
+    # pass-through (cash que entra y sale), no afecta la utilidad.
+    frank_commission_live = frank_pay_live - frank_tips_live
+    real_expenses = total_expenses_overall - frank_pay_live
+    net_income = float(cashflow_services.compute_live_net_income(
+        service_revenue=total_sales_overall,
+        inventory_revenue=total_inventory_sales_overall,
+        non_frank_commissions=total_commissions_overall,
+        real_expenses=real_expenses,
+        frank_commission=frank_commission_live,
+    ))
 
     return Response({
         'date': today.strftime('%Y-%m-%d'),
@@ -675,9 +708,14 @@ def reject_sale_view(request, sale_id):
         # la venta fue rechazada — y los pedidos a proveedor salen torcidos.
         if booking:
             from apps.inventory.models import InventoryMovement
+            # Solo revertir los consumos que NO se hayan revertido antes. Si la
+            # venta se re-facturó y se vuelve a rechazar, los movimientos viejos
+            # ya están marcados y se omiten — así no devolvemos stock dos veces
+            # (BIZ-07). Como InventoryMovement no tiene FK a Sale ni flag propio,
+            # marcamos el movimiento original con un sufijo en `notes`.
             consumptions = InventoryMovement.objects.filter(
                 booking=booking, movement_type='out'
-            ).select_related('item')
+            ).exclude(notes__icontains='[revertido').select_related('item')
             for mov in consumptions:
                 item = mov.item
                 if item is None:
@@ -698,6 +736,11 @@ def reject_sale_view(request, sale_id):
                         f'se devuelve {mov.quantity} {item.unit}.'
                     ),
                 )
+                # Marcar el consumo original como revertido para no devolverlo
+                # de nuevo si hay un futuro rechazo de una re-facturación.
+                marker = f' [revertido venta #{sale.id}]'
+                mov.notes = (mov.notes or '')[:300 - len(marker)] + marker
+                mov.save(update_fields=['notes'])
 
         # Si era un servicio manual de Frank, también se había generado un
         # Expense "Materiales Servicio: <cliente> (venta #<id>)" en
@@ -837,6 +880,8 @@ def create_inventory_sale_view(request):
     from apps.cashflow.models import InventorySale, PaymentMethod
     from apps.inventory.models import InventoryItem, InventoryMovement
     from django.db import transaction
+    from django.db.models import F
+    from decimal import Decimal
 
     data = request.data
     item_id = data.get('item_id')
@@ -844,16 +889,13 @@ def create_inventory_sale_view(request):
     payment_method_id = data.get('payment_method_id')
 
     try:
-        from decimal import Decimal
         quantity = Decimal(str(quantity))
         if quantity <= 0:
             return Response({'error': 'La cantidad debe ser mayor a 0'}, status=400)
     except Exception:
         return Response({'error': 'Cantidad inválida'}, status=400)
 
-    try:
-        item = InventoryItem.objects.get(pk=item_id)
-    except InventoryItem.DoesNotExist:
+    if not InventoryItem.objects.filter(pk=item_id).exists():
         return Response({'error': 'Producto no encontrado'}, status=404)
 
     payment_method = None
@@ -861,13 +903,20 @@ def create_inventory_sale_view(request):
         payment_method = PaymentMethod.objects.filter(id=payment_method_id).first()
 
     with transaction.atomic():
-        # Restar del inventario
-        from decimal import Decimal
+        # Bloquear la fila del producto para evitar sobreventa por carrera
+        # (dos ventas simultáneas leyendo el mismo stock). Si no hay
+        # existencias suficientes se AVISA con error, en vez de fijar el
+        # stock a 0 en silencio.
+        item = InventoryItem.objects.select_for_update().get(pk=item_id)
+        if item.quantity < quantity:
+            return Response({
+                'error': f'Stock insuficiente: quedan {item.quantity} {item.unit} de "{item.name}".'
+            }, status=400)
+
+        # Restar del inventario de forma atómica (F evita la condición de carrera).
         qty_before = item.quantity
-        item.quantity -= Decimal(str(quantity))
-        if item.quantity < 0:
-            item.quantity = 0
-        item.save()
+        InventoryItem.objects.filter(pk=item.pk).update(quantity=F('quantity') - quantity)
+        item.refresh_from_db(fields=['quantity'])
 
         # Registrar movimiento
         InventoryMovement.objects.create(

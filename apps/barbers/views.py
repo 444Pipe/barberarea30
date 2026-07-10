@@ -19,6 +19,38 @@ from .models import Barber, GalleryImage, Reel, BarberUnavailability
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
 
 
+# ─── Validación de archivos subidos (SEC-12) ─────────────
+# Reel.video usa RawMediaCloudinaryStorage (omite la validación de Pillow),
+# por lo que aquí validamos extensión y tamaño antes de guardar en las vistas
+# admin de galería y reels.
+_IMAGE_EXTENSIONS = ('jpg', 'jpeg', 'png', 'webp')
+_IMAGE_MAX_BYTES = 5 * 1024 * 1024      # 5 MB
+_VIDEO_EXTENSIONS = ('mp4', 'mov', 'webm')
+_VIDEO_MAX_BYTES = 50 * 1024 * 1024     # 50 MB
+
+
+def _validate_upload(uploaded_file, allowed_extensions, max_bytes, kind_label):
+    """Valida extensión y tamaño de un archivo subido.
+
+    Devuelve un mensaje de error (str) si es inválido, o None si es válido.
+    """
+    if uploaded_file is None:
+        return None
+
+    name = (getattr(uploaded_file, 'name', '') or '')
+    ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+    if ext not in allowed_extensions:
+        permitidas = ', '.join(allowed_extensions)
+        return f'Formato de {kind_label} no permitido. Use: {permitidas}.'
+
+    size = getattr(uploaded_file, 'size', 0) or 0
+    if size > max_bytes:
+        mb = max_bytes // (1024 * 1024)
+        return f'El {kind_label} supera el tamaño máximo permitido ({mb} MB).'
+
+    return None
+
+
 # ─── Public ──────────────────────────────────────────────
 
 class BarberPublicListView(generics.ListAPIView):
@@ -109,9 +141,14 @@ def barber_availability_view(request, barber_id):
         end_time = datetime.strptime(day_schedule['end'], '%H:%M').time()
 
     # Get existing bookings for this barber on this date
+    # Solo las reservas 'pending'/'confirmed' ocupan el slot, igual que en la
+    # creación de reservas. Una cita 'completed' ya fue atendida y no debe
+    # pintar el horario como ocupado (antes se usaba .exclude(status='cancelled'),
+    # que dejaba 'completed' bloqueando el slot).
     booked = Booking.objects.filter(
-        barber=barber, date=target_date
-    ).exclude(status='cancelled').values_list('time', 'duration_minutes')
+        barber=barber, date=target_date,
+        status__in=['pending', 'confirmed'],
+    ).values_list('time', 'duration_minutes')
 
     booked_ranges = []
     for bk_time, bk_duration in booked:
@@ -215,6 +252,13 @@ class BarberAdminListCreateView(generics.ListCreateAPIView):
         response_data = dict(response_data)
         response_data['created_username'] = getattr(barber, '_created_username', barber.user.username)
         response_data['created_password'] = getattr(barber, '_created_password', '')
+        # SEC-15: la contraseña se muestra UNA sola vez. No se registra en logs
+        # ni se puede volver a consultar; el admin debe copiarla ahora.
+        response_data['password_is_one_time'] = True
+        response_data['password_notice'] = (
+            'Esta contraseña se muestra una única vez. Cópiala y compártela de '
+            'forma segura con el barbero; no podrá recuperarse después.'
+        )
         return Response(response_data, status=status.HTTP_201_CREATED)
 
 
@@ -550,6 +594,16 @@ class GalleryAdminListCreateView(generics.ListCreateAPIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
+    def create(self, request, *args, **kwargs):
+        # SEC-12: validar la imagen antes de delegar en el serializer.
+        error = _validate_upload(
+            request.FILES.get('image'),
+            _IMAGE_EXTENSIONS, _IMAGE_MAX_BYTES, 'imagen',
+        )
+        if error:
+            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
+
 
 class GalleryAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/admin/gallery/{id}/"""
@@ -576,6 +630,23 @@ class ReelAdminListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdminOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
+
+    def create(self, request, *args, **kwargs):
+        # SEC-12: validar el video (y la miniatura si viene) antes de guardar.
+        # Reel.video usa RawMediaCloudinaryStorage y no pasa por Pillow.
+        error = _validate_upload(
+            request.FILES.get('video'),
+            _VIDEO_EXTENSIONS, _VIDEO_MAX_BYTES, 'video',
+        )
+        if error:
+            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+        thumb_error = _validate_upload(
+            request.FILES.get('thumbnail'),
+            _IMAGE_EXTENSIONS, _IMAGE_MAX_BYTES, 'miniatura',
+        )
+        if thumb_error:
+            return Response({'error': thumb_error}, status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
 
 
 class ReelAdminDetailView(generics.RetrieveUpdateDestroyAPIView):

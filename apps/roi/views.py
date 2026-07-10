@@ -210,16 +210,24 @@ def roi_add_investment_view(request):
         if not partner_id or not amount:
             raise ValueError('Socio y monto son obligatorios.')
 
+        # Validar monto: numérico y > 0 (mismo criterio que la edición de aportes).
+        try:
+            amount_val = int(float(amount))
+        except (TypeError, ValueError):
+            raise ValueError('El monto debe ser un número válido.')
+        if amount_val <= 0:
+            raise ValueError('El monto debe ser mayor a 0.')
+
         partner = Partner.objects.get(pk=partner_id)
-        
+
         PartnerInvestment.objects.create(
             partner=partner,
-            amount=amount,
+            amount=amount_val,
             description=description,
             registered_by=request.user
         )
-        
-        messages.success(request, f'✅ Inversión de ${int(float(amount)):,.0f} registrada para {partner.display_name}.')
+
+        messages.success(request, f'✅ Inversión de ${amount_val:,.0f} registrada para {partner.display_name}.')
     except Exception as e:
         messages.error(request, f'❌ Error al registrar inversión: {e}')
 

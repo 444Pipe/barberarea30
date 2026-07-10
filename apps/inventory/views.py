@@ -2,11 +2,29 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
-from django.views.decorators.csrf import csrf_exempt
 
 from apps.users.permissions import IsOperationalAdminOrAbove, IsBarberOrAbove
 from apps.analytics.models import log_audit
 from apps.inventory.models import InventoryItem, InventoryMovement
+
+
+# ─── VALIDACIÓN DE IMÁGENES DE PRODUCTO ───────────────────────────────────────
+
+ALLOWED_IMAGE_EXTENSIONS = ('jpg', 'jpeg', 'png', 'webp')
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+def _validate_product_image(image):
+    """Valida la extensión y el tamaño de una imagen de producto.
+
+    Retorna un mensaje de error (str) si es inválida, o None si es válida.
+    """
+    ext = image.name.rsplit('.', 1)[-1].lower() if '.' in image.name else ''
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        return 'Formato de imagen no permitido. Usa JPG, JPEG, PNG o WEBP.'
+    if image.size > MAX_IMAGE_SIZE:
+        return 'La imagen supera el tamaño máximo permitido (5 MB).'
+    return None
 
 
 # ─── LIST & CREATE ────────────────────────────────────────────────────────────
@@ -58,6 +76,11 @@ def inventory_create_view(request):
     except (TypeError, ValueError):
         return Response({'error': 'Valores numéricos inválidos.'}, status=400)
 
+    if image:
+        img_error = _validate_product_image(image)
+        if img_error:
+            return Response({'error': img_error}, status=400)
+
     try:
         item = InventoryItem.objects.create(
             name=name,
@@ -108,7 +131,11 @@ def inventory_update_view(request, item_id):
     item.sale_price = float(data.get('sale_price', item.sale_price))
 
     if 'image' in request.FILES:
-        item.image = request.FILES['image']
+        image = request.FILES['image']
+        img_error = _validate_product_image(image)
+        if img_error:
+            return Response({'error': img_error}, status=400)
+        item.image = image
 
     try:
         item.save()
@@ -278,6 +305,16 @@ def register_consumables_view(request, booking_id):
         booking = Booking.objects.get(id=booking_id)
     except Booking.DoesNotExist:
         return Response({'error': 'Reserva no encontrada.'}, status=404)
+
+    # SEC-08: un barbero puro solo puede registrar consumibles en sus propias reservas.
+    profile = getattr(request.user, 'profile', None)
+    if profile and profile.is_barber:
+        barbero = getattr(request.user, 'barber_profile', None)
+        if barbero is None or booking.barber_id != barbero.id:
+            return Response(
+                {'error': 'No puedes registrar consumibles en una reserva que no es tuya.'},
+                status=403
+            )
 
     items_data = request.data.get('items', [])
     if not items_data:

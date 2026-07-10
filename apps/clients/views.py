@@ -33,24 +33,41 @@ def clients_list_view(request):
         .order_by('-last_visit')
     )
 
-    result = []
-    for client in clients[:100]:
-        phone = client['client_phone']
-        
-        # Obtener el nombre de la cita más reciente
-        latest_booking = Booking.objects.filter(client_phone=phone).order_by('-date', '-time').first()
-        name = latest_booking.client_name if latest_booking else 'Desconocido'
-        email = latest_booking.client_email if latest_booking else ''
+    clients = list(clients[:100])
+    phones = [c['client_phone'] for c in clients]
 
-        # Get most visited barber
-        preferred = (
-            Booking.objects.filter(client_phone=phone)
-            .exclude(status='cancelled')
-            .values('barber__display_name')
-            .annotate(count=Count('id'))
-            .order_by('-count')
-            .first()
-        )
+    # Nombre/email: cita más reciente por teléfono (sin excluir canceladas, igual
+    # que antes). Una sola query ordenada; el primer registro por teléfono es el
+    # más reciente.
+    names = {}
+    for row in (
+        Booking.objects.filter(client_phone__in=phones)
+        .order_by('client_phone', '-date', '-time')
+        .values('client_phone', 'client_name', 'client_email')
+    ):
+        phone = row['client_phone']
+        if phone not in names:
+            names[phone] = (row['client_name'], row['client_email'])
+
+    # Barbero preferido: barbero con más visitas (excluyendo canceladas) por
+    # teléfono. Una sola query agregada; el primer registro por teléfono es el
+    # de mayor conteo.
+    preferred = {}
+    for row in (
+        Booking.objects.filter(client_phone__in=phones)
+        .exclude(status='cancelled')
+        .values('client_phone', 'barber__display_name')
+        .annotate(count=Count('id'))
+        .order_by('client_phone', '-count')
+    ):
+        phone = row['client_phone']
+        if phone not in preferred:
+            preferred[phone] = row['barber__display_name']
+
+    result = []
+    for client in clients:
+        phone = client['client_phone']
+        name, email = names.get(phone, ('Desconocido', ''))
         result.append({
             'name': name,
             'phone': phone,
@@ -58,7 +75,7 @@ def clients_list_view(request):
             'total_visits': client['total_visits'],
             'total_spent': client['total_spent'] or 0,
             'last_visit': str(client['last_visit']) if client['last_visit'] else '',
-            'preferred_barber': preferred['barber__display_name'] if preferred else '',
+            'preferred_barber': preferred.get(phone, ''),
         })
 
     return Response(result)

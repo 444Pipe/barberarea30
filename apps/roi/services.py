@@ -21,7 +21,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 
 from apps.cashflow.models import Sale, Commission, Expense, InventorySale
@@ -208,16 +208,26 @@ def get_net_income_for_month(year: int, month: int) -> dict:
 # Saldo de inversión por socio
 # ─────────────────────────────────────────────────────────
 
-def _get_partner_investment_balance(partner: Partner, up_to_snapshot_id=None) -> Decimal:
+def _get_partner_investment_balance(partner: Partner, before_snapshot=None) -> Decimal:
     """
-    Saldo pendiente del socio antes del snapshot indicado.
-    Si up_to_snapshot_id es None, considera todas las amortizaciones registradas.
+    Saldo pendiente del socio ANTES del snapshot indicado.
+
+    El "antes" es CRONOLÓGICO por (year, month), NO por orden de creación (pk):
+    al regenerar un mes viejo su snapshot recibe un pk nuevo, así que filtrar por
+    `snapshot_id < pk` contaría amortizaciones de meses posteriores como si fueran
+    previas (o dejaría de contar las de meses anteriores regenerados después).
+    Filtramos por (year, month) para respetar la línea de tiempo real.
+
+    Si `before_snapshot` es None, considera todas las amortizaciones registradas.
     """
     total_invested = _D(partner.investments.aggregate(t=Sum('amount'))['t'])
 
     share_qs = PartnerMonthlyShare.objects.filter(partner=partner)
-    if up_to_snapshot_id is not None:
-        share_qs = share_qs.filter(snapshot_id__lt=up_to_snapshot_id)
+    if before_snapshot is not None:
+        y, m = before_snapshot.year, before_snapshot.month
+        share_qs = share_qs.filter(
+            Q(snapshot__year__lt=y) | Q(snapshot__year=y, snapshot__month__lt=m)
+        )
 
     already_amortized = _D(share_qs.aggregate(t=Sum('amortization_applied'))['t'])
     balance = total_invested - already_amortized
@@ -269,8 +279,67 @@ def get_investment_summary() -> dict:
 # Consolidación del Mes (botón "Consolidar Mes")
 # ─────────────────────────────────────────────────────────
 
+def _rebuild_partner_shares(snapshot: MonthlyROISnapshot) -> None:
+    """
+    (Re)construye las PartnerMonthlyShare de un snapshot a partir de su
+    `net_income` y del saldo de inversión pendiente CRONOLÓGICAMENTE anterior a
+    ese mes. Borra las shares previas del snapshot y las recrea. La distribución
+    solo genera share positiva si el neto del mes es > 0.
+    """
+    snapshot.partner_shares.all().delete()
+
+    net = snapshot.net_income
+    for partner in Partner.objects.filter(is_active=True):
+        share_pct = partner.share_percentage
+
+        if net > 0:
+            gross_share = (net * share_pct / Decimal('100')).quantize(Decimal('1'))
+        else:
+            gross_share = Decimal('0')
+
+        balance_before = _get_partner_investment_balance(partner, before_snapshot=snapshot)
+        amortization = min(gross_share, balance_before)
+        balance_after = max(balance_before - amortization, Decimal('0'))
+        cash_out = gross_share - amortization
+
+        PartnerMonthlyShare.objects.create(
+            snapshot=snapshot,
+            partner=partner,
+            share_percentage=share_pct,
+            gross_share=gross_share,
+            investment_balance_before=balance_before,
+            amortization_applied=amortization,
+            investment_balance_after=balance_after,
+            cash_out=cash_out,
+        )
+
+
+def _cascade_regenerate_after(snapshot: MonthlyROISnapshot) -> None:
+    """
+    Tras regenerar/consolidar un mes, los meses POSTERIORES ya consolidados
+    dependen de él: su "saldo de inversión antes" incluye las amortizaciones de
+    este mes. Reconstruye sus shares en orden cronológico para que la amortización
+    no se descuadre en cascada.
+
+    Los snapshots bloqueados se respetan tal cual (no se recalculan), pero sus
+    amortizaciones siguen contando en la línea de tiempo de los que sí se
+    recalculan. Solo se tocan las shares; las cifras financieras del mes
+    (bruto/comisiones/egresos/neto) no dependen de otros meses y no se recalculan.
+    """
+    later = MonthlyROISnapshot.objects.filter(
+        Q(year__gt=snapshot.year) | Q(year=snapshot.year, month__gt=snapshot.month)
+    ).order_by('year', 'month')
+
+    for snap in later:
+        if snap.is_locked:
+            continue
+        _rebuild_partner_shares(snap)
+
+
 @transaction.atomic
-def generate_monthly_snapshot(year: int, month: int, user: User = None) -> MonthlyROISnapshot:
+def generate_monthly_snapshot(
+    year: int, month: int, user: User = None, *, cascade: bool = True
+) -> MonthlyROISnapshot:
     """
     Genera (o regenera, si no está bloqueado) el snapshot ROI del mes (year, month).
 
@@ -280,7 +349,9 @@ def generate_monthly_snapshot(year: int, month: int, user: User = None) -> Month
       3. Persiste MonthlyROISnapshot con desglose completo.
       4. Para cada socio activo: calcula share, amortiza contra su saldo
          pendiente y guarda PartnerMonthlyShare (reemplaza los previos).
-      5. NO bloquea el snapshot — el bloqueo es una acción aparte (roi_lock).
+      5. Si `cascade`, reconstruye en cascada las shares de los meses posteriores
+         no bloqueados (dependen de la amortización de este mes).
+      6. NO bloquea el snapshot — el bloqueo es una acción aparte (roi_lock).
     """
     existing = MonthlyROISnapshot.objects.filter(year=year, month=month).first()
     if existing and existing.is_locked:
@@ -307,34 +378,12 @@ def generate_monthly_snapshot(year: int, month: int, user: User = None) -> Month
         },
     )
 
-    # Reemplazar shares previas (en caso de regeneración).
-    snapshot.partner_shares.all().delete()
+    # Distribución ROI del mes (reemplaza las shares previas si es regeneración).
+    _rebuild_partner_shares(snapshot)
 
-    # Distribución ROI: solo si hay ganancia neta positiva.
-    net = f['net_income']
-    for partner in Partner.objects.filter(is_active=True):
-        share_pct = partner.share_percentage
-
-        if net > 0:
-            gross_share = (net * share_pct / Decimal('100')).quantize(Decimal('1'))
-        else:
-            gross_share = Decimal('0')
-
-        balance_before = _get_partner_investment_balance(partner, up_to_snapshot_id=snapshot.pk)
-        amortization = min(gross_share, balance_before)
-        balance_after = max(balance_before - amortization, Decimal('0'))
-        cash_out = gross_share - amortization
-
-        PartnerMonthlyShare.objects.create(
-            snapshot=snapshot,
-            partner=partner,
-            share_percentage=share_pct,
-            gross_share=gross_share,
-            investment_balance_before=balance_before,
-            amortization_applied=amortization,
-            investment_balance_after=balance_after,
-            cash_out=cash_out,
-        )
+    # Propagar el recálculo a los meses posteriores consolidados (no bloqueados).
+    if cascade:
+        _cascade_regenerate_after(snapshot)
 
     return snapshot
 

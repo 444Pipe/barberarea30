@@ -13,12 +13,51 @@ Centraliza la transacción completa de una venta:
 Toda la operación corre dentro de un bloque transaction.atomic(),
 garantizando que o todo sucede o nada sucede (rollback automático).
 """
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
 
 from apps.cashflow.models import Sale, Commission, PaymentMethod
 from apps.inventory.models import ServiceInventoryItem, InventoryMovement
 from apps.analytics.models import log_audit
+
+
+def _to_decimal(value):
+    """Convierte cualquier entrada (None, int, float, Decimal, str) a Decimal."""
+    if value is None:
+        return Decimal('0')
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def compute_live_net_income(*, service_revenue, inventory_revenue,
+                            non_frank_commissions, real_expenses,
+                            frank_commission=0):
+    """Fórmula ÚNICA del Ingreso Neto (referencia: cierre diario).
+
+    Se centraliza aquí para que el dashboard de caja, el detalle en vivo y el
+    cierre diario produzcan SIEMPRE el mismo resultado.
+
+    Neto = ingresos de servicios + ingresos de inventario
+           − comisiones de los barberos NO-Frank
+           − comisión de Frank (su propina es pass-through cliente→barbero,
+             no es utilidad ni gasto real de la empresa, por eso NO entra)
+           − egresos reales de la empresa (sin el componente de propina del
+             pago automático a Frank).
+
+    Todos los parámetros son montos ya agregados. `real_expenses` debe ser el
+    gasto real de la empresa EXCLUYENDO tanto la comisión como la propina de
+    Frank (es decir, sin el rubro "Pago Diario: Franko").
+    """
+    return (
+        _to_decimal(service_revenue)
+        + _to_decimal(inventory_revenue)
+        - _to_decimal(non_frank_commissions)
+        - _to_decimal(frank_commission)
+        - _to_decimal(real_expenses)
+    )
 
 
 def process_checkout(*, booking, confirmed_by, payment_method_id=None,

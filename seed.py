@@ -304,22 +304,28 @@ try:
     camilo_user = User.objects.filter(username='camilorf').first()
     jd_user = User.objects.filter(username='juandavid.castro').first()
     
-    # 2. Eliminar socios duplicados o con alias (manteniendo solo los que tengan estos usuarios)
+    # 2. Desactivar socios no canónicos (duplicados, con alias o con user=None).
+    #    NO se borran: eliminar en cascada arrastraría PartnerInvestment /
+    #    PartnerMonthlyShare y se perderían datos históricos. En su lugar se
+    #    marcan is_active=False para que no cuenten como socios activos al 50%.
     valid_users = [u for u in [camilo_user, jd_user] if u]
-    Partner.objects.exclude(user__in=valid_users).delete()
-    
-    # 3. Crear/Asegurar socio Camilo
+    Partner.objects.exclude(user__in=valid_users).update(is_active=False)
+    # Los socios con user=None no entran en el exclude anterior (NULL NOT IN → NULL),
+    # así que se desactivan aparte para no dejar "socios zombis" activos al 50%.
+    Partner.objects.filter(user__isnull=True).update(is_active=False)
+
+    # 3. Crear/Asegurar socio Camilo (reactivándolo si estaba inactivo)
     if camilo_user:
         Partner.objects.update_or_create(
             user=camilo_user,
-            defaults={'display_name': 'Camilo', 'share_percentage': 50.00}
+            defaults={'display_name': 'Camilo', 'share_percentage': 50.00, 'is_active': True}
         )
-        
-    # 4. Crear/Asegurar socio Juan David
+
+    # 4. Crear/Asegurar socio Juan David (reactivándolo si estaba inactivo)
     if jd_user:
         Partner.objects.update_or_create(
             user=jd_user,
-            defaults={'display_name': 'Juan David', 'share_percentage': 50.00}
+            defaults={'display_name': 'Juan David', 'share_percentage': 50.00, 'is_active': True}
         )
 except Exception as e:
     print(f"Error gestionando los socios únicos: {e}")
