@@ -635,6 +635,25 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
 
     document.getElementById('checkout-booking-id').value = id;
     document.getElementById('checkout-client-name').textContent = clientName;
+
+    // Reset explícito de cada campo del cobro: viven fuera de <form id="checkout-form">
+    // (que solo envuelve el footer), así que form.reset() no los limpia y se
+    // arrastraban los valores del cobro anterior.
+    document.getElementById('checkout-payment-method').value = '';
+    document.getElementById('checkout-reference').value = '';
+    document.getElementById('checkout-tip').value = 0;
+    document.getElementById('checkout-discount').value = 0;
+    document.getElementById('checkout-assumed-by').value = 'none';
+    document.getElementById('checkout-notes').value = '';
+    document.getElementById('checkout-has-added-value').checked = false;
+    document.getElementById('checkout-added-value-container').classList.add('hidden');
+    document.getElementById('checkout-added-value').value = 0;
+    document.getElementById('checkout-added-value-desc').value = '';
+    document.getElementById('checkout-has-frank-materials').checked = false;
+    document.getElementById('checkout-frank-materials-fields').classList.add('hidden');
+    document.getElementById('checkout-materials-value').value = 0;
+    document.getElementById('checkout-labor-value').value = 0;
+
     window._checkoutBasePrice = price;
     updateCheckoutTotal();
 
@@ -797,6 +816,15 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     e.preventDefault();
     const id = document.getElementById('checkout-booking-id').value;
     const btn = document.querySelector('#checkout-form [type="submit"]');
+
+    // El <select required> está fuera del <form>, así que la validación nativa
+    // no se dispara: verificamos el método de pago manualmente antes de enviar.
+    const paymentMethodEl = document.getElementById('checkout-payment-method');
+    if (!paymentMethodEl.value) {
+      alert('Debe seleccionar un método de pago.');
+      paymentMethodEl.focus();
+      return;
+    }
 
     const payload = {
       payment_method_id: document.getElementById('checkout-payment-method').value,

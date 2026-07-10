@@ -516,13 +516,13 @@
           Club</a>
         <a href="#servicios"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Servicios</a>
-        <a href="gallery.html"
+        <a href="/gallery/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Galería</a>
         <a href="/reels/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Reels</a>
         <a href="/profesionales/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Profesionales</a>
-        <a href="booking.html"
+        <a href="/booking/"
           class="px-6 py-2.5 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm">Reserva tu Cita</a>
       </div>
 
@@ -541,13 +541,13 @@
         Club</a>
       <a href="#servicios"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Servicios</a>
-      <a href="gallery.html"
+      <a href="/gallery/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Galería</a>
       <a href="/reels/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Reels</a>
       <a href="/profesionales/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Profesionales</a>
-      <a href="booking.html"
+      <a href="/booking/"
         class="block mt-6 px-4 py-3 gold-btn text-xs tracking-widest uppercase font-semibold text-center rounded-sm mx-8">Reserva
         tu Cita</a>
     </div>
@@ -583,7 +583,7 @@
           </p>
 
           <div class="flex flex-col sm:flex-row gap-8 items-start">
-            <a href="booking.html" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
+            <a href="/booking/" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
               <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold flex items-center gap-3">
                 Reserva Tu Lugar
                 <span class="btn-icon text-sm">→</span>
@@ -1231,6 +1231,7 @@
       })
       .catch(() => {
         document.getElementById('reviews-loader').style.display = 'none';
+        document.getElementById('reviews-empty').classList.remove('hidden');
       });
   </script>
   <script src="{% static 'js/animations.js' %}"></script>

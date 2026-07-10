@@ -103,6 +103,29 @@
                        Agendar <span class="text-lg">→</span>
                      </a>`;
 
+                // La API /api/servicios-nativos/ devuelve `description` (no `features`).
+                const bulletColor = isConsult ? 'text-emerald-400' : 'text-gold';
+                let descHtml;
+                if (servicio.description && isConsult) {
+                  // Servicios "a consulta" (Color): la description es prosa, se muestra como párrafo.
+                  descHtml = `<p class="text-smoke/60 text-sm font-light leading-relaxed mb-8">${servicio.description}</p>`;
+                } else if (servicio.description) {
+                  const features = servicio.description
+                    .split(/[\n,]+|\s+y\s+/i)
+                    .map(item => item.trim())
+                    .filter(item => item.length > 1)
+                    .map(f => f.charAt(0).toUpperCase() + f.slice(1));
+                  descHtml = `
+                    <ul class="text-smoke/60 text-sm font-light space-y-3 mb-8">
+                      ${features.map(f => `<li class="flex items-center gap-2"><span class="${bulletColor} text-xs">◆</span> ${f}</li>`).join('')}
+                    </ul>`;
+                } else {
+                  descHtml = `
+                    <ul class="text-smoke/60 text-sm font-light space-y-3 mb-8">
+                      <li class="flex items-center gap-2"><span class="${bulletColor} text-xs">◆</span> Atención premium</li>
+                    </ul>`;
+                }
+
                 htmlFragment += `
                   <div class="service-card p-10 rounded-sm relative overflow-hidden group fade-in-up" style="animation-delay: ${delay}ms;">
                     <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl ${isConsult ? 'from-emerald-500/10' : 'from-gold/10'} to-transparent"></div>
@@ -111,9 +134,7 @@
                       ${priceTag}
                     </div>
                     <div class="w-full h-[1px] ${isConsult ? 'bg-emerald-500/20 group-hover:bg-emerald-500/50' : 'bg-gold/20 group-hover:bg-gold/50'} mb-6 transition-colors"></div>
-                    <ul class="text-smoke/60 text-sm font-light space-y-3 mb-8">
-                      <li class="flex items-center gap-2"><span class="${isConsult ? 'text-emerald-400' : 'text-gold'} text-xs">◆</span> ${servicio.features ? servicio.features.join('</li><li class="flex items-center gap-2"><span class="' + (isConsult ? 'text-emerald-400' : 'text-gold') + ' text-xs">◆</span> ') : 'Atención premium'}</li>
-                    </ul>
+                    ${descHtml}
                     <div class="flex items-center justify-between mt-auto">
                       ${durationTag}
                       ${cta}
@@ -152,8 +173,6 @@
     </div>
   </footer>
 
-  <script src="{% static 'js/services.js' %}"></script>
-  
   <!-- Botón Flotante de Redes Sociales (FAB) -->
   <div class="fab-container">
     <div id="fab-list" class="fab-social-list">

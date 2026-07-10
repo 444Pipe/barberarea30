@@ -217,7 +217,9 @@
                </div>`;
 
           const nombre = b.nombre || b.display_name || 'Barbero';
-          const especialidad = b.especialidad || b.specialties || 'Master Barber';
+          const especialidad = Array.isArray(b.specialties) && b.specialties.length
+            ? b.specialties.map(s => s.name).join(', ')
+            : 'Master Barber';
           const bio = b.bio || 'Especialista en cortes clásicos, modernos y perfilado avanzado.';
           const rating = b.rating || 5;
           const stars = Array.from({length: 5}, (_, idx) =>
@@ -252,7 +254,10 @@
         document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
       })
       .catch(() => {
-        document.getElementById('barbers-loader').innerHTML = '<p class="text-smoke/30 text-sm">Error cargando profesionales.</p>';
+        const loader = document.getElementById('barbers-loader');
+        if (loader) {
+          loader.innerHTML = '<p class="text-smoke/30 text-sm">Error cargando profesionales.</p>';
+        }
       });
   </script>
   <script src="{% static 'js/animations.js' %}"></script>

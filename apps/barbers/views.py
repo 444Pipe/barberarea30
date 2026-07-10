@@ -670,16 +670,22 @@ def finalizar_cita(request):
 
     cita = get_object_or_404(Booking, id=cita_id)
 
-    # SEGURIDAD IDOR: validar que solo el barbero dueño de la cita pueda completarla
-    if not hasattr(request.user, 'barber_profile') or cita.barber.user != request.user:
+    # SEGURIDAD IDOR: validar que solo el barbero dueño de la cita pueda completarla.
+    # Guardar contra None ANTES de desreferenciar cita.barber.user para no lanzar
+    # AttributeError (500) en citas sin barbero asignado.
+    barbero = getattr(request.user, 'barber_profile', None)
+    if barbero is None or cita.barber is None or cita.barber.user != request.user:
         return JsonResponse({'ok': False, 'error': 'No autorizado para modificar esta cita'}, status=403)
 
-    cita.status = 'completed'
+    # No marcar 'completed': process_checkout (cashflow) rechaza reservas ya
+    # 'completed' y la cita nunca podría facturarse (sin Sale, sin comisión).
+    # Dejarla 'confirmed' la mantiene cobrable; completed_at registra la atención.
+    cita.status = 'confirmed'
     cita.notes = observaciones
-    
-    # También fijar el timestamp de finalización usando datetime.now
+
+    # Fijar el timestamp de finalización para dejar constancia de que fue atendida
     cita.completed_at = timezone.now()
-    
+
     cita.save()
-    
+
     return JsonResponse({'ok': True})

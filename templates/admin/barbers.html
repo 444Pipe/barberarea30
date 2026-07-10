@@ -612,8 +612,9 @@ let currentUnavailBarberId = null;
 function openUnavailability(barberId, barberName) {
   currentUnavailBarberId = barberId;
   document.getElementById('unavail-barber-subtitle').textContent = barberName;
-  // Setear fecha mínima como hoy
-  const today = new Date().toISOString().split('T')[0];
+  // Setear fecha mínima como hoy (fecha local de Bogotá, no UTC)
+  const _d = new Date();
+  const today = new Date(_d.getTime() - _d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
   document.getElementById('unavail-date').min = today;
   document.getElementById('unavail-date').value = today;
   document.getElementById('unavail-start').value = '';
@@ -813,7 +814,8 @@ document.getElementById('unavail-form').addEventListener('submit', function(e) {
       alert(data.warning);
     }
     document.getElementById('unavail-form').reset();
-    const today = new Date().toISOString().split('T')[0];
+    const _d = new Date();
+    const today = new Date(_d.getTime() - _d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
     document.getElementById('unavail-date').value = today;
     loadUnavailabilities(currentUnavailBarberId);
   })
@@ -911,7 +913,8 @@ document.getElementById('unavail-bulk-form').addEventListener('submit', function
     }
     alert(msg);
     document.getElementById('unavail-bulk-form').reset();
-    const today = new Date().toISOString().split('T')[0];
+    const _d = new Date();
+    const today = new Date(_d.getTime() - _d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
     document.getElementById('unavail-bulk-from').value = today;
     document.getElementById('unavail-bulk-to').value = today;
     document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
