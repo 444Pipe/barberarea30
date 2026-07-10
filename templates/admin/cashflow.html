@@ -689,6 +689,11 @@ function cfUpdateKPIs() {
   // Sales pending count
   const pendingSales = (cfLiveData.sales_detail || []).filter(s => s.type === 'service').length;
   document.getElementById('kpi-sales-sub').textContent = pendingSales + ' venta(s) pendientes de cerrar';
+  // Habilita/deshabilita el cierre según las ventas en vivo pendientes de cerrar.
+  const btnClose = document.getElementById('btn-daily-close');
+  if (btnClose) {
+    btnClose.disabled = (cfLiveData.sales_detail || []).length === 0;
+  }
 }
 
 function cfUpdatePendingBanner() {
@@ -797,7 +802,7 @@ function renderRow(it) {
         <div><span class="lbl">Precio base</span><span class="val">${fmt(r.base_price)}</span></div>
         <div><span class="lbl">Descuento</span><span class="val">${r.discount_amount > 0 ? '-'+fmt(r.discount_amount) : '$0'}</span></div>
         <div><span class="lbl">Propina</span><span class="val">${r.tip_amount > 0 ? '+'+fmt(r.tip_amount) : '$0'}</span></div>
-        <div><span class="lbl">Final cobrado</span><span class="val">${fmt(r.final_price + r.tip_amount)}</span></div>
+        <div><span class="lbl">Final cobrado</span><span class="val">${fmt(Number(r.final_price) + Number(r.tip_amount))}</span></div>
         <div><span class="lbl">Comisión ${r.commission_percentage ? r.commission_percentage+'%' : ''}</span><span class="val text-red-400">-${fmt(r.commission_amount)}</span></div>
         <div><span class="lbl">Método</span><span class="val">${escH(r.payment_method)}</span></div>
         <div><span class="lbl">Confirmó</span><span class="val">${escH(r.approved_by)}</span></div>
@@ -1012,8 +1017,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnConfirm = document.getElementById('btn-confirm-close');
   const errorDiv = document.getElementById('close-error');
 
-  if (btnOpen && !btnOpen.disabled) {
+  if (btnOpen) {
     btnOpen.addEventListener('click', () => {
+      if (btnOpen.disabled) return;
       modal.classList.remove('hidden');
       errorDiv.classList.add('hidden');
     });

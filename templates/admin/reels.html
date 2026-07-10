@@ -213,7 +213,10 @@ function toggleActive(id, newState) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
     body: JSON.stringify({ is_active: newState })
-  }).then(() => loadReels());
+  }).then(res => {
+    if (!res.ok) { alert('No se pudo actualizar el estado del reel.'); return; }
+    loadReels();
+  }).catch(() => alert('No se pudo actualizar el estado del reel.'));
 }
 
 function deleteReel(id, name) {

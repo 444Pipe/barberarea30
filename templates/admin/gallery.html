@@ -48,8 +48,9 @@
           <option value="">— Sin asignar —</option>
         </select>
       </div>
+      <p id="upload-feedback" class="hidden text-xs text-center py-1"></p>
       <div class="flex gap-2 pt-2">
-        <button type="submit" class="flex-1 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold">Subir</button>
+        <button type="submit" id="upload-submit" class="flex-1 py-2.5 rounded-md bg-gradient-to-r from-gold-dark to-gold text-jet text-xs tracking-widest uppercase font-bold">Subir</button>
         <button type="button" onclick="closeUploadModal()" class="px-6 py-2.5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
       </div>
     </form>
@@ -135,7 +136,21 @@ function openUploadModal() {
   document.getElementById('upload-form').reset();
   document.getElementById('upload-preview').classList.add('hidden');
   document.getElementById('upload-placeholder').classList.remove('hidden');
+  hideUploadFeedback();
   document.getElementById('upload-modal').classList.remove('hidden');
+}
+
+function showUploadFeedback(message, isError) {
+  const el = document.getElementById('upload-feedback');
+  el.textContent = message;
+  el.classList.remove('hidden', 'text-red-400', 'text-emerald-400');
+  el.classList.add(isError ? 'text-red-400' : 'text-emerald-400');
+}
+
+function hideUploadFeedback() {
+  const el = document.getElementById('upload-feedback');
+  el.classList.add('hidden');
+  el.textContent = '';
 }
 
 function closeUploadModal() {
@@ -146,19 +161,44 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData();
   const file = document.getElementById('gallery-file').files[0];
-  if (!file) return;
+  if (!file) {
+    showUploadFeedback('Selecciona una imagen antes de subir.', true);
+    return;
+  }
 
   formData.append('image', file);
   formData.append('title', this.title.value);
   const barberId = this.barber.value;
   if (barberId) formData.append('barber', barberId);
 
+  const submitBtn = document.getElementById('upload-submit');
+  submitBtn.disabled = true;
+  submitBtn.classList.add('opacity-60', 'pointer-events-none');
+  showUploadFeedback('Subiendo foto...', false);
+
   fetch('/api/admin/gallery/', {
     method: 'POST',
     headers: { 'X-CSRFToken': getCSRF() },
     body: formData,
-  }).then(r => {
-    if (r.ok) { closeUploadModal(); loadGallery(); }
+  }).then(async r => {
+    if (r.ok) {
+      showUploadFeedback('¡Foto subida con éxito!', false);
+      loadGallery();
+      setTimeout(closeUploadModal, 800);
+      return;
+    }
+    let msg = 'No se pudo subir la foto. Intenta de nuevo.';
+    try {
+      const data = await r.json();
+      const detail = data.detail || (data.image && data.image[0]) || (data.non_field_errors && data.non_field_errors[0]);
+      if (detail) msg = detail;
+    } catch (_) {}
+    showUploadFeedback(msg, true);
+  }).catch(() => {
+    showUploadFeedback('Error de conexión. Verifica tu red e intenta de nuevo.', true);
+  }).finally(() => {
+    submitBtn.disabled = false;
+    submitBtn.classList.remove('opacity-60', 'pointer-events-none');
   });
 });
 

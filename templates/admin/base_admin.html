@@ -271,6 +271,39 @@
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
+    // Toast flotante reutilizable para feedback consistente en todo el panel.
+    // Reutiliza el estilo del bloque de Django messages. tipo: 'success' | 'error' | 'info'.
+    // Uso: window.showToast('Guardado con éxito', 'success');
+    window.showToast = function (mensaje, tipo) {
+      let cont = document.getElementById('global-messages');
+      if (!cont) {
+        cont = document.createElement('div');
+        cont.id = 'global-messages';
+        cont.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none';
+        document.body.appendChild(cont);
+      }
+      const estilos = {
+        success: 'bg-emerald-900/90 border border-emerald-500/50 text-emerald-100',
+        error: 'bg-red-900/90 border border-red-500/50 text-red-100',
+        info: 'bg-amber-900/90 border border-amber-500/50 text-amber-100'
+      };
+      const toast = document.createElement('div');
+      toast.className = 'message-toast pointer-events-auto flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-sm shadow-xl transition-all duration-300 translate-x-0 opacity-100 ' + (estilos[tipo] || estilos.info);
+      toast.innerHTML = '<span>' + window.esc(mensaje) + '</span>' +
+        '<button class="text-white/50 hover:text-white" aria-label="Cerrar">&#10005;</button>';
+      toast.querySelector('button').addEventListener('click', function () {
+        toast.style.opacity = '0';
+        setTimeout(function () { toast.remove(); }, 300);
+      });
+      cont.appendChild(toast);
+      setTimeout(function () {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+        setTimeout(function () { toast.remove(); }, 300);
+      }, 5000);
+      return toast;
+    };
+
     function toggleSidebar() {
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('sidebar-overlay');
@@ -335,8 +368,14 @@
     // Check periodically (every 60s)
     setInterval(() => {
       fetch('/api/admin/notifications/').then(r=>r.json()).then(data => {
-         if(data.length > 0) document.getElementById('notif-badge').classList.remove('hidden');
-      });
+         const badge = document.getElementById('notif-badge');
+         if (!badge) return;
+         if (Array.isArray(data) && data.length > 0) {
+           badge.classList.remove('hidden');
+         } else {
+           badge.classList.add('hidden');
+         }
+      }).catch(() => { /* sin conexión: se reintenta en el próximo ciclo */ });
     }, 60000);
     {% endif %}
   </script>

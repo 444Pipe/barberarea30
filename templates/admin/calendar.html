@@ -73,6 +73,14 @@
 const userIsSuperAdmin = {% if user_role == 'superadmin' %}true{% else %}false{% endif %};
 const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational_admin' %}true{% else %}false{% endif %};
 
+// Mapa de badges de estado (replica bookings.html): traduce el status crudo a español con color.
+const statusBadge = {
+  pending: '<span class="inline-flex px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[0.6rem]">Pendiente</span>',
+  confirmed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[0.6rem]">Confirmado</span>',
+  completed: '<span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[0.6rem]">Completado</span>',
+  cancelled: '<span class="inline-flex px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[0.6rem]">Cancelado</span>',
+};
+
 let calendar = null;
 let allEvents = [];
 let currentBookingId = null;
@@ -215,8 +223,8 @@ function openModal(data) {
   document.getElementById('modal-barber').textContent = data.barber_name || '';
   document.getElementById('modal-date').textContent = data.date;
   document.getElementById('modal-time').textContent = formatTime12(data.time);
-  document.getElementById('modal-price').textContent = '$' + (data.price || 0).toLocaleString('es-CO');
-  document.getElementById('modal-status').textContent = data.status;
+  document.getElementById('modal-price').textContent = '$' + Number(data.price || 0).toLocaleString('es-CO');
+  document.getElementById('modal-status').innerHTML = statusBadge[data.status] || statusBadge.pending;
   document.getElementById('booking-modal').classList.remove('hidden');
 }
 

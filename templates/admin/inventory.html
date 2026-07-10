@@ -379,7 +379,8 @@ function renderInventory() {
         class="flex-1 py-2 text-[0.6rem] tracking-widest uppercase font-bold text-smoke/50 hover:text-gold border-t border-white/5 transition-colors">
         ✎ Editar
       </button>
-      <button onclick="openAdjustModal(${item.id}, '${item.name}', '${item.unit}')"
+      <button data-id="${item.id}" data-name="${esc(item.name)}" data-unit="${esc(item.unit)}"
+        onclick="openAdjustModal(this.dataset.id, this.dataset.name, this.dataset.unit)"
         class="flex-1 py-2 text-[0.6rem] tracking-widest uppercase font-bold text-smoke/50 hover:text-emerald-400 border-t border-l border-white/5 transition-colors">
         ± Stock
       </button>
@@ -418,8 +419,10 @@ function renderInventory() {
 
 function renderStats() {
   const total = allItems.length;
-  const low   = allItems.filter(i => i.is_low_stock && i.quantity > 0).length;
-  const ok    = allItems.filter(i => !i.is_low_stock).length;
+  // Un producto agotado (stock 0) cuenta como Stock Bajo, coherente con low_stock_count del server.
+  // Así total === ok + low (categorías mutuamente excluyentes y exhaustivas).
+  const low   = allItems.filter(i => i.is_low_stock || i.quantity <= 0).length;
+  const ok    = allItems.filter(i => !i.is_low_stock && i.quantity > 0).length;
   const value = allItems.reduce((sum, i) => sum + i.cost_per_unit * i.quantity, 0);
 
   document.getElementById('stat-total').textContent = total;

@@ -162,8 +162,8 @@
           <!-- Video -->
           ${r.thumbnail
             ? `<img src="${r.thumbnail}" class="reel-video" alt="${r.title || 'Reel'}">
-               <video class="reel-video absolute inset-0" src="${r.video}" loop playsinline preload="none" id="vid-${i}"></video>`
-            : `<video class="reel-video" src="${r.video}" loop playsinline preload="metadata" id="vid-${i}"></video>`
+               <video class="reel-video absolute inset-0" src="${r.video}" loop playsinline muted preload="none" id="vid-${i}"></video>`
+            : `<video class="reel-video" src="${r.video}" loop playsinline muted preload="metadata" id="vid-${i}"></video>`
           }
 
           <!-- Overlay gradiente -->
@@ -179,7 +179,7 @@
           <!-- Acciones derecha -->
           <div class="absolute bottom-16 right-4 flex flex-col items-center gap-5 z-10">
             <!-- Like -->
-            <button class="like-btn flex flex-col items-center gap-1 ${likes[r.id] ? 'liked' : ''}" onclick="toggleLike(${r.id}, this)">
+            <button class="like-btn flex flex-col items-center gap-1 ${likes[r.id] ? 'liked' : ''}" aria-label="Me gusta" onclick="toggleLike(${r.id}, this)">
               <div class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
                 <svg class="w-5 h-5 text-white" fill="${likes[r.id] ? '#ef4444' : 'none'}" stroke="${likes[r.id] ? '#ef4444' : 'currentColor'}" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
@@ -199,11 +199,11 @@
             </a>
 
             <!-- Mute -->
-            <button onclick="toggleMute(${i})" id="mute-btn-${i}" class="flex flex-col items-center gap-1">
-              <div id="mute-bg-${i}" class="w-10 h-10 rounded-full bg-gold shadow-[0_0_15px_rgba(212,175,55,0.4)] backdrop-blur-sm flex items-center justify-center transition-colors">
-                <svg id="mute-icon-${i}" class="w-5 h-5 text-jet transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <!-- Por defecto está encendido (globalMuted = false al inicio) -->
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+            <button onclick="toggleMute(${i})" id="mute-btn-${i}" aria-label="Silenciar o activar el sonido" class="flex flex-col items-center gap-1">
+              <div id="mute-bg-${i}" class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center transition-colors">
+                <svg id="mute-icon-${i}" class="w-5 h-5 text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <!-- Por defecto está silenciado (globalMuted = true al inicio) para permitir el autoplay -->
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
                 </svg>
               </div>
             </button>
@@ -259,6 +259,13 @@
       const vid = document.getElementById(`vid-${i}`);
       const icon = document.getElementById(`play-icon-${i}`);
       if (!vid) return;
+      // Primer tap/click: activar el sonido (como TikTok/IG) sin pausar el video.
+      if (!soundActivated) {
+        activateSound();
+        if (vid.paused) vid.play();
+        if (icon) icon.style.opacity = '0';
+        return;
+      }
       if (vid.paused) {
         vid.play();
         icon.style.opacity = '0';
@@ -269,11 +276,29 @@
       }
     }
 
-    let globalMuted = false;
+    // Los navegadores bloquean el autoplay con audio, así que los videos arrancan MUTEADOS
+    // (globalMuted = true) para garantizar la reproducción automática. El sonido se activa
+    // con el primer tap/click del usuario, igual que en TikTok/IG.
+    let globalMuted = true;
+    let soundActivated = false;
+
     function toggleMute(i) {
+      soundActivated = true;
       globalMuted = !globalMuted;
+      applyMuteState();
+    }
+
+    // Activa el sonido en la primera interacción del usuario (sin pausar el video).
+    function activateSound() {
+      if (soundActivated || !globalMuted) return;
+      soundActivated = true;
+      globalMuted = false;
+      applyMuteState();
+    }
+
+    function applyMuteState() {
       document.querySelectorAll('video').forEach(v => { v.muted = globalMuted; });
-      
+
       // Update all mute icons and backgrounds
       document.querySelectorAll('[id^="mute-icon-"]').forEach(icon => {
         icon.innerHTML = globalMuted
@@ -298,6 +323,9 @@
       });
     }
 
+    // TODO: la persistencia real de likes requiere un endpoint backend (POST /api/reels/<id>/like/).
+    // Por ahora el "me gusta" solo se guarda en localStorage y likes_count no cambia en el servidor.
+    // El estado visual se restaura al recargar leyendo `likes` desde localStorage (ver renderReels).
     function toggleLike(id, btn) {
       btn.classList.toggle('liked');
       if (likes[id]) {

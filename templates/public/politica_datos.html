@@ -1,0 +1,78 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/favicon30.png' %}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Tratamiento de Datos — Área 30 Barber Club</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
+                  jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' }, smoke: '#F5F5F5' },
+        fontFamily: { sans: ['Montserrat','sans-serif'], serif: ['Playfair Display','serif'] }
+      }}
+    }
+  </script>
+</head>
+<body class="bg-jet text-smoke font-sans antialiased">
+  <div class="max-w-3xl mx-auto px-5 py-12">
+
+    <a href="/" class="inline-flex items-center gap-2 text-gold text-xs tracking-widest uppercase font-bold hover:text-white transition-colors mb-8">← Volver al inicio</a>
+
+    <header class="mb-10 border-b border-white/10 pb-6">
+      <div class="text-2xl font-serif font-bold tracking-widest text-gold">ÁREA 30 BARBER CLUB</div>
+      <h1 class="mt-4 text-2xl md:text-3xl font-serif text-white">Política de Tratamiento de Datos Personales</h1>
+      <p class="mt-2 text-smoke/50 text-sm">En cumplimiento de la Ley 1581 de 2012 y el Decreto 1377 de 2013 de la República de Colombia.</p>
+    </header>
+
+    <div class="space-y-8 text-smoke/70 text-sm leading-relaxed font-light">
+
+      <section>
+        <h2 class="text-white font-semibold tracking-wider uppercase text-xs mb-2">1. Responsable del tratamiento</h2>
+        <p><strong class="text-smoke">Área 30 Barber Club</strong>, ubicado en Restrepo (Meta), Colombia, es el responsable del tratamiento de los datos personales que recolecta a través de su sitio web y sus canales de reserva.</p>
+      </section>
+
+      <section>
+        <h2 class="text-white font-semibold tracking-wider uppercase text-xs mb-2">2. Datos que recolectamos</h2>
+        <p>Recolectamos únicamente los datos necesarios para gestionar tu reserva y la prestación del servicio: <strong class="text-smoke">nombre, número de teléfono y correo electrónico</strong>, junto con la información de la cita (fecha, hora, servicio y barbero seleccionado).</p>
+      </section>
+
+      <section>
+        <h2 class="text-white font-semibold tracking-wider uppercase text-xs mb-2">3. Finalidad</h2>
+        <p>Los datos se utilizan para:</p>
+        <ul class="list-disc list-inside mt-2 space-y-1">
+          <li>Confirmar, recordar y gestionar tus reservas.</li>
+          <li>Contactarte ante cambios, cancelaciones o para coordinar servicios por consulta.</li>
+          <li>Enviarte, si lo autorizas, la encuesta de satisfacción posterior al servicio.</li>
+          <li>Llevar el historial de atención para mejorar tu experiencia.</li>
+        </ul>
+        <p class="mt-2">No vendemos ni compartimos tus datos con terceros con fines comerciales.</p>
+      </section>
+
+      <section>
+        <h2 class="text-white font-semibold tracking-wider uppercase text-xs mb-2">4. Tus derechos como titular</h2>
+        <p>De acuerdo con la Ley 1581 de 2012, tienes derecho a conocer, actualizar, rectificar y suprimir tus datos personales, así como a revocar la autorización otorgada. Puedes ejercer estos derechos escribiéndonos a nuestros canales de contacto.</p>
+      </section>
+
+      <section>
+        <h2 class="text-white font-semibold tracking-wider uppercase text-xs mb-2">5. Conservación y seguridad</h2>
+        <p>Conservamos tus datos mientras exista una relación con el club y por el tiempo que exija la ley. Adoptamos medidas razonables de seguridad para proteger la información contra acceso o uso no autorizado.</p>
+      </section>
+
+      <section>
+        <h2 class="text-white font-semibold tracking-wider uppercase text-xs mb-2">6. Contacto</h2>
+        <p>Para consultas, reclamos o para ejercer tus derechos sobre el tratamiento de tus datos personales, contáctanos a través de los canales publicados en nuestro sitio web o directamente en el establecimiento en Restrepo, Meta.</p>
+      </section>
+
+      <p class="text-smoke/40 text-xs pt-6 border-t border-white/10">Este documento es una política base y debe ser revisada y validada por el responsable del establecimiento antes de su publicación definitiva.</p>
+    </div>
+  </div>
+</body>
+</html>

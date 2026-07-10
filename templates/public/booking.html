@@ -180,7 +180,7 @@
         <div class="flex items-start gap-3 mt-4 bg-jet border border-white/5 p-4 rounded-sm">
           <input type="checkbox" id="privacy-accepted" name="privacy_accepted" class="mt-1 w-4 h-4 accent-gold" required>
           <label for="privacy-accepted" class="text-[0.65rem] text-smoke/60 leading-relaxed">
-            Acepto la <a href="#" class="text-gold hover:underline">Política de Tratamiento de Datos Personales</a>. Autorizo a Área 30 Barber Club a contactarme para fines relacionados con mi cita y enviarme promociones exclusivas (Ley 1581 de 2012).
+            Acepto la <a href="/politica-datos/" class="text-gold hover:underline">Política de Tratamiento de Datos Personales</a>. Autorizo a Área 30 Barber Club a contactarme para fines relacionados con mi cita y enviarme promociones exclusivas (Ley 1581 de 2012).
           </label>
         </div>
 
@@ -229,6 +229,16 @@ const state = {
   slotBarberMap: {}, // { "09:00": [barberObj, ...], ... }
   allBarberData: []
 };
+
+// ─── Formato de fecha legible (mantiene el valor interno YYYY-MM-DD) ───
+function formatDateLong(dateStr) {
+  if (!dateStr) return '';
+  // Parsear como fecha local para evitar el desfase de zona horaria de UTC.
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const dateObj = new Date(y, mo - 1, d);
+  const txt = dateObj.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
 
 // ─── Step Navigation ─────────────────────────
 function goStep(n) {
@@ -467,7 +477,7 @@ function loadAllBarberSlots() {
   state.slotBarberMap = {};
   state.time = null;
   state.barber = null;
-  document.getElementById('step3-date-label').textContent = `Fecha: ${state.date}`;
+  document.getElementById('step3-date-label').textContent = `Fecha: ${formatDateLong(state.date)}`;
 
   fetch('/api/barberos-nativos/')
     .then(r => r.json())
@@ -560,10 +570,24 @@ function selectBarber(el) {
   const h = parseInt(state.time.split(':')[0]), m = state.time.split(':')[1];
   document.getElementById('summary-service').textContent = state.service.name;
   document.getElementById('summary-barber').textContent = state.barber.display_name;
-  document.getElementById('summary-date').textContent = state.date;
+  document.getElementById('summary-date').textContent = formatDateLong(state.date);
   document.getElementById('summary-time').textContent = `${h%12||12}:${m} ${h>=12?'PM':'AM'}`;
   document.getElementById('summary-price').textContent = `$${Number(state.service.price).toLocaleString('es-CO')} COP`;
   setTimeout(() => goStep(4), 300);
+}
+
+// Extrae el primer mensaje legible del error del backend (DRF suele devolver
+// {campo: ["mensaje"]} o {detail: "..."}) en vez de mostrar el JSON crudo.
+function firstErrorMessage(data) {
+  if (!data || typeof data !== 'object') return 'Ocurrió un error. Intenta de nuevo.';
+  if (typeof data.error === 'string') return data.error;
+  if (typeof data.detail === 'string') return data.detail;
+  for (const key of Object.keys(data)) {
+    const val = data[key];
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val) && val.length && typeof val[0] === 'string') return val[0];
+  }
+  return 'Ocurrió un error. Intenta de nuevo.';
 }
 
 // ─── Step 4: Submit ─────────────────────────
@@ -605,7 +629,7 @@ document.getElementById('booking-form').addEventListener('submit', function(e) {
       if (window.A30Reveal) setTimeout(() => window.A30Reveal.refresh(), 60);
     } else {
       restoreBtn();
-      alert('Error al reservar: ' + (data.error || data.detail || JSON.stringify(data)));
+      alert('Error al reservar: ' + firstErrorMessage(data));
     }
   })
   .catch(() => {

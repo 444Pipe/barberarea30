@@ -59,17 +59,27 @@ function debounceClientSearch() {
 function loadClients() {
   const search = document.getElementById('client-search').value;
   const params = search ? `?search=${encodeURIComponent(search)}` : '';
+  const tbody = document.getElementById('clients-table');
+
+  tbody.innerHTML = `
+    <tr><td colspan="7" class="px-4 py-6 text-center text-smoke/40 text-xs">Cargando...</td></tr>
+  `;
 
   fetch('/api/admin/clients/' + params)
     .then(r => r.json())
     .then(clients => {
-      const tbody = document.getElementById('clients-table');
+      if (!clients.length) {
+        tbody.innerHTML = `
+          <tr><td colspan="7" class="px-4 py-6 text-center text-smoke/40 text-xs">Sin clientes</td></tr>
+        `;
+        return;
+      }
       tbody.innerHTML = clients.map(c => `
         <tr class="hover:bg-white/[0.02]">
           <td class="px-4 py-3 text-white font-medium">${esc(c.name)}</td>
           <td class="px-4 py-3 text-smoke/60">${esc(c.phone)}</td>
           <td class="px-4 py-3 text-smoke/80">${esc(c.total_visits)}</td>
-          <td class="px-4 py-3 text-emerald-400 font-medium">$${(c.total_spent||0).toLocaleString('es-CO')}</td>
+          <td class="px-4 py-3 text-emerald-400 font-medium">$${Number(c.total_spent||0).toLocaleString('es-CO')}</td>
           <td class="px-4 py-3 text-smoke/60">${esc(c.last_visit)}</td>
           <td class="px-4 py-3 text-gold">${esc(c.preferred_barber)}</td>
           <td class="px-4 py-3">
@@ -77,6 +87,11 @@ function loadClients() {
           </td>
         </tr>
       `).join('');
+    })
+    .catch(() => {
+      tbody.innerHTML = `
+        <tr><td colspan="7" class="px-4 py-6 text-center text-red-400 text-xs">Error al cargar clientes</td></tr>
+      `;
     });
 }
 
@@ -95,7 +110,7 @@ function viewHistory(phone) {
               <span class="text-smoke/40 ml-2">${esc(h.time)}</span>
               <span class="text-smoke/60 ml-2">${esc(h.service)}</span>
             </div>
-            <span class="text-emerald-400">$${(h.price||0).toLocaleString('es-CO')}</span>
+            <span class="text-emerald-400">$${Number(h.price||0).toLocaleString('es-CO')}</span>
           </div>
         `).join('')}
       `;

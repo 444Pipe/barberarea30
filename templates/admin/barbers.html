@@ -79,13 +79,13 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="admin-label">Usuario</label>
-            <input type="text" id="cred-username" name="new_username" class="admin-input" placeholder="ej: carlos_barber">
+            <input type="text" id="cred-username" name="new_username" autocomplete="off" class="admin-input" placeholder="ej: carlos_barber">
             <p class="text-[0.6rem] text-smoke/30 mt-1">Dejar vacío para generar automático</p>
           </div>
           <div>
             <label class="admin-label">Contraseña</label>
             <div class="relative">
-              <input type="text" id="cred-password" name="new_password" class="admin-input pr-9" placeholder="ej: Barber2024!">
+              <input type="text" id="cred-password" name="new_password" autocomplete="off" class="admin-input pr-9" placeholder="ej: Barber2024!">
               <button type="button" onclick="generatePassword()" title="Generar contraseña" class="absolute right-2 top-1/2 -translate-y-1/2 text-smoke/40 hover:text-gold transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               </button>
@@ -366,8 +366,13 @@ function deleteBarber() {
     method: 'DELETE',
     headers: { 'X-CSRFToken': getCSRF() },
   }).then(r => {
-    if (r.ok) { closeDeleteModal(); loadBarbers(); }
-  });
+    if (r.ok || r.status === 204) {
+      closeDeleteModal();
+      loadBarbers();
+    } else {
+      alert('Error al eliminar el barbero');
+    }
+  }).catch(() => alert('Error de conexión'));
 }
 </script>
 
