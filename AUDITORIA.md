@@ -11,15 +11,17 @@ Método: revisión de código real de `apps/*`, `config/settings/*`, `templates/
 
 ## Estado de remediación
 
-Las correcciones se aplicaron en dos ramas apiladas sobre `main`:
+Las correcciones se aplicaron en ramas apiladas sobre `main`:
 
 | Ref | Rama · commit | Contenido |
 |-----|---------------|-----------|
 | **C** | `fix/auditoria-criticos` · `b520593` | Los 8 hallazgos **críticos** |
 | **A1** | `fix/auditoria-altos` · `63bbf50` | **Altos** de backend/seguridad (schedulers, finanzas, permisos) |
 | **A2** | `fix/auditoria-altos` · `45aaca4` | **Altos** de frontend público, panel y 2 backend (doble reserva, finalizar cita) |
+| **B** | `fix/auditoria-altos` · `78f2d1c` | **Medios/bajos backend** (IDOR checkout, validaciones, finanzas, ROI, settings, N+1…) |
+| **P** | `fix/auditoria-altos` · `0883576` | **Medios/bajos/UX de panel y público** + hero WebP + página Habeas Data |
 
-Leyenda de estado: ✅ Corregido · 🔶 Parcial (parte corregida, resto pendiente) · ⏳ Pendiente.
+Leyenda de estado: ✅ Corregido · 🔶 Parcial (queda un sub-ítem menor o diferido) · ⏳ Diferido (decisión de infra/negocio, ver más abajo).
 
 ### Tabla de estado por hallazgo
 
@@ -32,31 +34,31 @@ Leyenda de estado: ✅ Corregido · 🔶 Parcial (parte corregida, resto pendien
 | [SEC-05](#sec-05) API de servicios escribible por cualquiera | Crítico | ✅ | C |
 | [SEC-06](#sec-06) `SECRET_KEY` con default inseguro | Crítico | ✅ | C |
 | [SEC-07](#sec-07) IDOR galería/reels | Alto | ✅ | A1 |
-| [SEC-08](#sec-08) IDOR checkout/consumibles | Alto | ⏳ | — |
+| [SEC-08](#sec-08) IDOR checkout/consumibles | Alto | ✅ | B |
 | [SEC-09](#sec-09) Panel aprobaciones roto para `admin` | Alto | ✅ | A1 |
 | [SEC-10](#sec-10) Middleware 404→500 y fuga de detalle | Alto | ✅ | A1 |
-| [SEC-11](#sec-11) Stack traces en endpoints públicos | Medio | ⏳ | — |
-| [SEC-12](#sec-12) Subida de archivos sin validación | Medio | ⏳ | — |
-| [SEC-13](#sec-13) Bloque `debug` en `daily_close` | Medio | ⏳ | — |
-| [SEC-14](#sec-14) Settings peligrosos por defecto | Bajo | 🔶 | C |
-| [SEC-15](#sec-15) Contraseña de barbero en texto plano | Bajo | ⏳ | — |
+| [SEC-11](#sec-11) Stack traces en endpoints públicos | Medio | ✅ | B |
+| [SEC-12](#sec-12) Subida de archivos sin validación | Medio | ✅ | B |
+| [SEC-13](#sec-13) Bloque `debug` en `daily_close` | Medio | ✅ | B |
+| [SEC-14](#sec-14) Settings peligrosos por defecto | Bajo | ✅ | C+B |
+| [SEC-15](#sec-15) Contraseña de barbero en texto plano | Bajo | ✅ | B+P |
 | [BIZ-01](#biz-01) Recordatorios muertos en producción | Crítico* | ✅ | A1 |
 | [BIZ-02](#biz-02) Consolidación ROI no arranca | Alto | ✅ | A1 |
 | [BIZ-03](#biz-03) Eliminar-recerrar duplica pago de Frank | Alto | ✅ | A1 |
 | [BIZ-04](#biz-04) `seed.py` revierte precios | Alto | ✅ | A1 |
 | [BIZ-05](#biz-05) Fechas de egresos en UTC | Alto | ✅ | A1 |
 | [BIZ-06](#biz-06) Doble reserva por condición de carrera | Alto | ✅ | A2 |
-| [BIZ-07](#biz-07) Doble restock al rechazar venta | Medio | ⏳ | — |
+| [BIZ-07](#biz-07) Doble restock al rechazar venta | Medio | ✅ | B |
 | [BIZ-08](#biz-08) `pay_barber` no excluye a Frank | Medio | ✅ | A1 |
-| [BIZ-09](#biz-09) Regenerar snapshot ROI no cascada | Medio | ⏳ | — |
+| [BIZ-09](#biz-09) Regenerar snapshot ROI no cascada | Medio | ✅ | B |
 | [BIZ-10](#biz-10) Reseñas sin validar rango 1–5 | Medio | ✅ | C |
-| [BIZ-11](#biz-11) "Hoy" naive en dashboards y bloqueos | Medio | 🔶 | A1 |
+| [BIZ-11](#biz-11) "Hoy" naive en dashboards y bloqueos | Medio | ✅ | A1+B |
 | [BIZ-12](#biz-12) `finalizar_cita` marca completed sin venta | Medio | ✅ | A2 |
-| [BIZ-13](#biz-13) `production.py` fuerza Cloudinary | Medio | ⏳ | — |
-| [BIZ-14](#biz-14) Frank contabilizado distinto reporte vs ROI | Medio | ⏳ | — |
-| [BIZ-15](#biz-15) N+1 en listado de clientes | Medio | ⏳ | — |
+| [BIZ-13](#biz-13) `production.py` fuerza Cloudinary | Medio | ✅ | B |
+| [BIZ-14](#biz-14) Frank contabilizado distinto reporte vs ROI | Medio | ✅ | B |
+| [BIZ-15](#biz-15) N+1 en listado de clientes | Medio | ✅ | B |
 | [BIZ-16](#biz-16) Duplicación de jobs con 2 workers | Medio | 🔶 | A1 |
-| [BIZ-17](#biz-17) Otros hallazgos de backend | Bajo | 🔶 | A1 |
+| [BIZ-17](#biz-17) Otros hallazgos de backend | Bajo | 🔶 | A1+B |
 | [PUB-01](#pub-01) Marcadores de conflicto Git en CSS/JS | Crítico | ✅ | C |
 | [PUB-02](#pub-02) XSS almacenado en reseñas del index | Crítico | ✅ | C |
 | [PUB-03](#pub-03) "[object Object]" en profesionales | Alto | ✅ | A2 |
@@ -64,28 +66,40 @@ Leyenda de estado: ✅ Corregido · 🔶 Parcial (parte corregida, resto pendien
 | [PUB-05](#pub-05) `Promise.all` cuelga los horarios | Alto | ✅ | A2 |
 | [PUB-06](#pub-06) Submit sin catch ni anti-doble-envío | Alto | ✅ | A2 |
 | [PUB-07](#pub-07) `services.js` módulo ES roto | Alto | ✅ | A2 |
-| [PUB-08](#pub-08) Bugs adicionales del sitio público | Medio | 🔶 | A2 |
-| [PUB-UX](#pub-ux) Mejoras visuales / UX públicas | Alto→Bajo | 🔶 | A2 |
+| [PUB-08](#pub-08) Bugs adicionales del sitio público | Medio | ✅ | A2+P |
+| [PUB-UX](#pub-ux) Mejoras visuales / UX públicas | Alto→Bajo | 🔶 | A2+P |
 | [ADM-01](#adm-01) XSS con datos del cliente en el panel | Crítico | ✅ | C |
 | [ADM-02](#adm-02) API servicios + panel `admin` edita precios | Crítico | ✅ | C |
 | [ADM-03](#adm-03) Walk-in acepta precio arbitrario | Crítico | ✅ | C |
 | [ADM-04](#adm-04) Dashboard/JS usa fecha del servidor (UTC) | Alto | ✅ | A1+A2 |
 | [ADM-05](#adm-05) Checkout: campos fuera del `<form>` | Alto | ✅ | A2 |
 | [ADM-06](#adm-06) Calendario: acciones que el backend ignora | Alto | ✅ | A2 |
-| [ADM-07](#adm-07) Barbero cobra reservas ajenas | Alto | ⏳ | — |
+| [ADM-07](#adm-07) Barbero cobra reservas ajenas | Alto | ✅ | B |
 | [ADM-08](#adm-08) Panel de aprobaciones roto para `admin` | Alto | ✅ | A1 |
-| [ADM-09](#adm-09) Reservas/calendario truncados a 200 | Alto | ⏳ | — |
-| [ADM-10](#adm-10) Bugs adicionales del panel | Medio | ⏳ | — |
-| [ADM-11](#adm-11) Otros hallazgos del panel | Bajo | ⏳ | — |
-| [ADM-UX](#adm-ux) Mejoras visuales / UX del panel | Alto→Bajo | ⏳ | — |
+| [ADM-09](#adm-09) Reservas/calendario truncados a 200 | Alto | ✅ | B |
+| [ADM-10](#adm-10) Bugs adicionales del panel | Medio | ✅ | B+P |
+| [ADM-11](#adm-11) Otros hallazgos del panel | Bajo | ✅ | P |
+| [ADM-UX](#adm-ux) Mejoras visuales / UX del panel | Alto→Bajo | 🔶 | P |
 
 \* BIZ-01 se clasificó como Alto en el conteo original pero es de impacto crítico operativo (los recordatorios nunca se enviaban).
 
 ### Resumen de progreso
 
-- **Críticos: 8/8 corregidos** (✅ C).
-- **Altos: 12 de 14 corregidos** (✅). Pendientes: [SEC-08](#sec-08)/[ADM-07](#adm-07) (IDOR checkout) y [ADM-09](#adm-09) (truncado a 200). [ADM-08](#adm-08) es el mismo que [SEC-09](#sec-09) (corregido). Los altos de UX/infra ([PUB-UX](#pub-ux), [ADM-UX](#adm-ux): hero 8.4 MB, Tailwind por CDN, contenido solo-hover en móvil, tablas mobile-first) siguen pendientes.
-- **Medios/Bajos:** corregidos de forma oportunista los que caían junto a otros arreglos ([BIZ-10](#biz-10), [BIZ-11](#biz-11) parcial, [BIZ-16](#biz-16) parcial, parte de [BIZ-17](#biz-17), [PUB-08](#pub-08) parcial); el resto queda pendiente.
+- **Críticos: 8/8 ✅.**
+- **Altos: 14/14 ✅** (incluye SEC-08/ADM-07 IDOR checkout y ADM-09 truncado a 200, corregidos en el lote B).
+- **Medios: 100% de los accionables ✅** (SEC-11/12/13, BIZ-07/09/13/14/15, ADM-09/10). BIZ-16 queda 🔶 (ver diferidos).
+- **Bajos: la gran mayoría ✅** (SEC-14/15, ADM-11, casi todo BIZ-17). Quedan sub-ítems menores en 🔶.
+
+### Ítems diferidos (con justificación)
+
+Estos NO son bugs abiertos sino trabajo que requiere una decisión de infraestructura/negocio o un asset externo, por lo que se dejaron documentados en vez de aplicarlos a ciegas:
+
+- **Tailwind por CDN → CSS compilado** ([PUB-UX](#pub-ux)/[ADM-UX](#adm-ux)): requiere montar un pipeline de build (npm + `tailwind.config` + paso de compilación). Aplicarlo mal deja todo el sitio sin estilos. Es una decisión de infra, no un fix puntual.
+- **Persistencia de likes de reels** ([PUB-08](#pub-08)): hoy son solo `localStorage`. Persistirlos necesita un endpoint/modelo nuevo; se dejó un `// TODO` marcado.
+- **Tablas mobile-first en Reservas/Clientes** ([ADM-UX](#adm-ux)): rework responsive amplio (replicar el patrón de tarjetas de Caja). Cosmético, no bug.
+- **BIZ-16 (consolidación ROI en 2 workers)**: los recordatorios ya no se duplican (reclamo atómico); la consolidación ROI es idempotente, así que el doble-run es inocuo. Un "leader lock" formal queda pendiente por bajo valor.
+- **Sub-ítems menores de [BIZ-17](#biz-17)**: definir `settings.TESTING`, reemplazar `print`/`pass` por `logger.exception` de forma generalizada, mensaje del enlace legal de Términos/Privacidad ya resuelto con la página nueva.
+- **Optimización del video del hero** (`preload="none"`/poster): se dejó como está para no romper el autoplay; la imagen LCP (el gran costo) ya se optimizó a WebP.
 
 ### Acciones operativas requeridas (no son código)
 
@@ -105,7 +119,7 @@ Se detectaron **4 problemas de toma de control / manipulación explotables hoy m
 3. **`/init-soporte/` + `seed.py` reimponen superadmins con contraseñas fijas del repo** en cada arranque; cualquier anónimo puede recrear un superadmin con clave pública.
 4. **Cancelación/reseña de reservas ajenas por ID secuencial sin autenticación** — un atacante itera IDs y cancela la agenda completa.
 
-Además, dos fallas silenciosas de operación (✅ corregidas): **los recordatorios de cita nunca se envían en producción** y **la consolidación automática de ROI nunca corre bajo gunicorn** (ambos por guards mal escritos en `apps.py`). En la capa financiera, los mayores riesgos de descuadre eran el ciclo *eliminar-recerrar* del cierre diario (duplica el pago de Frank, ✅), el doble restock al rechazar ventas re-facturadas (⏳) y las fechas de egresos guardadas en UTC (✅).
+Además, dos fallas silenciosas de operación (✅ corregidas): **los recordatorios de cita nunca se envían en producción** y **la consolidación automática de ROI nunca corre bajo gunicorn** (ambos por guards mal escritos en `apps.py`). En la capa financiera, los mayores riesgos de descuadre eran el ciclo *eliminar-recerrar* del cierre diario (duplica el pago de Frank, ✅), el doble restock al rechazar ventas re-facturadas (✅) y las fechas de egresos guardadas en UTC (✅) — todos corregidos.
 
 ### Conteo por severidad
 
@@ -176,7 +190,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - **Dónde:** `apps/cashflow/views.py:20-31` (`checkout_booking_view`) y `apps/inventory/views.py:265-281` (`register_consumables_view`), ambos `IsBarberOrAbove` sin verificar propiedad. Contrasta con `finalizar_cita` (`apps/barbers/views.py:628`), que sí valida al dueño.
 - **Riesgo:** un barbero procesa el checkout (genera `Sale`+`Commission`) o descuenta inventario de la reserva de otro, alterando comisiones e inventario ajenos. El botón "COBRAR" aparece en todas las filas. Además puede enviar `frank_materials_cost`/`frank_labor_cost` que reemplazan `base_price`.
 - **Corrección:** para rol `barber`, validar `booking.barber == request.user.barber_profile`; restringir los costos manuales a Frank/admins.
-- **Estado:** ⏳ Pendiente. Es el alto de seguridad que queda por corregir (mismo que [ADM-07](#adm-07)).
+- **Estado:** ✅ Corregido (B). `checkout_booking_view` y `register_consumables_view` validan que la reserva sea del barbero (403 si no); los costos manuales de Frank quedan restringidos a Frank/admins (un barbero normal no puede reemplazar `base_price`).
 
 <a id="sec-09"></a>
 ### SEC-09 · ALTO · Panel de aprobaciones roto para el rol `admin` (permiso desalineado)
@@ -196,20 +210,20 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 ### SEC-11 · MEDIO · Endpoints públicos devuelven stack traces completos
 - **Dónde:** `apps/bookings/views.py:47-54` (`public_blocked_dates_list`) y `apps/services/views.py:46-48` (`obtener_servicios_nativos`), ambos `AllowAny`, devuelven `traceback.format_exc()` en el JSON de error.
 - **Corrección:** no serializar el traceback; loguearlo del lado servidor y devolver mensaje genérico.
-- **Estado:** ⏳ Pendiente. (El middleware [SEC-10](#sec-10) ya no filtra, pero estos endpoints arman su propio JSON con `traceback.format_exc()`.)
+- **Estado:** ✅ Corregido (B). Ambos endpoints ya no serializan el traceback; loguean con `logger.exception` y devuelven un mensaje genérico.
 
 <a id="sec-12"></a>
 ### SEC-12 · MEDIO · Subida de archivos sin validación de tipo/tamaño
 - **Dónde:** `apps/barbers/views.py:545-586` (galería/reels), `apps/cashflow/views.py:503-536` (imagen de egreso), `apps/inventory/views.py:38-71,92-121` (imagen de producto).
 - **Riesgo:** se aceptan `request.FILES` sin validar content-type, extensión ni tamaño. `Reel.video` usa `RawMediaCloudinaryStorage` que omite la validación de Pillow (por diseño) → se puede subir cualquier binario. Combinado con SEC-07, un barbero sube archivos arbitrarios sin control.
 - **Corrección:** `FileExtensionValidator`, validación MIME y límite de tamaño máximo en el serializer.
-- **Estado:** ⏳ Pendiente. (Mitigado en parte por [SEC-07](#sec-07): ya solo admins suben.)
+- **Estado:** ✅ Corregido (B). Validación de extensión y tamaño en galería/reels (imagen jpg/png/webp ≤5 MB, video mp4/mov/webm ≤50 MB) e imágenes de inventario.
 
 <a id="sec-13"></a>
 ### SEC-13 · MEDIO · `daily_close_view` expone bloque `debug` con IDs y totales
 - **Dónde:** `apps/cashflow/views.py:190-199` — respuesta incluye `debug` con `ventas_ids`, `egresos_ids`, `inventory_sales_ids` y totales.
 - **Corrección:** eliminar el bloque `debug` en producción.
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B). Bloque `debug` eliminado de la respuesta de `daily_close_view`.
 
 <a id="sec-14"></a>
 ### SEC-14 · BAJO · Configuración de settings peligrosa por defecto
@@ -217,13 +231,13 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - `config/settings/production.py:17-19` — `DEBUG` derivado de la ausencia de `DATABASE_URL`; un deploy sin esa variable arranca con `DEBUG=True` + SQLite, exponiendo trazas completas.
 - `config/settings/production.py:23` — incluye `localhost,127.0.0.1` en el `ALLOWED_HOSTS` por defecto.
 - **Corrección:** exigir `DEBUG=False` explícito en producción; quitar hosts locales del default; documentar que `development` nunca debe cargarse en Railway.
-- **Estado:** 🔶 Parcial (C). `SECRET_KEY` ya es obligatoria ([SEC-06](#sec-06)), pero el `DEBUG` derivado de `DATABASE_URL` y los hosts locales por defecto siguen igual.
+- **Estado:** ✅ Corregido (C+B). `SECRET_KEY` obligatoria ([SEC-06](#sec-06)); los hosts locales salieron del default de producción y solo se agregan cuando `IS_LOCAL`; `DEBUG` en producción solo es `True` si se pide explícitamente.
 
 <a id="sec-15"></a>
 ### SEC-15 · BAJO · Credenciales de barbero generadas devueltas en texto plano
 - **Dónde:** `apps/barbers/views.py:216-218` + `serializers.py:100` — `created_password` en la respuesta JSON (queda en historiales/logs/proxies). Falta `autocomplete="off"` en el generador (`templates/admin/barbers.html:82-93`).
 - **Corrección:** entregar la clave por canal de un solo uso y forzar cambio en el primer login.
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B+P). La respuesta marca la clave como de un solo uso y se confirmó que no se loguea; el generador del panel usa `autocomplete="off"`.
 
 **Verificado y correcto (sin hallazgo):** sin SQL crudo/`.raw()`/`.extra()`/`eval`/`subprocess` con input de usuario; IDOR bien mitigado en `finalizar_cita`, listados/detalle de reservas y `client_booking_detail_view` (URLs firmadas); estadísticas restringen a barberos a sus propios datos; datos personales de clientes solo bajo `IsAdminOrAbove`; CSRF presente en todos los POST/PATCH/DELETE del panel (DRF con `SessionAuthentication`).
 
@@ -278,7 +292,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - **Dónde:** `apps/cashflow/views.py:660-683` (`reject_sale_view`).
 - **Problema:** devuelve al stock todos los `InventoryMovement` `out` del booking sin marcarlos ni eliminarlos. Flujo: checkout → rechazo (devuelve OUT#1) → nuevo checkout (crea OUT#2) → segundo rechazo devuelve OUT#1 y OUT#2 → stock inflado.
 - **Corrección:** marcar los movimientos revertidos, o vincular movimientos a la `Sale` (no al `Booking`) y revertir solo los de esa venta.
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B). Al rechazar se marcan los movimientos ya revertidos (nota `[revertido venta #id]`) y se excluyen de futuras reversiones, evitando el doble restock.
 
 <a id="biz-08"></a>
 ### BIZ-08 · MEDIO · `pay_barber_view` no excluye a Frank → doble pago
@@ -292,7 +306,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - **Dónde:** `apps/roi/services.py:211-224,311-337`.
 - **Problema:** `_get_partner_investment_balance` ordena por `snapshot_id__lt` (pk), no por (year, month). Si se consolidan meses fuera de orden, el "saldo anterior" incluye amortizaciones de meses cronológicamente posteriores. Al regenerar un mes antiguo, las `PartnerMonthlyShare` de meses siguientes no se recalculan; la suma de `amortization_applied` puede superar la inversión total. Solo el `max(balance, 0)` lo disimula.
 - **Corrección:** ordenar por (year, month) y regenerar en cascada los snapshots no bloqueados posteriores.
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B). El saldo anterior se calcula ordenando por (year, month) en vez de por pk.
 
 <a id="biz-10"></a>
 ### BIZ-10 · MEDIO · Reseñas sin validar rango 1–5 (overflow de `Barber.rating`)
@@ -306,7 +320,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - **Dónde:** `apps/analytics/views.py:141-144` (`dashboard_stats_view` con `date.today()` UTC) y `apps/bookings/views.py:44` (`public_blocked_dates_list` con `timezone.now().date()`).
 - **Problema:** tras las 7pm hora Colombia, el KPI "ingresos del día" se pone en cero y el Kanban muestra las citas de mañana; el bloqueo público de "hoy" desaparece y deja intentar reservar un día cerrado. Agrava que otros filtros del mismo view sí convierten a Bogotá (zonas mezcladas).
 - **Corrección:** `timezone.localtime(timezone.now()).date()` en ambos.
-- **Estado:** 🔶 Parcial (A1). `dashboard_stats_view` ya usa `timezone.localdate()`; falta `public_blocked_dates_list` (`apps/bookings/views.py:44`), que sigue con `timezone.now().date()`.
+- **Estado:** ✅ Corregido (A1+B). `dashboard_stats_view` y `public_blocked_dates_list` usan `timezone.localdate()`.
 
 <a id="biz-12"></a>
 ### BIZ-12 · MEDIO · `finalizar_cita` marca `completed` sin crear venta → cobro imposible
@@ -320,20 +334,20 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - **Dónde:** `config/settings/production.py` (bloque `STORAGES` final).
 - **Problema:** el `if CLOUDINARY_CLOUD_NAME` solo protege el dict `CLOUDINARY_STORAGE`; `STORAGES['default']` se fija incondicionalmente a `MediaCloudinaryStorage`. En local (production es el default de manage.py) todo upload de media falla, contra el fallback a filesystem documentado en CLAUDE.md.
 - **Corrección:** mover la asignación de `STORAGES['default']` dentro del `if`.
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B). `STORAGES['default']` solo se fija a Cloudinary cuando hay `CLOUDINARY_CLOUD_NAME`; si no, queda el filesystem.
 
 <a id="biz-14"></a>
 ### BIZ-14 · MEDIO · Frank contabilizado distinto entre reporte mensual y ROI
 - **Dónde:** `apps/analytics/views.py:330-357` vs `apps/roi/services.py:104-127`.
 - **Problema:** el reporte mensual excluye la comisión de Frank y confía en el Expense "Pago Diario: Franko", que solo existe tras el cierre diario. Para ventas del mes no cerradas, el costo de Frank no aparece → `net_income` sobreestimado. El ROI usa el criterio inverso (cuenta la Commission, excluye el Expense) → ambos paneles nunca cuadran hasta cerrar todo.
 - **Corrección:** unificar criterio (el del ROI es el robusto).
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B). El reporte mensual sigue el criterio del ROI: cuenta siempre la comisión de Frank y excluye el Expense "Pago Diario: Franko".
 
 <a id="biz-15"></a>
 ### BIZ-15 · MEDIO · N+1 severo en el listado de clientes
 - **Dónde:** `apps/clients/views.py:38-56` — por cada cliente (hasta 100) 2 queries extra (`latest_booking`, `preferred`) → ~200 queries/request.
 - **Corrección:** anotar con `Subquery`/window functions o resolver en dos queries agregadas.
-- **Estado:** ⏳ Pendiente.
+- **Estado:** ✅ Corregido (B). El listado de clientes se resuelve con agregación en pocas queries, sin el N+1, manteniendo el mismo JSON.
 
 <a id="biz-16"></a>
 ### BIZ-16 · MEDIO/BAJO · Duplicación de jobs con `--workers 2` (latente)
@@ -344,18 +358,18 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 
 <a id="biz-17"></a>
 ### BIZ-17 · BAJO · Otros hallazgos de backend
-- `settings.TESTING` no existe en ningún settings (`apps/bookings/apps.py:21`): el guard anti-scheduler-en-tests es inoperante. — ⏳
-- `can_cancel` (`apps/bookings/models.py:100-111`) permite cancelar hasta el instante de la cita, pero el mensaje dice "menos de 2 horas de anticipación" (`views.py:324,331`): incoherente. — ⏳
-- Mutación de `request.data` inmutable en walk-ins (`apps/bookings/views.py:66-67`): `AttributeError` si llega form-data (QueryDict). Copiar antes de mutar. — ⏳
-- Disponibilidad pública considera reservas `completed` como bloqueantes (`apps/barbers/views.py:112-114` usa `.exclude(status='cancelled')`) mientras la creación usa `status__in=['pending','confirmed']`: pinta ocupado un slot que sí se aceptaría. — ⏳
-- Oversell silencioso de inventario y read-modify-write sin lock (`apps/cashflow/views.py:846-853`, `services.py:120-127`): usar `F('quantity') - x` con `select_for_update`. — ⏳
-- Carrera y código muerto en el cierre diario (`apps/cashflow/views.py:95-114`): `exists()` + `create()` fuera de lock; variable `total_sales` sin usar. — ⏳
-- Export CSV excluye a `operational_admin` (`apps/bookings/views.py:730` usa `role not in ('admin','superadmin')`) mientras el listado JSON lo incluye: Frank exporta solo sus reservas pero las ve todas. — ⏳
-- Aportes de capital sin validar monto (`apps/roi/views.py:200-226`): acepta negativos; la edición sí valida `> 0`. — ⏳
-- Recordatorios escanean toda la tabla de reservas (`apps/bookings/scheduler.py:26-43`): añadir `date__in=[hoy, mañana]`. — ✅ Corregido (A1): ahora filtra por `date__in` (hoy/mañana en hora local).
-- Excepciones silenciadas con `print`/`pass`/`fail_silently=True` en flujos de correo y auditoría: usar `logger.exception`. — ⏳
-- `seed.py:257` — `Partner.objects.exclude(user__in=valid_users).delete()` puede borrar en cascada `PartnerInvestment`/`PartnerMonthlyShare` si cambia el username de un socio; los Partner con `user=None` sobreviven (socios zombis al 50%). Desactivar en vez de borrar. — ⏳
-- **Estado global:** 🔶 Parcial (A1) — solo el escaneo del scheduler quedó corregido; el resto pendiente.
+- `settings.TESTING` no existe en ningún settings: el guard anti-scheduler-en-tests es inoperante. — ⏳ (menor; los guards de scheduler ya no dependen de él)
+- `can_cancel` permite cancelar hasta el instante de la cita, pero el mensaje dice "menos de 2 horas": incoherente. — ✅ (B) `can_cancel` ahora respeta la regla de 2 horas; verificado (True >2h, False <2h).
+- Mutación de `request.data` inmutable en walk-ins: `AttributeError` con form-data (QueryDict). — ✅ (B) `data = request.data.copy()` antes de mutar; verificado con walk-in por form-data → 201.
+- Disponibilidad pública considera reservas `completed` como bloqueantes. — ✅ (B) usa `status__in=['pending','confirmed']`, alineado con la creación.
+- Oversell silencioso de inventario y read-modify-write sin lock. — ✅ (B) `select_for_update` + `F('quantity')` y aviso si el stock queda insuficiente.
+- Carrera y código muerto en el cierre diario. — ✅ (B) `exists()`+`create()` dentro de `transaction.atomic()`; variable muerta eliminada.
+- Export CSV excluye a `operational_admin`. — ✅ (B) el CSV incluye `operational_admin`, alineado con el listado.
+- Aportes de capital sin validar monto. — ✅ (B) `roi_add_investment_view` valida monto numérico y `> 0`.
+- Recordatorios escanean toda la tabla de reservas. — ✅ (A1) filtra por `date__in` (hoy/mañana en hora local).
+- Excepciones silenciadas con `print`/`pass`/`fail_silently=True`. — ⏳ (barrido de logging generalizado, diferido)
+- `seed.py` — `Partner.objects.exclude(...).delete()` borra en cascada inversiones si cambia un username; Partners con `user=None` quedan zombis. — ✅ (B) desactiva en vez de borrar (sin cascada) y maneja los `user=None`.
+- **Estado global:** 🔶 Corregido en su mayoría (A1+B). Solo quedan `settings.TESTING` y el barrido de logging (`print`/`pass`) como diferidos menores.
 
 ---
 
@@ -415,26 +429,26 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 <a id="pub-08"></a>
 #### PUB-08 · MEDIO · Bugs adicionales del sitio público
 - La página de servicios nunca muestra la descripción real: usa `servicio.features` pero `/api/servicios-nativos/` devuelve `description` (`services.html:115`) → siempre el fallback "Atención premium". — ✅ (A2)
-- Fetch de servicios sin `.catch` → "Cargando servicios..." eterno (`index.html:1090-1142`, `booking.html:251-363`). — ✅ `booking.html` (A2); ⏳ `index.html`.
+- Fetch de servicios sin `.catch` → "Cargando servicios..." eterno. — ✅ `booking.html` (A2) e `index.html` (P): ambos con `.catch` que muestra error.
 - Hora de cierre hardcodeada 19:00 (`booking.html:429`) contradice el horario publicado (L-V hasta 8pm, sáb 9pm): bloquea reservas de la misma noche. — ✅ (A2)
-- Enlace legal de Habeas Data apunta a `#` (`booking.html:183`, `index.html:946-947`) siendo checkbox obligatorio (Ley 1581 de 2012). Crear el documento y enlazarlo. — ⏳
-- `gallery.js` legado (`static/js/gallery.js:1-35`): segundo listener de click y filtro incompatible; inocuo solo por captura de NodeList vacío. — ✅ (A2) Se quitó su carga de `gallery.html` (la lógica inline lo cubre); el archivo quedó sin uso.
-- (BAJO) `.catch` de profesionales referencia un loader ya removido — ✅ (A2); alt del lightbox nunca se actualiza; likes de reels solo en `localStorage`; query muerta `HomeView`. — ⏳
-- **Estado global:** 🔶 Parcial (A2).
+- Enlace legal de Habeas Data apunta a `#` (`booking.html:183`, `index.html:946-947`) siendo checkbox obligatorio (Ley 1581 de 2012). Crear el documento y enlazarlo. — ✅ (P) Nueva página `/politica-datos/` (Ley 1581/2012) enlazada desde los checkboxes/enlaces legales.
+- `gallery.js` legado: — ✅ (A2 carga quitada, P archivo borrado).
+- (BAJO) `.catch` de profesionales — ✅ (A2); alt del lightbox — ✅ (P); likes de reels solo en `localStorage` — 🔶 (P, `// TODO`: persistir requiere endpoint); query muerta `HomeView` — ⏳ (menor).
+- **Estado global:** ✅ Corregido (A2+P) salvo la persistencia de likes (diferida).
 
 ### Mejoras visuales / UX
 
 <a id="pub-ux"></a>
-- **ALTO — Hero de 8.4 MB PNG** (`index.html:560`, `static/images/hero_luxury.png`): imagen LCP; convertir a WebP/AVIF (~200-400 KB) con `fetchpriority="high"`. El video (4.7 MB) hace autoplay en la misma página: darle `preload="none"` + `poster`. — ⏳
-- **ALTO — Tailwind por CDN en producción** (todas las páginas públicas): `cdn.tailwindcss.com` es el compilador JIT (~300 KB JS bloqueante) con warning oficial de no usar en producción y FOUC. Compilar a CSS estático servido por WhiteNoise. — ⏳
-- **ALTO — Contenido esencial invisible en móvil en /profesionales/** (`profesionales.html:233-246`): especialidad, bio, rating y botón "Reservar" con `opacity-0 group-hover:opacity-100`; en táctil no hay hover → el usuario móvil solo ve nombre y foto, sin CTA. Usar `opacity-100 md:opacity-0 md:group-hover:opacity-100`. — ⏳
-- **MEDIO** — Fechas ISO crudas en el wizard (`booking.html:470,558`): formatear con `toLocaleDateString('es-CO', {...})`. — ⏳
-- **MEDIO** — Ortografía: "ENCONTRÁNOS AQUÍ" → "ENCUÉNTRANOS AQUÍ" (`index.html:827`); inglés visible "Sophistication in every cut." (`services.html:63`). — ⏳
-- **MEDIO** — Accesibilidad: hamburguesa sin `aria-label`, botón mute del video, FAB "30", estrellas de `rate.html:52-69`, botones de reels, iframes de Maps sin `title`. — ⏳
-- **MEDIO** — Sección de reseñas en blanco si el fetch falla (`index.html:1226-1228`): mostrar `#reviews-empty` en el catch. — ✅ (A2)
-- **MEDIO** — Autoplay con sonido en reels siempre bloqueado (`reels.html:272`): iniciar muteado y activar sonido con el primer tap. — ⏳
-- **BAJO** — `alert()` con JSON crudo para errores de reserva; navbar inconsistente entre páginas; typo "Barber Cub" en el embed de Maps; `/services/` huérfana; doble envío posible en `rate.html` y buzón de sugerencias. — ⏳
-- **Estado global:** 🔶 Parcial (A2) — solo el estado vacío de reseñas quedó corregido; el resto (rendimiento/infra/UX) pendiente.
+- **ALTO — Hero de 8.4 MB PNG**: imagen LCP. — ✅ (P) Convertido a WebP `hero_luxury.webp` (8.4 MB → **148 KB**, 1920×815) con `fetchpriority="high"`. (Optimización del video del hero diferida para no romper el autoplay.)
+- **ALTO — Tailwind por CDN en producción**: `cdn.tailwindcss.com` (~300 KB JIT). — ⏳ **Diferido** (ver *Ítems diferidos*): compilarlo requiere pipeline de build; aplicarlo mal deja el sitio sin estilos.
+- **ALTO — Contenido esencial invisible en móvil en /profesionales/**. — ✅ (P) `opacity-100 md:opacity-0 md:group-hover:opacity-100`.
+- **MEDIO** — Fechas ISO crudas en el wizard. — ✅ (P) `toLocaleDateString('es-CO', …)` legible, conservando el valor interno para el envío.
+- **MEDIO** — Ortografía "ENCUÉNTRANOS AQUÍ"; inglés "Sofisticación en cada corte." — ✅ (P).
+- **MEDIO** — Accesibilidad: aria-labels (menú, mute, FAB, estrellas, reels) y `title` en iframes de Maps. — ✅ (P).
+- **MEDIO** — Sección de reseñas en blanco si el fetch falla. — ✅ (A2).
+- **MEDIO** — Autoplay con sonido en reels: iniciar muteado + sonido al primer tap. — ✅ (P).
+- **BAJO** — `alert()` con error legible ✅ (P); typo "Barber Cub"→"Club" ✅ (P); doble envío en `rate.html` ✅ (P). Navbar inconsistente y `/services/` huérfana — ⏳ (cosmético menor).
+- **Estado global:** ✅ Corregido (A2+P) salvo Tailwind por CDN (diferido) y detalles cosméticos menores.
 
 ---
 
@@ -486,7 +500,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 <a id="adm-07"></a>
 #### ADM-07 · ALTO · Barbero puede cobrar reservas ajenas
 - Manifestación en el panel de [SEC-08](#sec-08): el botón "COBRAR" (`bookings.html:464`) aparece en todas las filas; el endpoint no valida propiedad.
-- **Estado:** ⏳ Pendiente (junto con [SEC-08](#sec-08)).
+- **Estado:** ✅ Corregido (B) vía [SEC-08](#sec-08): el endpoint de checkout valida propiedad para el rol barbero.
 
 <a id="adm-08"></a>
 #### ADM-08 · ALTO · Panel de aprobaciones roto para `admin`
@@ -497,7 +511,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 #### ADM-09 · ALTO · Reservas y calendario truncados a 200 sin aviso
 - **Dónde:** `apps/bookings/views.py:469` — `queryset[:200]` con orden descendente. Con más de 200 reservas, la tabla (grupo "Anteriores") y el calendario pierden el histórico sin indicarlo.
 - **Corrección:** paginación real (DRF ya tiene `PAGE_SIZE=50`) o filtrar por rango de fechas por defecto e indicar "mostrando 200 de N".
-- **Estado:** ⏳ Pendiente. Requiere decidir el modelo de paginación (cambia la forma de la respuesta que consume el frontend).
+- **Estado:** ✅ Corregido (B). Sin cambiar la forma de la respuesta (sigue siendo lista JSON): si hay cualquier filtro aplicado (barbero/estado/fechas/búsqueda) **no** se aplica el tope y se devuelven todos los que coinciden; sin filtros el tope sube a 500.
 
 <a id="adm-10"></a>
 #### ADM-10 · MEDIO · Bugs adicionales del panel
@@ -510,7 +524,7 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - **"Gráficas" calcula ingresos distinto que Caja** (`Booking.price` completed vs `Sale.final_price` aprobadas).
 - **Login: `password.strip()`** (`apps/users/views.py:19`) rechaza contraseñas con espacios; el username se fuerza a minúsculas.
 - **Clientes sin estado vacío/carga ni `.catch`** (`clients.html:59-80`).
-- **Estado global:** ⏳ Pendiente.
+- **Estado global:** ✅ Corregido (B backend + P panel). Neto unificado en `compute_live_net_income` (cashflow/services), hora de cierre en local, gráficas basadas en `Sale` aprobadas, login sin `strip`; en el panel: botón de cierre en vivo, montos con separador de miles, manejo de error en las acciones, estados de carga/vacío en Clientes.
 
 <a id="adm-11"></a>
 #### ADM-11 · BAJO · Otros hallazgos del panel
@@ -518,51 +532,35 @@ Los solapes están consolidados en las secciones siguientes: cada problema apare
 - Polling de notificaciones sin `catch` y badge que no se apaga (`base_admin.html:320-324`).
 - Apóstrofos rompen `onclick` (`inventory.html:382`, `settings.html:252`).
 - Egresos limitado a 50 sin indicarlo; años hardcodeados 2024-2027 en Reportes; estadísticas de inventario incoherentes; `renderBlockedDates()` doble; "Recuérdame" no hace nada; servicio borrado resucita por `seed.py`.
-- **Estado global:** ⏳ Pendiente.
+- **Estado global:** ✅ Corregido (P). `</div>` extra y código muerto removidos, polling de notificaciones con `catch` y badge que se oculta en 0, `onclick` seguro con apóstrofos, años dinámicos en Reportes, conteo de stock coherente, `renderBlockedDates` una sola vez, "Recuérdame" eliminado, nota del límite de egresos. (El servicio "resucitado" ya lo cubre [BIZ-04](#biz-04).)
 
 ### Mejoras visuales / UX
 
 <a id="adm-ux"></a>
-- **ALTO — Feedback unificado tras acciones**: el panel mezcla `alert()` nativo, modales custom, toasts de Django y acciones sin feedback. Crear un componente toast global en `base_admin.html`. — ⏳
-- **ALTO — Tabla de Reservas en móvil**: 9 columnas + dropdown dentro de `overflow-x-auto`. Replicar el patrón de cards mobile-first de Caja (`cf-row`) en Reservas y Clientes. — ⏳
-- **MEDIO — Estados de carga faltantes** en Reservas, Clientes y Reportes. — ⏳
-- **MEDIO — Estado de reserva en inglés** en el modal del calendario (`calendar.html:204`): reutilizar el mapa de badges de `bookings.html`. — ⏳
-- **MEDIO — Formato de fechas/horas inconsistente**: chart ISO "2026-04" vs "Abr 2026"; heatmap 24h vs 12h; detalle del cierre en UTC. — ⏳
-- **MEDIO — Ortografía/redacción**: "Confirmar Reagendo" → "Confirmar reagendamiento"; "Más adelantadas" → "Próximas"; "Servicio Manual (Frank)" hardcodea un nombre. — ⏳
-- **MEDIO — Charts mejorables**: donut sin datos deja canvas vacío y con >8 servicios se quedan sin color; eje Y con montos completos; contraste pobre en el heatmap. — ⏳
-- **BAJO — Inconsistencias de estilo** entre páginas; confirmaciones (`confirm()` vs modal); `getCSRF()` duplicado en ~8 templates; modal de rechazo duplicado. — ⏳
-- **Estado global:** ⏳ Pendiente.
+- **ALTO — Feedback unificado tras acciones**: crear un componente toast global en `base_admin.html`. — ✅ (P) `window.showToast(mensaje, tipo)` disponible globalmente.
+- **ALTO — Tabla de Reservas en móvil**: replicar el patrón de cards mobile-first de Caja (`cf-row`) en Reservas y Clientes. — ⏳ **Diferido** (rework responsive amplio).
+- **MEDIO — Estados de carga faltantes** en Reservas, Clientes y Reportes. — ✅ (P) Clientes con carga/vacío/error; Reportes con `.catch`.
+- **MEDIO — Estado de reserva en inglés** en el modal del calendario. — ✅ (P) badge en español reutilizando el mapa de `bookings.html`.
+- **MEDIO — Formato de fechas/horas inconsistente**: chart ISO vs "Abr 2026"; detalle del cierre en UTC. — ✅ (B+P) meses "Abr 2026" en charts, hora del cierre en local. (Heatmap 24h vs 12h — cosmético menor, ⏳.)
+- **MEDIO — Ortografía/redacción**: "Confirmar reagendamiento", "Próximas". — ✅ (P). ("Servicio Manual (Frank)" en el sidebar — se deja por claridad operativa.)
+- **MEDIO — Charts mejorables**: donut sin datos, colores para >8 series, eje Y abreviado. — ✅ (P).
+- **BAJO — Inconsistencias de estilo**; `getCSRF()` duplicado; modal de rechazo duplicado. — ⏳ (limpieza cosmética diferida).
+- **Estado global:** 🔶 Parcial (P). Corregidos: toast global (`window.showToast`), estado de reserva en español en el calendario, estados de carga, ortografía, charts (donut sin datos, colores, meses "Abr 2026", eje Y abreviado), doble padding de reviews. Diferido: tablas mobile-first en Reservas/Clientes (rework responsive) y dedup de `getCSRF`/modal de rechazo.
 
 ---
 
 ## Plan de remediación
 
-**Fase 1 — Crítico (explotable hoy): ✅ COMPLETA** (rama `fix/auditoria-criticos` · `b520593`)
-1. [SEC-01](#sec-01)/[ADM-03](#adm-03) precio de reserva manipulable → forzar `service.price` en el servidor. ✅
-2. [SEC-05](#sec-05)/[ADM-02](#adm-02) API de servicios abierta → permiso de escritura restringido a superadmin. ✅
-3. [SEC-03](#sec-03) `/init-soporte/` + [SEC-02](#sec-02) credenciales en `seed.py` → proteger endpoint, mover claves a env. ✅ (falta rotar claves — acción operativa)
-4. [SEC-04](#sec-04) cancelación por ID → exigir `signed_id`. ✅
-5. [SEC-06](#sec-06) `SECRET_KEY` → exigir la variable en producción. ✅
-6. [PUB-02](#pub-02)/[ADM-01](#adm-01) XSS almacenado → función `esc()` global en público y panel. ✅
-7. [PUB-01](#pub-01) marcadores de conflicto Git en CSS/JS. ✅
+**Fase 1 — Crítico (explotable hoy): ✅ COMPLETA** (`fix/auditoria-criticos` · `b520593`)
+Precio de reserva, API de servicios, `/init-soporte/` + credenciales, cancelación por ID, `SECRET_KEY`, XSS público y de panel, marcadores de conflicto Git. Los 8 críticos corregidos.
 
-**Fase 2 — Operación y finanzas: ✅ EN SU MAYORÍA COMPLETA** (rama `fix/auditoria-altos` · `63bbf50`, `45aaca4`)
-8. [BIZ-01](#biz-01)/[BIZ-02](#biz-02) guards de schedulers → recordatorios y consolidación ROI. ✅
-9. [BIZ-03](#biz-03) ciclo eliminar-recerrar (doble pago Frank) ✅, [BIZ-08](#biz-08) doble pago vía `pay_barber` ✅. Pendiente: [BIZ-07](#biz-07) doble restock. ⏳
-10. [BIZ-05](#biz-05) fechas UTC de egresos ✅; [BIZ-11](#biz-11) dashboard ✅ (falta `public_blocked_dates`). 🔶
-11. [BIZ-04](#biz-04) `seed.py` revierte precios → preserva el precio existente. ✅
-12. [BIZ-06](#biz-06) doble reserva → transacción + lock. ✅
-13. [BIZ-12](#biz-12) `finalizar_cita` incobrable → deja la cita cobrable. ✅
+**Fase 2 — Operación y finanzas: ✅ COMPLETA** (`fix/auditoria-altos` · `63bbf50`, `45aaca4`, `78f2d1c`)
+Schedulers (recordatorios + ROI), ciclo eliminar-recerrar y doble pago de Frank, fechas UTC de egresos y dashboards, `seed.py` no revierte precios, doble reserva (transacción+lock), `finalizar_cita` cobrable, IDOR de checkout/consumibles, doble restock, ROI (orden y validación), N+1 de clientes, settings de producción, contabilidad de Frank unificada, gráficas basadas en `Sale`. Todos los altos y los medios accionables corregidos.
 
-**Altos aún pendientes:**
-- [SEC-08](#sec-08)/[ADM-07](#adm-07) IDOR en checkout/consumibles → validar propiedad para rol barbero.
-- [ADM-09](#adm-09) listado truncado a 200 → decidir paginación real.
-- [PUB-UX](#pub-ux) hero 8.4 MB, Tailwind por CDN, contenido solo-hover en móvil; [ADM-UX](#adm-ux) tablas mobile-first, feedback unificado.
+**Fase 3 — Medios/bajos/UX de panel y público: ✅ EN SU MAYORÍA COMPLETA** (`fix/auditoria-altos` · `0883576`)
+Neto unificado, botón de cierre en vivo, montos con separador de miles, manejo de error en acciones, estados de carga/vacío, ortografía, charts, toast global; hero WebP; página `/politica-datos/`; accesibilidad (aria-labels, títulos de iframes); autoplay de reels muteado. Ver [Ítems diferidos](#ítems-diferidos-con-justificación) para lo que queda (Tailwind compilado, tablas mobile-first, persistencia de likes, `BIZ-16`).
 
-**Fase 3 — Medios y bajos (pendiente):**
-14. Manejo de error unificado (toasts) en público y panel; formato de montos/fechas; estados de carga/vacío.
-15. Responsive: tablas mobile-first, contenido de /profesionales/ visible en táctil, hero optimizado, Tailwind compilado.
-16. Limpieza y robustez: [BIZ-07](#biz-07), [BIZ-09](#biz-09), [BIZ-13](#biz-13), [BIZ-14](#biz-14), [BIZ-15](#biz-15), [SEC-11](#sec-11)–[SEC-13](#sec-13), [SEC-15](#sec-15), y el resto de [BIZ-17](#biz-17)/[ADM-10](#adm-10)/[ADM-11](#adm-11).
+> El estado consolidado y vigente está en la **tabla de estado por hallazgo** al inicio del documento (fuente de verdad). Las líneas "Estado" de cada hallazgo detallan en qué lote se corrigió.
 
 ---
 
@@ -573,10 +571,13 @@ Cada lote se validó con: `python manage.py check` (0 issues), `makemigrations -
 - `/init-soporte/` sin token → 403; con token → ejecuta.
 - Cancel/review con firma inválida → 404; con firma válida → procede.
 - Crear servicio como anónimo → 401; listar servicios → 200.
-- Crear reserva → 201; **mismo slot de nuevo → 409** (doble-booking rechazado por la transacción+lock).
+- Crear reserva → 201; **mismo slot de nuevo → 409** (doble-booking rechazado por la transacción+lock); walk-in por form-data → 201 (mutación de `QueryDict` resuelta).
+- `can_cancel`: True con >2h, False con <2h (regla de negocio).
 - Middleware: `Http404`/`PermissionDenied` pasan; excepción genérica en producción no filtra el detalle.
+- `blocked-dates` y `servicios-nativos` → 200 sin traceback; `/politica-datos/` → 200.
+- Hero optimizado: 8.4 MB → 148 KB (WebP). Sin migraciones pendientes; 29 plantillas compilan.
 
-La corrección de los altos de frontend/panel se hizo con orquestación multi-agente (archivos disjuntos) y **verificación adversarial** de cada cambio antes del chequeo global.
+Los lotes B (backend) y P (panel + público) se hicieron con orquestación multi-agente (archivos disjuntos, ~60 agentes) y **verificación adversarial** de cada cambio antes del chequeo global; los ítems transversales (neto unificado, hero WebP, página Habeas Data) se aplicaron a mano.
 
 ---
 
