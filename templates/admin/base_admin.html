@@ -102,9 +102,14 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>Caja / Finanzas</span>
           </div>
+          <div class="flex items-center gap-1">
+          {% if unclosed_services_count and unclosed_services_count > 0 %}
+          <span class="bg-amber-500 text-jet text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full" title="Servicios del día sin cerrar (+3h)">{{ unclosed_services_count }}</span>
+          {% endif %}
           {% if pending_approvals_count and pending_approvals_count > 0 %}
           <span class="bg-red-500 text-white text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full animate-pulse">{{ pending_approvals_count }}</span>
           {% endif %}
+          </div>
         </a>
         <a href="/admin-panel/expenses/" class="sidebar-link {% if active_section == 'expenses' %}active{% endif %}" data-section="expenses">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>

@@ -28,12 +28,14 @@ class BookingsConfig(AppConfig):
         try:
             from apscheduler.schedulers.background import BackgroundScheduler
             from apscheduler.triggers.interval import IntervalTrigger
+            from apscheduler.triggers.cron import CronTrigger
             from django.conf import settings
 
             if getattr(settings, 'TESTING', False):
                 return  # No correr scheduler en tests
 
             from .scheduler import send_upcoming_reminders
+            from apps.cashflow.alerts import send_unclosed_services_alert, send_daily_close_reminder
 
             scheduler = BackgroundScheduler(timezone='America/Bogota')
             scheduler.add_job(
@@ -42,6 +44,25 @@ class BookingsConfig(AppConfig):
                 id='booking_reminders',
                 name='Envío de recordatorios de citas',
                 replace_existing=True,
+            )
+            # Alerta de servicios del día sin cerrar (~3h después de la cita).
+            # Dedup interno vía Booking.close_alert_sent (claim atómico).
+            scheduler.add_job(
+                send_unclosed_services_alert,
+                trigger=IntervalTrigger(minutes=15),
+                id='unclosed_services_alert',
+                name='Alerta de servicios sin cerrar',
+                replace_existing=True,
+            )
+            # Recordatorio de cierre de caja a las 9 pm (hora Bogotá).
+            # Dedup multi-worker vía CashflowAlertLog (UniqueConstraint).
+            scheduler.add_job(
+                send_daily_close_reminder,
+                trigger=CronTrigger(hour=21, minute=0),
+                id='daily_close_reminder',
+                name='Recordatorio de cierre de caja 9pm',
+                replace_existing=True,
+                misfire_grace_time=3600,
             )
             scheduler.start()
         except Exception as e:

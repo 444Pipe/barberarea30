@@ -17,6 +17,18 @@ def _safe_decimal(val, default=0):
     except (ValueError, TypeError, InvalidOperation):
         return Decimal(default)
 
+
+def _cash_income_for(sales_qs, inventory_qs):
+    """Efectivo físico que entra a caja: ventas y productos pagados en efectivo
+    o sin método (paridad con el label 'Efectivo/Sin Especificar' del detalle),
+    INCLUYENDO propinas — están físicamente en la caja aunque sean pass-through.
+    """
+    from django.db.models import Q, Sum, F
+    cash_q = Q(payment_method__isnull=True) | Q(payment_method__slug='efectivo')
+    s = sales_qs.filter(cash_q).aggregate(t=Sum(F('final_price') + F('tip_amount')))['t'] or Decimal('0')
+    i = inventory_qs.filter(cash_q).aggregate(t=Sum('total_price'))['t'] or Decimal('0')
+    return Decimal(s) + Decimal(i)
+
 @api_view(['POST'])
 @permission_classes([IsBarberOrAbove])
 def checkout_booking_view(request, booking_id):
@@ -109,13 +121,25 @@ def daily_close_view(request):
     """
     POST /api/admin/cashflow/daily-close/
     Genera el cierre de caja del día actual. Agrupa ventas no cerradas.
+
+    Body opcional (pago diario de Frank):
+      frank_pay_enabled: bool  — si se le paga hoy (chulo del modal)
+      frank_pay_amount: int    — monto realmente entregado (editable)
+      force_cash: bool         — confirma un pago que supera el efectivo del día
     """
-    from apps.cashflow.models import DailyClose, Expense, Sale, Commission, InventorySale
+    from apps.cashflow.models import DailyClose, Expense, Sale, Commission, InventorySale, BarberAdvance, BarberPayment
     from django.db.models import Sum
     from django.db import transaction
     from django.utils import timezone
 
     today = timezone.localtime(timezone.now()).date()
+
+    body = request.data or {}
+    frank_pay_enabled = bool(body.get('frank_pay_enabled', False))
+    frank_pay_amount = _safe_decimal(body.get('frank_pay_amount', 0))
+    force_cash = bool(body.get('force_cash', False))
+    if frank_pay_enabled and frank_pay_amount < 0:
+        return Response({'error': 'El monto del pago a Franko no puede ser negativo.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Buscar ventas que no estén en un cierre
     pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
@@ -140,52 +164,68 @@ def daily_close_view(request):
             return Response({'error': 'El cierre de caja para el día de hoy ya fue generado.'}, status=status.HTTP_400_BAD_REQUEST)
 
         total_tips = pending_sales.aggregate(total=Sum('tip_amount'))['total'] or 0
-        
+
         # Ventas de inventario
         total_inventory_sales = pending_inventory_sales.aggregate(total=Sum('total_price'))['total'] or 0
-        
+
         # Comisiones
         commissions = Commission.objects.filter(sale__in=pending_sales)
-        
+
         # Separar a Franko. Solo las comisiones NO pagadas: si una ya se liquidó
         # (o el cierre se rehízo), no se debe volver a pagar.
+        frank_barber = cashflow_services.get_frank_barber()
         frank_commissions = commissions.filter(
             barber__display_name__icontains='frank', is_paid=False
         )
         frank_total_comm = frank_commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
-        frank_total_tips = frank_commissions.aggregate(total=Sum('tip_amount'))['total'] or 0
-        frank_pay = frank_total_comm + frank_total_tips
-        
+
         # Comisiones de los demás (40%)
         other_commissions = commissions.exclude(barber__display_name__icontains='frank')
         total_commissions = other_commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
 
-        if frank_pay > 0:
-            # Crear Egreso Diario para Franko
-            frank_expense = Expense.objects.create(
-                description="Pago Diario: Franko",
-                amount=frank_pay,
-                expense_type='variable',
-                registered_by=request.user
-            )
-            # Marcar automáticamente como pagado
-            frank_commissions.update(is_paid=True, is_paid_in_daily_close=True, paid_at=timezone.now())
+        # ── Pago diario de Frank (chulo + monto editable) ──────────────
+        # El saldo se deriva del ledger (ganado − vales − pagos) ANTES de
+        # registrar nada de este cierre. Si se paga menos que lo sugerido, el
+        # resto queda como saldo a favor de Frank; si se paga más, queda deuda.
+        ledger = cashflow_services.compute_frank_ledger()
+        frank_suggested = ledger['suggested_payment']
+        cash_income = _cash_income_for(pending_sales, pending_inventory_sales)
+
+        frank_paid = Decimal('0')
+        frank_expense = None
+        if frank_pay_enabled and frank_barber:
+            frank_paid = frank_pay_amount
+            # El pago de Frank sale SOLO del efectivo del día.
+            if frank_paid > cash_income and not force_cash:
+                return Response({
+                    'error': f'El pago a Franko (${frank_paid:,.0f}) supera el efectivo del día (${cash_income:,.0f}).',
+                    'code': 'cash_exceeded',
+                    'cash_available': float(cash_income),
+                }, status=status.HTTP_400_BAD_REQUEST)
+            if frank_paid > 0:
+                frank_expense = Expense.objects.create(
+                    description="Pago Diario: Franko",
+                    amount=frank_paid,
+                    expense_type='variable',
+                    registered_by=request.user
+                )
+
+        # Las comisiones de Frank SIEMPRE se marcan procesadas por este cierre
+        # (se pague lo que se pague): `is_paid` significa "procesada en un
+        # cierre", no "pagada completa". El saldo real vive en el ledger.
+        frank_commissions.update(is_paid=True, is_paid_in_daily_close=True, paid_at=timezone.now())
 
         # Egresos variables del día (no asignados a un cierre).
-        # OJO: este total INCLUYE el "Pago Diario: Franko" recién creado, que
-        # a su vez es (comisión + propinas). Las propinas del cliente son
-        # pass-through (cliente → barbero), no son revenue ni gasto real de
-        # la empresa, así que las restamos del total para que el net no
-        # quede artificialmente más bajo.
+        # OJO: este total INCLUYE el "Pago Diario: Franko" recién creado.
         pending_expenses = Expense.objects.filter(included_in_daily_close__isnull=True)
         total_expenses = pending_expenses.aggregate(total=Sum('amount'))['total'] or 0
 
         # Ingreso neto (fórmula única centralizada en cashflow.services). El
-        # `total_expenses` almacenado incluye el "Pago Diario: Franko" (comisión
-        # + propina); para el neto pasamos el gasto REAL de la empresa, es decir
-        # sin ese rubro, y aportamos la comisión de Frank por separado.
+        # neto es DEVENGADO: resta la comisión devengada de Frank del día, no
+        # el monto pagado — pagar de más/de menos es movimiento de deuda, no
+        # utilidad. Para el gasto real quitamos el rubro "Pago Diario: Franko".
         total_final_prices = pending_sales.aggregate(total=Sum('final_price'))['total'] or 0
-        real_expenses = total_expenses - frank_pay
+        real_expenses = total_expenses - frank_paid
         net_income = cashflow_services.compute_live_net_income(
             service_revenue=total_final_prices,
             inventory_revenue=total_inventory_sales,
@@ -205,19 +245,48 @@ def daily_close_view(request):
             net_income=net_income
         )
 
+        if frank_paid > 0 and frank_barber:
+            # Registro del pago real (ledger). CASCADE con el cierre: si el
+            # cierre se borra, el pago desaparece y el saldo se restaura solo.
+            BarberPayment.objects.create(
+                barber=frank_barber,
+                daily_close=daily_close,
+                expense=frank_expense,
+                amount=frank_paid,
+                suggested_amount=frank_suggested,
+                created_by=request.user,
+            )
+            # Liquidar los vales pendientes de Frank: ya quedaron descontados
+            # en el saldo con el que se calculó este pago.
+            BarberAdvance.objects.filter(barber=frank_barber, is_settled=False).update(
+                is_settled=True, settled_at=timezone.now(), settled_in_daily_close=daily_close
+            )
+
         # Update sales and expenses
         pending_sales.update(included_in_daily_close=daily_close)
         pending_inventory_sales.update(included_in_daily_close=daily_close)
         pending_expenses.update(included_in_daily_close=daily_close)
 
         # Audit log
+        frank_msg = ''
+        if frank_barber:
+            if frank_paid > 0:
+                frank_msg = f". Pago a Franko: ${frank_paid:,.0f} (sugerido ${frank_suggested:,.0f})"
+            elif frank_pay_enabled:
+                frank_msg = ". Pago a Franko: $0"
+            else:
+                frank_msg = ". Sin pago a Franko (queda acumulado)"
         log_audit(
             user=request.user,
             action='daily_close',
             obj=daily_close,
-            changes={},
+            changes={
+                'frank_pay_enabled': frank_pay_enabled,
+                'frank_paid': str(frank_paid),
+                'frank_suggested': str(frank_suggested),
+            },
             request=request,
-            extra_data={'msg': f"Realizó el Cierre de Caja del {today} con Neto ${net_income:,.0f}"}
+            extra_data={'msg': f"Realizó el Cierre de Caja del {today} con Neto ${net_income:,.0f}{frank_msg}"}
         )
 
     return Response({
@@ -225,6 +294,43 @@ def daily_close_view(request):
         'close_id': daily_close.id,
         'net_income': daily_close.net_income,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def daily_close_preview_view(request):
+    """GET /api/admin/cashflow/daily-close/preview/ - Datos para el modal de cierre.
+
+    Devuelve el saldo corriente de Frank (sugerido de pago) y el efectivo del
+    día, para que el operador decida el chulo y el monto antes de cerrar.
+    """
+    from apps.cashflow.models import Sale, InventorySale
+
+    pending_sales = Sale.objects.filter(
+        approval_status=Sale.STATUS_APPROVED, included_in_daily_close__isnull=True
+    )
+    pending_inventory_sales = InventorySale.objects.filter(included_in_daily_close__isnull=True)
+    pending_approvals_count = Sale.objects.filter(
+        approval_status=Sale.STATUS_PENDING, included_in_daily_close__isnull=True
+    ).count()
+
+    ledger = cashflow_services.compute_frank_ledger()
+
+    return Response({
+        'frank': {
+            'exists': ledger['exists'],
+            'unpaid_earnings': float(ledger['unpaid_earnings']),
+            'unsettled_advances': float(ledger['unsettled_advances']),
+            'balance': float(ledger['balance']),
+            'suggested': float(ledger['suggested_payment']),
+        },
+        'cash': {
+            'cash_income': float(_cash_income_for(pending_sales, pending_inventory_sales)),
+        },
+        'pending_sales_count': pending_sales.count() + pending_inventory_sales.count(),
+        'pending_approvals_count': pending_approvals_count,
+    })
+
 
 @api_view(['GET'])
 @permission_classes([IsOperationalAdminOrAbove])
@@ -315,11 +421,27 @@ def daily_close_detail_view(request, close_id):
             'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
         })
 
+    # Pago real a Frank en este cierre (ledger) y resumen del efectivo.
+    frank_payment = daily_close.barber_payments.first()
+    cash_income = _cash_income_for(sales, inventory_sales)
+    frank_paid = float(frank_payment.amount) if frank_payment else 0.0
+
     return Response({
         'id': daily_close.id,
         'date': daily_close.date.strftime('%Y-%m-%d'),
         'closed_at': timezone.localtime(daily_close.closed_at).strftime('%Y-%m-%d %H:%M:%S'),
         'closed_by': daily_close.closed_by.username,
+        'closed_by_name': daily_close.closed_by.get_full_name() or daily_close.closed_by.username,
+        'frank_payment': {
+            'amount': float(frank_payment.amount),
+            'suggested_amount': float(frank_payment.suggested_amount),
+            'by': (frank_payment.created_by.get_full_name() or frank_payment.created_by.username) if frank_payment.created_by else '—',
+        } if frank_payment else None,
+        'cash_summary': {
+            'cash_income': float(cash_income),
+            'frank_paid': frank_paid,
+            'cash_net': float(cash_income) - frank_paid,
+        },
         'total_sales': float(daily_close.total_sales),
         'total_inventory_sales': float(daily_close.total_inventory_sales),
         'total_tips': float(daily_close.total_tips),
@@ -354,8 +476,16 @@ def delete_daily_close_view(request, close_id):
                 is_paid_in_daily_close=True,
             ).update(is_paid=False, is_paid_in_daily_close=False, paid_at=None)
             daily_close.expenses.filter(
-                description__icontains='Pago Diario: Franko'
+                description__startswith='Pago Diario: Franko'
             ).delete()
+
+            # Des-liquidar los vales de Frank liquidados por este cierre: al
+            # recerrar vuelven a descontarse del sugerido.
+            daily_close.settled_advances.update(
+                is_settled=False, settled_at=None, settled_in_daily_close=None
+            )
+            # El BarberPayment de este cierre cae solo por CASCADE al borrar el
+            # cierre — el saldo derivado del ledger se restaura automáticamente.
 
             # Desvincular las ventas y egresos restantes (vuelven a pendientes).
             daily_close.sales.update(included_in_daily_close=None)
@@ -509,19 +639,23 @@ def live_cashflow_detail_view(request):
             'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
         })
         
+    # El rubro sintético del pago a Frank refleja el DEVENGADO DEL DÍA
+    # (comisión + propinas de hoy), para que el KPI "Egresos" sea comparable
+    # con el del cierre (que registra el egreso del día). El saldo corriente
+    # con arrastre se expone aparte en `frank_ledger` para el modal de cierre.
+    ledger = cashflow_services.compute_frank_ledger()
     if frank_pay_live > 0:
         expenses_data.append({
-            'description': 'Pago Diario: Franko (Comisiones + Propinas)',
+            'description': 'Pago Diario: Franko (devengado del día)',
             'amount': frank_pay_live,
             'type': 'Variable'
         })
         total_expenses_overall += frank_pay_live
 
-    # Ingreso neto con la fórmula única (cashflow.services). `frank_pay_live`
-    # (comisión + propina de Frank) se agregó como rubro sintético a
-    # `total_expenses_overall`; para el neto pasamos el gasto REAL (sin ese
-    # rubro) y la comisión de Frank por separado. La propina de Frank es
-    # pass-through (cash que entra y sale), no afecta la utilidad.
+    # Ingreso neto con la fórmula única (cashflow.services). El neto es
+    # DEVENGADO: usa la comisión de Frank generada HOY (frank_commission_live).
+    # Para el gasto real quitamos el rubro sintético (comisión + propina de
+    # Frank), ya que la propina es pass-through (cash que entra y sale).
     frank_commission_live = frank_pay_live - frank_tips_live
     real_expenses = total_expenses_overall - frank_pay_live
     net_income = float(cashflow_services.compute_live_net_income(
@@ -532,6 +666,8 @@ def live_cashflow_detail_view(request):
         frank_commission=frank_commission_live,
     ))
 
+    cash_income_live = float(_cash_income_for(approved_sales, inventory_sales))
+
     return Response({
         'date': today.strftime('%Y-%m-%d'),
         'total_sales': total_sales_overall,
@@ -541,6 +677,14 @@ def live_cashflow_detail_view(request):
         'total_expenses': total_expenses_overall,
         'net_income': net_income,
         'pending_approvals_count': pending_approvals_count,
+        'frank_ledger': {
+            'balance': float(ledger['balance']),
+            'suggested': float(ledger['suggested_payment']),
+            'unsettled_advances': float(ledger['unsettled_advances']),
+        },
+        'cash_summary': {
+            'cash_income': cash_income_live,
+        },
         'barbers': list(barbers_data.values()),
         'payment_methods': payment_methods_data,
         'expenses': expenses_data,
@@ -620,6 +764,210 @@ def delete_expense_view(request, expense_id):
         return Response({'error': 'Egreso no encontrado.'}, status=404)
     except Exception as e:
         return Response({'error': f'Error al eliminar: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsOperationalAdminOrAbove])
+def edit_expense_view(request, expense_id):
+    """POST /api/admin/cashflow/expenses/<id>/edit/ - Editar un egreso (auditado).
+
+    Reglas:
+    - Egresos generados por el sistema (Pago Diario: Franko, materiales de una
+      venta) no se editan: desincronizarían el ledger / la trazabilidad.
+    - Egreso ya incluido en un cierre: monto y tipo quedan bloqueados para
+      todos (DailyClose es inmutable; el camino es borrar cierre → editar →
+      recerrar). Superadmin sí puede corregir descripción/notas/imagen.
+    - operational_admin (Frank): solo egresos variables y sin cambiar el tipo
+      (espeja la restricción de creación).
+    Todo cambio queda en AuditLog con {campo: [antes, después]}.
+    """
+    from apps.cashflow.models import Expense
+
+    try:
+        expense = Expense.objects.get(pk=expense_id)
+    except Expense.DoesNotExist:
+        return Response({'error': 'Egreso no encontrado.'}, status=404)
+
+    # 1. Egresos automáticos del sistema: intocables.
+    if (expense.description.startswith('Pago Diario: Franko')
+            or '(venta #' in expense.description
+            or expense.barber_payments.exists()):
+        return Response({'error': 'Este egreso fue generado automáticamente por el sistema y no se puede editar.'}, status=400)
+
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
+
+    data = request.data
+    new_description = (data.get('description') or '').strip() or None
+    new_amount_raw = data.get('amount')
+    new_expense_type = data.get('expense_type') or None
+    new_notes = data.get('notes') if 'notes' in data else None
+    new_image = request.FILES.get('image') if hasattr(request, 'FILES') else None
+
+    # 2. Restricción de rol: Frank solo egresos variables, sin cambiar el tipo.
+    if not is_superadmin:
+        if expense.expense_type != 'variable':
+            return Response({'error': 'Solo los administradores principales pueden editar egresos fijos o de inventario.'}, status=403)
+        if new_expense_type and new_expense_type != 'variable':
+            return Response({'error': 'Solo los administradores principales pueden cambiar el tipo de un egreso.'}, status=403)
+
+    # 3. Egreso ya cerrado: monto y tipo bloqueados para todos.
+    is_closed = expense.included_in_daily_close_id is not None
+    if is_closed:
+        wants_amount = new_amount_raw is not None and str(new_amount_raw).strip() != '' and _safe_decimal(new_amount_raw) != expense.amount
+        wants_type = new_expense_type and new_expense_type != expense.expense_type
+        if wants_amount or wants_type:
+            close_date = expense.included_in_daily_close.date.strftime('%d/%m/%Y')
+            return Response({'error': f'Este egreso pertenece al cierre del {close_date}. Para corregir monto o tipo, un superadmin debe eliminar ese cierre, editar y volver a cerrar.'}, status=400)
+        if not is_superadmin:
+            return Response({'error': 'Este egreso ya está incluido en un cierre; solo un superadmin puede corregir su descripción o notas.'}, status=403)
+
+    # La nueva descripción no puede adoptar un patrón reservado del sistema:
+    # delete_daily_close_view borra por prefijo "Pago Diario: Franko" y los
+    # egresos de materiales se identifican por "(venta #". Renombrar hacia
+    # ellos causaría borrados/tratamientos incorrectos.
+    if new_description and (new_description.startswith('Pago Diario: Franko') or '(venta #' in new_description):
+        return Response({'error': 'La descripción no puede usar un patrón reservado del sistema ("Pago Diario: Franko" o "(venta #").'}, status=400)
+
+    changes = {}
+
+    if new_description and new_description != expense.description:
+        changes['description'] = [expense.description, new_description]
+        expense.description = new_description
+
+    if new_amount_raw is not None and str(new_amount_raw).strip() != '':
+        try:
+            new_amount = Decimal(str(new_amount_raw)).quantize(Decimal('1'))
+            if new_amount <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, ValueError, TypeError):
+            return Response({'error': 'Monto inválido.'}, status=400)
+        if new_amount != expense.amount:
+            changes['amount'] = [str(expense.amount), str(new_amount)]
+            expense.amount = new_amount
+
+    valid_types = {t[0] for t in Expense.EXPENSE_TYPES}
+    if new_expense_type and new_expense_type != expense.expense_type:
+        if new_expense_type not in valid_types:
+            return Response({'error': 'Tipo de egreso inválido.'}, status=400)
+        changes['expense_type'] = [expense.expense_type, new_expense_type]
+        expense.expense_type = new_expense_type
+
+    if new_notes is not None and new_notes != expense.notes:
+        changes['notes'] = [expense.notes, new_notes]
+        expense.notes = new_notes
+
+    if new_image:
+        changes['image'] = [expense.image.name if expense.image else '', new_image.name]
+        expense.image = new_image
+
+    if not changes:
+        return Response({'ok': True, 'message': 'Sin cambios.'})
+
+    expense.save()
+
+    changed_fields = ', '.join(changes.keys())
+    log_audit(
+        user=request.user,
+        action='update',
+        obj=expense,
+        changes=changes,
+        request=request,
+        extra_data={'msg': f"Editó el egreso #{expense.id} ({expense.description}): {changed_fields}"}
+    )
+    return Response({'ok': True, 'message': 'Egreso actualizado correctamente.'})
+
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def daily_closes_list_view(request):
+    """GET /api/admin/cashflow/daily-closes/?date_from=&date_to= - Historial de cierres.
+
+    Sin filtros devuelve los últimos 10 (paridad con la vista anterior);
+    con filtros devuelve todo el rango.
+    """
+    from apps.cashflow.models import DailyClose
+    from datetime import datetime
+
+    def _parse(value):
+        try:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return None
+
+    closes = DailyClose.objects.select_related('closed_by').prefetch_related(
+        'barber_payments').order_by('-date', '-closed_at')
+
+    date_from = _parse(request.query_params.get('date_from'))
+    date_to = _parse(request.query_params.get('date_to'))
+    if date_from:
+        closes = closes.filter(date__gte=date_from)
+    if date_to:
+        closes = closes.filter(date__lte=date_to)
+
+    is_filtered = bool(date_from or date_to)
+    if not is_filtered:
+        closes = closes[:10]
+
+    data = []
+    for close in closes:
+        payment = next(iter(close.barber_payments.all()), None)
+        data.append({
+            'id': close.id,
+            'date': close.date.strftime('%Y-%m-%d'),
+            'date_display': tz.localtime(close.closed_at).strftime('%d/%m/%Y') if close.closed_at else close.date.strftime('%d/%m/%Y'),
+            'closed_at_time': tz.localtime(close.closed_at).strftime('%I:%M %p') if close.closed_at else '',
+            'closed_by_name': close.closed_by.get_full_name() or close.closed_by.username,
+            'total_sales': float(close.total_sales),
+            'total_commissions': float(close.total_commissions),
+            'total_expenses': float(close.total_expenses),
+            'net_income': float(close.net_income),
+            'is_verified': close.is_verified,
+            'frank_paid': float(payment.amount) if payment else None,
+        })
+
+    return Response({'closes': data, 'is_filtered': is_filtered, 'count': len(data)})
+
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def cashflow_alerts_view(request):
+    """GET /api/admin/cashflow/alerts/ - Alertas operativas para el panel.
+
+    - unclosed: citas de hoy sin checkout hace más de ~3 horas.
+    - close_pending: ya son ≥9 pm, no hay cierre de hoy y quedan movimientos.
+    """
+    from django.utils import timezone
+    from apps.cashflow.models import DailyClose, Sale, InventorySale
+    from apps.cashflow.alerts import get_unclosed_bookings
+
+    unclosed = get_unclosed_bookings()
+    unclosed_data = [{
+        'id': b.id,
+        'client_name': b.client_name,
+        'barber_name': b.barber.display_name if b.barber else 'Sin barbero',
+        'service_name': b.service.name if b.service else 'Servicio',
+        'time': b.time.strftime('%I:%M %p'),
+    } for b in unclosed]
+
+    now_local = timezone.localtime()
+    close_pending = False
+    if now_local.hour >= 21 and not DailyClose.objects.filter(date=now_local.date()).exists():
+        # Solo hay algo cerrable si existen ventas APROBADAS o inventario
+        # pendientes (mismas condiciones que daily_close_view y el recordatorio
+        # por email); un egreso o una venta sin aprobar no habilita el cierre.
+        close_pending = (
+            Sale.objects.filter(
+                approval_status=Sale.STATUS_APPROVED, included_in_daily_close__isnull=True
+            ).exists()
+            or InventorySale.objects.filter(included_in_daily_close__isnull=True).exists()
+        )
+
+    return Response({
+        'unclosed': unclosed_data,
+        'unclosed_count': len(unclosed_data),
+        'close_pending': close_pending,
+    })
 
 
 # ─── SISTEMA DE APROBACIÓN DE VENTAS ──────────────────────────────────────────
@@ -775,7 +1123,7 @@ def reject_sale_view(request, sale_id):
 @permission_classes([IsOperationalAdminOrAbove])
 def fix_frank_history_view(request):
     """GET /api/admin/cashflow/fix-frank-history/"""
-    from apps.cashflow.models import Commission, DailyClose, Expense
+    from apps.cashflow.models import Commission, DailyClose, Expense, BarberPayment
     from apps.barbers.models import Barber
     from decimal import Decimal
     from django.db.models import Sum
@@ -827,34 +1175,77 @@ def fix_frank_history_view(request):
             # Comisiones de los demás
             other_comms = comms.exclude(barber=frank)
             total_other_comms = other_comms.aggregate(total=Sum('commission_amount'))['total'] or 0
-            
+
             # Buscar o crear el gasto de Franko
-            expense = close.expenses.filter(description__icontains='Pago Diario: Franko').first()
-            
-            if frank_pay > 0:
+            expense = close.expenses.filter(description__startswith='Pago Diario: Franko').first()
+
+            # ¿Ya hay un pago registrado en el ledger para este cierre?
+            existing_payment = BarberPayment.objects.filter(
+                barber=frank, daily_close=close
+            ).first()
+            # Un pago de "backfill"/legacy (marcado con 'legacy' en notes) refleja
+            # el devengado automático viejo y DEBE realinearse cuando fix-frank
+            # recalcula las comisiones al 50%; un pago del modal (notes vacío) fue
+            # una decisión humana (chulo + monto editable) y NO se toca.
+            is_human_payment = bool(existing_payment and 'legacy' not in (existing_payment.notes or ''))
+
+            if is_human_payment:
+                frank_expense_amount = existing_payment.amount
+                frank_comms.update(is_paid=True, is_paid_in_daily_close=True, paid_at=close.closed_at or timezone.now())
+            elif frank_pay > 0:
+                # Cierre legacy / pago de backfill: se ajusta el egreso y el
+                # BarberPayment al devengado recalculado para que el ledger netee.
                 if expense:
                     Expense.objects.filter(id=expense.id).update(amount=frank_pay)
                 else:
-                    Expense.objects.create(
+                    expense = Expense.objects.create(
                         description='Pago Diario: Franko',
                         amount=frank_pay,
                         expense_type='variable',
                         registered_by=close.closed_by,
                         included_in_daily_close=close
                     )
+                if existing_payment:
+                    existing_payment.amount = frank_pay
+                    existing_payment.suggested_amount = frank_pay
+                    existing_payment.expense = expense
+                    existing_payment.notes = 'Realineado por fix-frank-history (legacy)'
+                    existing_payment.save(update_fields=['amount', 'suggested_amount', 'expense', 'notes'])
+                else:
+                    BarberPayment.objects.create(
+                        barber=frank,
+                        daily_close=close,
+                        expense=expense,
+                        amount=frank_pay,
+                        suggested_amount=frank_pay,
+                        notes='Registrado por fix-frank-history (pago automático legacy)',
+                    )
+                frank_expense_amount = frank_pay
                 frank_comms.update(is_paid=True, is_paid_in_daily_close=True, paid_at=close.closed_at or timezone.now())
-            elif expense:
-                expense.delete()
-            
+            else:
+                # Sin devengado: borrar el egreso y el pago de backfill (si es legacy).
+                if expense:
+                    expense.delete()
+                if existing_payment:
+                    existing_payment.delete()
+                frank_expense_amount = Decimal('0')
+
             # Recalcular totales del cierre
             total_expenses = close.expenses.aggregate(total=Sum('amount'))['total'] or 0
             total_sales = sales.aggregate(total=Sum('final_price'))['total'] or 0
             total_tips = sales.aggregate(total=Sum('tip_amount'))['total'] or 0
             total_inventory = close.inventory_sales.aggregate(total=Sum('total_price'))['total'] or 0
-            
-            # Neto = (Ventas) + (Inventario) - (Comisiones de otros) - (Gastos, incluido Frank)
-            net_income = total_sales + total_inventory - total_other_comms - total_expenses
-            
+
+            # Fórmula canónica (misma del cierre): neto devengado — comisión
+            # devengada de Frank + gastos reales sin el rubro de su pago.
+            net_income = cashflow_services.compute_live_net_income(
+                service_revenue=total_sales,
+                inventory_revenue=total_inventory,
+                non_frank_commissions=total_other_comms,
+                real_expenses=Decimal(total_expenses) - Decimal(frank_expense_amount),
+                frank_commission=frank_total_comm,
+            )
+
             DailyClose.objects.filter(id=close.id).update(
                 total_sales=total_sales,
                 total_tips=total_tips,
@@ -1048,6 +1439,7 @@ def unpaid_commissions_view(request):
         data.append({
             'barber_id': barber.id,
             'barber_name': barber.display_name,
+            'is_frank': False,
             'total_commissions': total_commissions,
             'total_tips': total_tips,
             'total_earnings': total_earnings,
@@ -1056,6 +1448,55 @@ def unpaid_commissions_view(request):
             'history': history,
             'advances': advances,
         })
+
+    # Card de Frank: su pago se automatiza en el cierre diario, pero su saldo
+    # corriente (que puede ser negativo) y sus vales sí se gestionan aquí.
+    frank = cashflow_services.get_frank_barber()
+    if frank:
+        ledger = cashflow_services.compute_frank_ledger()
+
+        frank_daily = Commission.objects.filter(
+            barber=frank, is_paid=False, sale__approval_status='approved'
+        ).annotate(date=TruncDate('created_at')).values('date').annotate(
+            daily_total=Sum('total_earnings'),
+            daily_commissions=Sum('commission_amount'),
+            daily_tips=Sum('tip_amount')
+        ).order_by('-date')
+        frank_history = [{
+            'date': day['date'].strftime('%Y-%m-%d'),
+            'total': float(day['daily_total'] or 0),
+            'commissions': float(day['daily_commissions'] or 0),
+            'tips': float(day['daily_tips'] or 0),
+        } for day in frank_daily if day['date']]
+
+        frank_advances_qs = BarberAdvance.objects.filter(
+            barber=frank, is_settled=False
+        ).select_related('created_by').order_by('-created_at')
+        frank_advances = [{
+            'id': adv.id,
+            'amount': float(adv.amount),
+            'reason': adv.reason,
+            'date': adv.created_at.strftime('%Y-%m-%d'),
+            'by': (adv.created_by.get_full_name() or adv.created_by.username) if adv.created_by else '—',
+        } for adv in frank_advances_qs]
+
+        frank_unpaid = Commission.objects.filter(
+            barber=frank, is_paid=False, sale__approval_status='approved'
+        ).aggregate(commissions=Sum('commission_amount'), tips=Sum('tip_amount'))
+
+        if ledger['balance'] != 0 or frank_history or frank_advances:
+            data.append({
+                'barber_id': frank.id,
+                'barber_name': frank.display_name,
+                'is_frank': True,
+                'total_commissions': float(frank_unpaid['commissions'] or 0),
+                'total_tips': float(frank_unpaid['tips'] or 0),
+                'total_earnings': float(ledger['unpaid_earnings']),
+                'total_advances': float(ledger['unsettled_advances']),
+                'net_payable': float(ledger['balance']),
+                'history': frank_history,
+                'advances': frank_advances,
+            })
 
     # Ordenar por nombre
     data.sort(key=lambda x: x['barber_name'])
@@ -1091,18 +1532,22 @@ def register_barber_advance_view(request, barber_id):
         return Response({'error': 'El monto del vale debe ser mayor a cero.'}, status=400)
 
     # Saldo disponible = comisiones+propinas no pagadas − vales pendientes.
-    earnings = Commission.objects.filter(
-        barber_id=barber_id, is_paid=False, sale__approval_status='approved'
-    ).aggregate(t=Sum('total_earnings'))['t'] or Decimal('0')
-    outstanding = BarberAdvance.objects.filter(
-        barber_id=barber_id, is_settled=False
-    ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
-    available = Decimal(earnings) - Decimal(outstanding)
+    # Frank es la excepción: su saldo corriente puede quedar negativo (la deuda
+    # se arrastra y se descuenta en los cierres siguientes), así que no se le
+    # aplica el tope.
+    if not barber.is_frank:
+        earnings = Commission.objects.filter(
+            barber_id=barber_id, is_paid=False, sale__approval_status='approved'
+        ).aggregate(t=Sum('total_earnings'))['t'] or Decimal('0')
+        outstanding = BarberAdvance.objects.filter(
+            barber_id=barber_id, is_settled=False
+        ).aggregate(t=Sum('amount'))['t'] or Decimal('0')
+        available = Decimal(earnings) - Decimal(outstanding)
 
-    if amount > available:
-        return Response({
-            'error': f'El vale (${amount:,.0f}) supera el saldo disponible del barbero (${available:,.0f}).'
-        }, status=400)
+        if amount > available:
+            return Response({
+                'error': f'El vale (${amount:,.0f}) supera el saldo disponible del barbero (${available:,.0f}).'
+            }, status=400)
 
     advance = BarberAdvance.objects.create(
         barber=barber, amount=amount, reason=reason, created_by=request.user

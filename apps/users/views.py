@@ -293,8 +293,9 @@ def admin_cashflow_view(request):
         frank_commission=frank_commission,
     )
 
-    recent_closes = DailyClose.objects.all().order_by('-date', '-closed_at')[:10]
-    
+    # El historial de cierres ahora se carga vía JS filtrable
+    # (GET /api/admin/cashflow/daily-closes/), ya no por contexto.
+
     # Data for inventory sales modal
     inventory_items = InventoryItem.objects.filter(is_active=True).order_by('category', 'name')
     payment_methods = PaymentMethod.objects.filter(is_active=True).order_by('name')
@@ -312,7 +313,6 @@ def admin_cashflow_view(request):
         'total_expenses': total_expenses,
         'total_commissions': total_commissions,
         'net_income': net_income,
-        'recent_closes': recent_closes,
         'inventory_items': inventory_items,
         'payment_methods': payment_methods,
     }
@@ -321,13 +321,41 @@ def admin_cashflow_view(request):
 
 @operational_admin_required
 def admin_expenses_view(request):
-    expenses = Expense.objects.all().order_by('-created_at')[:50]
-    
+    """Lista de egresos con filtro por rango de fechas (?date_from=&date_to=)."""
+    from datetime import datetime
+    from django.db.models import Sum
+
+    def _parse(value):
+        try:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return None
+
+    date_from = _parse(request.GET.get('date_from'))
+    date_to = _parse(request.GET.get('date_to'))
+
+    qs = Expense.objects.select_related('registered_by', 'included_in_daily_close')
+    if date_from:
+        qs = qs.filter(date__gte=date_from)
+    if date_to:
+        qs = qs.filter(date__lte=date_to)
+    qs = qs.order_by('-date', '-created_at')
+
+    is_filtered = bool(date_from or date_to)
+    filtered_total = qs.aggregate(t=Sum('amount'))['t'] or 0
+    filtered_count = qs.count()
+    expenses = qs if is_filtered else qs[:50]
+
     context = {
         'user_role': request.user.profile.role,
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'expenses',
         'expenses': expenses,
+        'is_filtered': is_filtered,
+        'date_from_str': date_from.strftime('%Y-%m-%d') if date_from else '',
+        'date_to_str': date_to.strftime('%Y-%m-%d') if date_to else '',
+        'filtered_total': filtered_total,
+        'filtered_count': filtered_count,
     }
     return render(request, 'admin/expenses.html', context)
 

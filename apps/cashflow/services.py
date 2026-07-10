@@ -60,6 +60,63 @@ def compute_live_net_income(*, service_revenue, inventory_revenue,
     )
 
 
+def get_frank_barber():
+    """Único punto de identificación de Frank como barbero."""
+    from apps.barbers.models import Barber
+    return Barber.objects.filter(display_name__icontains='frank').first()
+
+
+def compute_frank_ledger():
+    """Saldo corriente de Frank, SIEMPRE derivado (nunca almacenado):
+
+        saldo = Σ ganado (comisiones+propinas de ventas aprobadas, histórico)
+              − Σ vales entregados (TODOS, liquidados o no)
+              − Σ pagos reales hechos en cierres (BarberPayment)
+
+    Positivo → la empresa le debe a Frank; negativo → Frank debe.
+    `unpaid_earnings` / `unsettled_advances` son informativos para la UI
+    (desglose del día); el saldo NO depende de los flags is_paid/is_settled.
+    """
+    from django.db.models import Sum
+    from apps.cashflow.models import Commission, BarberAdvance, BarberPayment
+
+    frank = get_frank_barber()
+    zero = Decimal('0')
+    if not frank:
+        return {
+            'exists': False, 'earnings_total': zero, 'advances_total': zero,
+            'payments_total': zero, 'balance': zero, 'unpaid_earnings': zero,
+            'unsettled_advances': zero, 'suggested_payment': zero,
+        }
+
+    frank_commissions = Commission.objects.filter(
+        barber=frank, sale__approval_status=Sale.STATUS_APPROVED
+    )
+    earnings_total = frank_commissions.aggregate(t=Sum('total_earnings'))['t'] or zero
+    advances_total = BarberAdvance.objects.filter(barber=frank).aggregate(
+        t=Sum('amount'))['t'] or zero
+    payments_total = BarberPayment.objects.filter(barber=frank).aggregate(
+        t=Sum('amount'))['t'] or zero
+
+    balance = _to_decimal(earnings_total) - _to_decimal(advances_total) - _to_decimal(payments_total)
+
+    unpaid_earnings = frank_commissions.filter(is_paid=False).aggregate(
+        t=Sum('total_earnings'))['t'] or zero
+    unsettled_advances = BarberAdvance.objects.filter(
+        barber=frank, is_settled=False).aggregate(t=Sum('amount'))['t'] or zero
+
+    return {
+        'exists': True,
+        'earnings_total': _to_decimal(earnings_total),
+        'advances_total': _to_decimal(advances_total),
+        'payments_total': _to_decimal(payments_total),
+        'balance': balance,
+        'unpaid_earnings': _to_decimal(unpaid_earnings),
+        'unsettled_advances': _to_decimal(unsettled_advances),
+        'suggested_payment': max(balance, Decimal('0')),
+    }
+
+
 def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                      payment_reference='', tip_amount=0,
                      discount_amount=0, discount_assumed_by='none',

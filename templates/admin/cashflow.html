@@ -365,6 +365,39 @@
     </div>
   </div>
 
+  <!-- ═══ ALERTA SERVICIOS SIN CERRAR ═══ -->
+  <div id="cf-unclosed-alert" class="cf-section hidden">
+    <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+      <div class="relative flex h-3 w-3 flex-shrink-0 mt-1">
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-bold text-amber-400">
+          <span id="cf-unclosed-count">0</span> servicio(s) del día sin cerrar hace más de 3 horas
+        </p>
+        <p class="text-[0.7rem] text-smoke/60 mb-1">Citas que ya pasaron y siguen sin checkout — ciérralas para que entren al cierre de hoy.</p>
+        <div id="cf-unclosed-list" class="text-[0.7rem] text-smoke/70 space-y-0.5"></div>
+      </div>
+      <a href="/admin-panel/bookings/" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-jet text-[0.65rem] font-bold tracking-widest uppercase rounded whitespace-nowrap">
+        Ir a reservas
+      </a>
+    </div>
+  </div>
+
+  <!-- ═══ ALERTA CIERRE PENDIENTE (9PM) ═══ -->
+  <div id="cf-close-pending-alert" class="cf-section hidden">
+    <div class="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center gap-3">
+      <span class="text-lg flex-shrink-0">🕘</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-bold text-purple-300">El cierre de caja de hoy sigue pendiente</p>
+        <p class="text-[0.7rem] text-smoke/60">Ya son más de las 9 pm y hay movimientos sin cerrar.</p>
+      </div>
+      <button onclick="document.getElementById('btn-daily-close') && document.getElementById('btn-daily-close').click()" class="px-3 py-2 bg-purple-500 hover:bg-purple-400 text-white text-[0.65rem] font-bold tracking-widest uppercase rounded whitespace-nowrap">
+        Cerrar caja
+      </button>
+    </div>
+  </div>
+
   <!-- ═══ TRAZABILIDAD DEL DÍA ═══ -->
   <div class="cf-section">
     <div class="flex items-baseline justify-between mb-2">
@@ -404,43 +437,31 @@
 
   <!-- ═══ HISTORIAL DE CIERRES ═══ -->
   <div class="cf-section">
-    <div class="cf-section-title">Historial de cierres</div>
-    {% if recent_closes %}
-    <div class="cf-close-list">
-      {% for close in recent_closes %}
-      <div class="bg-jet-card border border-white/5 rounded-md p-4 hover:border-gold/30 transition-colors flex flex-col">
-        <div class="flex justify-between items-start mb-2">
-          <div>
-            <div class="text-white font-bold text-sm">{{ close.date|date:"d M Y" }}</div>
-            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest mt-0.5">{{ close.closed_at|date:"g:i A" }} · {{ close.closed_by.username }}</div>
-          </div>
-          <span class="px-2 py-0.5 bg-gold/10 text-gold text-[0.55rem] uppercase tracking-widest font-bold rounded">Cerrado</span>
-        </div>
-        <div class="space-y-1 text-[0.7rem] border-t border-white/5 pt-2 mt-1 mb-3">
-          <div class="flex justify-between"><span class="text-smoke/50">Ventas</span><span class="text-white">${{ close.total_sales|floatformat:0 }}</span></div>
-          <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-red-400">-${{ close.total_commissions|floatformat:0 }}</span></div>
-          <div class="flex justify-between"><span class="text-smoke/50">Egresos</span><span class="text-red-400">-${{ close.total_expenses|floatformat:0 }}</span></div>
-          <div class="flex justify-between border-t border-white/5 pt-1.5 mt-1.5 font-bold">
-            <span class="text-gold uppercase tracking-widest text-[0.6rem]">Neto</span>
-            <span class="text-gold text-sm">${{ close.net_income|floatformat:0 }}</span>
-          </div>
-        </div>
-        <div class="mt-auto flex gap-2">
-          <button onclick="showDailyCloseDetails({{ close.id }})" class="flex-1 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/5 hover:border-gold/30 py-2 rounded transition-colors">
-            Detalle
-          </button>
-          {% if user_role == 'superadmin' %}
-          <button onclick="deleteDailyClose({{ close.id }}, '{{ close.date|date:"d M Y" }}')" class="px-3 py-2 text-smoke/30 hover:text-red-400 border border-transparent hover:border-red-400/30 rounded transition-all" title="Borrar Cierre">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          </button>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div class="cf-section-title" style="margin-bottom:0">Historial de cierres</div>
     </div>
-    {% else %}
-    <div class="cf-empty">No hay cierres registrados aún.</div>
-    {% endif %}
+    <!-- Filtro por fechas -->
+    <div class="bg-jet-card border border-white/5 rounded-md p-3 mb-3 flex flex-wrap items-end gap-2">
+      <div class="flex flex-wrap gap-1.5">
+        <button type="button" onclick="cfCloseRange('today')" class="px-2.5 py-1.5 text-[0.6rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Hoy</button>
+        <button type="button" onclick="cfCloseRange('yesterday')" class="px-2.5 py-1.5 text-[0.6rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Ayer</button>
+        <button type="button" onclick="cfCloseRange('week')" class="px-2.5 py-1.5 text-[0.6rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Semana</button>
+        <button type="button" onclick="cfCloseRange('month')" class="px-2.5 py-1.5 text-[0.6rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Mes</button>
+      </div>
+      <div>
+        <label class="block text-[0.55rem] uppercase tracking-widest text-smoke/50 mb-1">Desde</label>
+        <input type="date" id="cf-close-from" class="bg-jet-lighter border border-white/10 text-smoke rounded px-2.5 py-1.5 text-sm focus:border-gold transition-all">
+      </div>
+      <div>
+        <label class="block text-[0.55rem] uppercase tracking-widest text-smoke/50 mb-1">Hasta</label>
+        <input type="date" id="cf-close-to" class="bg-jet-lighter border border-white/10 text-smoke rounded px-2.5 py-1.5 text-sm focus:border-gold transition-all">
+      </div>
+      <button type="button" onclick="cfLoadCloses()" class="px-3 py-1.5 bg-gold hover:bg-gold-light text-jet font-bold rounded text-[0.6rem] tracking-widest uppercase transition-colors">Buscar</button>
+      <button type="button" onclick="cfClearCloseFilter()" class="px-3 py-1.5 text-smoke/60 hover:text-white border border-white/10 rounded text-[0.6rem] tracking-widest uppercase transition-colors">Limpiar ✕</button>
+    </div>
+    <div id="cf-close-list" class="cf-close-list">
+      <div class="cf-empty">Cargando cierres...</div>
+    </div>
   </div>
 
 </div>
@@ -453,14 +474,33 @@
 <div id="modal-daily-close" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('modal-daily-close').classList.add('hidden')"></div>
   <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
-    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl p-5">
+    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl p-5 max-h-[85vh] overflow-y-auto">
       <h3 class="text-lg font-serif text-white mb-2">Confirmar cierre</h3>
-      <p class="text-smoke/60 text-sm mb-5">Se liquidan comisiones y se bloquean las ventas del día. Neto reportado: <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>.</p>
+      <p class="text-smoke/60 text-sm mb-4">Se liquidan comisiones y se bloquean las ventas del día. Neto reportado: <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>.</p>
+
+      <!-- Pago diario de Franko -->
+      <div id="frank-pay-section" class="hidden mb-4 p-3 bg-jet border border-amber-500/20 rounded space-y-3">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="frank-pay-check" class="w-4 h-4 accent-amber-500">
+          <span class="text-white text-sm font-bold">Pagar a Franko hoy</span>
+        </label>
+        <div id="frank-pay-breakdown" class="text-[0.7rem] text-smoke/60 space-y-1"></div>
+        <div id="frank-pay-amount-wrap">
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Monto a pagar (editable)</label>
+          <input type="number" id="frank-pay-amount" min="0" step="500" class="w-full bg-jet-lighter border border-white/10 text-white rounded px-3 py-2 focus:border-amber-400 outline-none">
+        </div>
+        <div class="text-[0.7rem] text-smoke/50">Efectivo del día: <strong class="text-emerald-400" id="frank-cash-available"></strong> <span class="text-smoke/40">(el pago de Franko sale solo del efectivo)</span></div>
+        <div id="frank-cash-warning" class="hidden p-2 bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[0.7rem] rounded"></div>
+      </div>
+
       <div class="flex gap-2 justify-end">
         <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="document.getElementById('modal-daily-close').classList.add('hidden')">Cancelar</button>
         <button id="btn-confirm-close" class="px-5 py-2 bg-gold text-jet font-bold rounded text-xs tracking-widest uppercase">Sí, cerrar</button>
       </div>
       <div id="close-error" class="hidden mt-3 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded"></div>
+      <div id="close-force-wrap" class="hidden mt-2 text-right">
+        <button id="btn-force-close" class="px-4 py-2 bg-red-600/80 hover:bg-red-500 text-white font-bold rounded text-[0.65rem] tracking-widest uppercase">Cerrar de todos modos</button>
+      </div>
     </div>
   </div>
 </div>
@@ -498,7 +538,7 @@
       </div>
       <div class="p-5 space-y-4">
         <div class="text-xs text-smoke/70">Préstamo a <strong class="text-white" id="cf-advance-barber-name"></strong>. Se descuenta de su acumulado de la quincena.</div>
-        <div class="text-[0.7rem] text-smoke/50">Saldo disponible: <strong class="text-gold" id="cf-advance-available"></strong></div>
+        <div class="text-[0.7rem] text-smoke/50"><span id="cf-advance-available-label">Saldo disponible: </span><strong class="text-gold" id="cf-advance-available"></strong></div>
         <div>
           <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Monto del vale</label>
           <input type="number" id="cf-advance-amount" min="1" step="1000" placeholder="0" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-amber-400 outline-none">
@@ -661,14 +701,16 @@ function cfShowTab(name) {
 // ═══ CARGA Y RENDER DE TRAZABILIDAD ═════════════════════
 async function cfLoadLive() {
   try {
-    const [liveRes, pendingRes] = await Promise.all([
+    const [liveRes, pendingRes, alertsRes] = await Promise.all([
       fetch('/api/admin/cashflow/live-detail/').then(r => r.json()),
       fetch('/api/admin/cashflow/pending-approvals/').then(r => r.json()).catch(() => ({pending_approvals: []})),
+      fetch('/api/admin/cashflow/alerts/').then(r => r.json()).catch(() => null),
     ]);
     cfLiveData = liveRes;
     cfPendingApprovals = pendingRes.pending_approvals || [];
     cfUpdateKPIs();
     cfUpdatePendingBanner();
+    cfUpdateAlerts(alertsRes);
     cfRenderTrazabilidad();
     setLastRefresh();
   } catch (e) {
@@ -676,6 +718,22 @@ async function cfLoadLive() {
     document.getElementById('cf-trazabilidad').innerHTML =
       '<div class="cf-empty text-red-400">Error al cargar datos. <button onclick="cfRefreshAll()" class="underline">Reintentar</button></div>';
   }
+}
+
+function cfUpdateAlerts(alerts) {
+  const unclosedEl = document.getElementById('cf-unclosed-alert');
+  const closePendingEl = document.getElementById('cf-close-pending-alert');
+  if (!alerts) { return; }
+  if (alerts.unclosed_count > 0) {
+    document.getElementById('cf-unclosed-count').textContent = alerts.unclosed_count;
+    document.getElementById('cf-unclosed-list').innerHTML = alerts.unclosed.map(b =>
+      `<div>· ${esc(b.time)} — ${esc(b.client_name)} (${esc(b.service_name)} · ${esc(b.barber_name)})</div>`
+    ).join('');
+    unclosedEl.classList.remove('hidden');
+  } else {
+    unclosedEl.classList.add('hidden');
+  }
+  closePendingEl.classList.toggle('hidden', !alerts.close_pending);
 }
 
 function cfUpdateKPIs() {
@@ -1017,38 +1075,107 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnConfirm = document.getElementById('btn-confirm-close');
   const errorDiv = document.getElementById('close-error');
 
+  // ── Pago diario de Franko en el modal de cierre ──
+  let cfClosePreview = null;
+  const frankSection = document.getElementById('frank-pay-section');
+  const frankCheck = document.getElementById('frank-pay-check');
+  const frankAmount = document.getElementById('frank-pay-amount');
+  const frankAmountWrap = document.getElementById('frank-pay-amount-wrap');
+  const frankCashWarning = document.getElementById('frank-cash-warning');
+  const forceWrap = document.getElementById('close-force-wrap');
+  const btnForce = document.getElementById('btn-force-close');
+
+  function cfUpdateFrankCashWarning() {
+    if (!cfClosePreview) return;
+    const amount = parseInt(frankAmount.value, 10) || 0;
+    const cash = cfClosePreview.cash.cash_income;
+    if (frankCheck.checked && amount > cash) {
+      frankCashWarning.textContent = `⚠ El pago (${fmt(amount)}) supera el efectivo del día (${fmt(cash)}).`;
+      frankCashWarning.classList.remove('hidden');
+    } else {
+      frankCashWarning.classList.add('hidden');
+    }
+  }
+  function cfToggleFrankAmount() {
+    frankAmountWrap.style.opacity = frankCheck.checked ? '1' : '0.4';
+    frankAmount.disabled = !frankCheck.checked;
+    cfUpdateFrankCashWarning();
+  }
+  if (frankCheck) frankCheck.addEventListener('change', cfToggleFrankAmount);
+  if (frankAmount) frankAmount.addEventListener('input', cfUpdateFrankCashWarning);
+
+  function cfLoadClosePreview() {
+    fetch('/api/admin/cashflow/daily-close/preview/')
+      .then(r => r.json())
+      .then(data => {
+        cfClosePreview = data;
+        document.getElementById('frank-cash-available').textContent = fmt(data.cash.cash_income);
+        if (!data.frank.exists) { frankSection.classList.add('hidden'); return; }
+        frankSection.classList.remove('hidden');
+        const f = data.frank;
+        const carry = f.balance - (f.unpaid_earnings - f.unsettled_advances);
+        let rows = `<div class="flex justify-between"><span>Ganancias pendientes</span><span class="text-white">${fmt(f.unpaid_earnings)}</span></div>`;
+        if (f.unsettled_advances > 0) rows += `<div class="flex justify-between"><span>Vales / adelantos</span><span class="text-amber-400">-${fmt(f.unsettled_advances)}</span></div>`;
+        if (Math.abs(carry) >= 1) rows += `<div class="flex justify-between"><span>Arrastre de días anteriores</span><span class="${carry < 0 ? 'text-red-400' : 'text-emerald-400'}">${carry < 0 ? '-' : '+'}${fmt(Math.abs(carry))}</span></div>`;
+        rows += `<div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span>Saldo</span><span class="${f.balance < 0 ? 'text-red-400' : 'text-gold'}">${fmt(f.balance)}</span></div>`;
+        if (f.balance < 0) rows += `<div class="text-amber-300 pt-1">Franko debe ${fmt(Math.abs(f.balance))} — se sugiere no pagar hoy.</div>`;
+        document.getElementById('frank-pay-breakdown').innerHTML = rows;
+        frankCheck.checked = f.suggested > 0;
+        frankAmount.value = Math.round(f.suggested);
+        cfToggleFrankAmount();
+      })
+      .catch(() => { cfClosePreview = null; frankSection.classList.add('hidden'); });
+  }
+
+  function cfSubmitClose(forceCash) {
+    const original = 'Sí, cerrar';
+    btnConfirm.textContent = 'Procesando...';
+    btnConfirm.disabled = true;
+    errorDiv.classList.add('hidden');
+    forceWrap.classList.add('hidden');
+    const body = {
+      frank_pay_enabled: !!(frankCheck && frankCheck.checked),
+      frank_pay_amount: parseInt(frankAmount && frankAmount.value, 10) || 0,
+      force_cash: !!forceCash,
+    };
+    fetch('/api/admin/cashflow/daily-close/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify(body)
+    })
+    .then(r => r.json().then(data => ({ status: r.status, body: data })))
+    .then(res => {
+      if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
+        window.location.reload();
+      } else if (res.body.code === 'cash_exceeded') {
+        errorDiv.textContent = res.body.error + ' Puedes ajustar el monto o forzar el cierre.';
+        errorDiv.classList.remove('hidden');
+        forceWrap.classList.remove('hidden');
+        btnConfirm.textContent = original;
+        btnConfirm.disabled = false;
+      } else {
+        throw new Error(res.body.error || 'Error al ejecutar cierre');
+      }
+    })
+    .catch(err => {
+      errorDiv.textContent = err.message;
+      errorDiv.classList.remove('hidden');
+      btnConfirm.textContent = original;
+      btnConfirm.disabled = false;
+    });
+  }
+
   if (btnOpen) {
     btnOpen.addEventListener('click', () => {
       if (btnOpen.disabled) return;
       modal.classList.remove('hidden');
       errorDiv.classList.add('hidden');
+      forceWrap.classList.add('hidden');
+      cfLoadClosePreview();
     });
   }
-  if (btnConfirm) {
-    btnConfirm.addEventListener('click', () => {
-      const original = btnConfirm.textContent;
-      btnConfirm.textContent = 'Procesando...';
-      btnConfirm.disabled = true;
-      fetch('/api/admin/cashflow/daily-close/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF }
-      })
-      .then(r => r.json().then(data => ({ status: r.status, body: data })))
-      .then(res => {
-        if (res.status === 200 || res.status === 201 || res.body.message === 'Cierre de caja exitoso') {
-          window.location.reload();
-        } else {
-          throw new Error(res.body.error || 'Error al ejecutar cierre');
-        }
-      })
-      .catch(err => {
-        errorDiv.textContent = err.message;
-        errorDiv.classList.remove('hidden');
-        btnConfirm.textContent = original;
-        btnConfirm.disabled = false;
-      });
-    });
-  }
+  if (btnConfirm) btnConfirm.addEventListener('click', () => cfSubmitClose(false));
+  if (btnForce) btnForce.addEventListener('click', () => cfSubmitClose(true));
   cfRefreshAll();
 });
 
@@ -1118,19 +1245,21 @@ function fetchBarberPayments() {
       container.innerHTML = data.payments.map(p => {
         const hasAdvances = (p.total_advances || 0) > 0;
         const safeName = (p.barber_name || '').replace(/'/g, "\\'");
+        const isDebt = p.is_frank && p.net_payable < 0;
         return `
-        <div class="bg-jet-card border border-gold/20 rounded-md p-4 flex flex-col">
+        <div class="bg-jet-card border ${isDebt ? 'border-red-500/30' : 'border-gold/20'} rounded-md p-4 flex flex-col">
           <div class="flex items-baseline justify-between mb-3">
             <h3 class="text-white font-serif text-base">${escH(p.barber_name)}</h3>
-            <span class="text-gold font-bold text-base">${fmt(p.net_payable)}</span>
+            <span class="${isDebt ? 'text-red-400' : 'text-gold'} font-bold text-base">${fmt(p.net_payable)}</span>
           </div>
+          ${isDebt ? `<div class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-[0.65rem] text-red-300">${escH(p.barber_name)} debe ${fmt(Math.abs(p.net_payable))} a la empresa. La deuda se descuenta en los próximos cierres.</div>` : ''}
           <div class="space-y-1 text-[0.7rem]">
             <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-white">${fmt(p.total_commissions)}</span></div>
             <div class="flex justify-between"><span class="text-smoke/50">Propinas</span><span class="text-emerald-400">+${fmt(p.total_tips)}</span></div>
             <div class="flex justify-between border-t border-white/5 pt-1"><span class="text-smoke/50">Acumulado</span><span class="text-white">${fmt(p.total_earnings)}</span></div>
             ${hasAdvances ? `
             <div class="flex justify-between"><span class="text-amber-400/80">Vales / adelantos</span><span class="text-amber-400">-${fmt(p.total_advances)}</span></div>
-            <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-gold uppercase tracking-widest text-[0.6rem]">Neto a pagar</span><span class="text-gold">${fmt(p.net_payable)}</span></div>
+            <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="${isDebt ? 'text-red-400' : 'text-gold'} uppercase tracking-widest text-[0.6rem]">${p.is_frank ? 'Saldo corriente' : 'Neto a pagar'}</span><span class="${isDebt ? 'text-red-400' : 'text-gold'}">${fmt(p.net_payable)}</span></div>
             ` : ''}
           </div>
           ${p.history && p.history.length > 0 ? `
@@ -1158,14 +1287,20 @@ function fetchBarberPayments() {
             </details>
           ` : ''}
           <div class="mt-auto pt-3 flex flex-wrap gap-2">
-            <button onclick="openAdvanceModal(${p.barber_id}, '${safeName}', ${p.net_payable})"
+            <button onclick="openAdvanceModal(${p.barber_id}, '${safeName}', ${p.net_payable}, ${p.is_frank ? 'true' : 'false'})"
               class="flex-1 min-w-[7rem] py-2 bg-amber-600/15 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 font-bold tracking-wider text-[0.65rem] uppercase rounded transition-colors whitespace-nowrap">
               Dar vale
             </button>
+            ${p.is_frank ? `
+            <div class="flex-1 min-w-[7rem] py-2 text-center text-smoke/40 text-[0.6rem] uppercase tracking-widest border border-white/5 rounded">
+              Se liquida en el cierre diario
+            </div>
+            ` : `
             <button onclick="payBarber(${p.barber_id}, '${safeName}', ${p.net_payable})"
               class="flex-1 min-w-[7rem] py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold tracking-wider text-[0.65rem] uppercase rounded transition-colors whitespace-nowrap">
               Marcar pagado
             </button>
+            `}
           </div>
         </div>
       `;}).join('');
@@ -1195,10 +1330,11 @@ window.payBarber = function(barberId, barberName, netAmount) {
 
 // ═══ VALES / ADELANTOS A BARBEROS ═══════════════════════
 let cfAdvanceBarberId = null;
-window.openAdvanceModal = function(barberId, barberName, available) {
+window.openAdvanceModal = function(barberId, barberName, available, isFrank) {
   cfAdvanceBarberId = barberId;
   document.getElementById('cf-advance-barber-name').textContent = barberName;
-  document.getElementById('cf-advance-available').textContent = fmt(available);
+  document.getElementById('cf-advance-available').textContent = fmt(available) + (isFrank ? ' (puede quedar negativo)' : '');
+  document.getElementById('cf-advance-available-label').textContent = isFrank ? 'Saldo actual: ' : 'Saldo disponible: ';
   document.getElementById('cf-advance-amount').value = '';
   document.getElementById('cf-advance-reason').value = '';
   const err = document.getElementById('cf-advance-error');
@@ -1282,17 +1418,35 @@ function renderCloseDetail(data) {
   // Totals
   html += `
     <div class="bg-black/30 border border-gold/20 rounded p-4 mb-5 text-sm space-y-2">
+      ${data.closed_by_name ? `<div class="flex justify-between text-[0.7rem] pb-1 border-b border-white/5"><span class="text-smoke/50 uppercase tracking-widest text-[0.6rem]">Cerrado por</span><span class="text-white">${esc(data.closed_by_name)}</span></div>` : ''}
       <div class="flex justify-between"><span class="text-smoke/60">Ventas servicios</span><span class="text-white">${fmt(data.total_sales)}</span></div>
       <div class="flex justify-between"><span class="text-smoke/60">Ventas productos</span><span class="text-emerald-400">+${fmt(data.total_inventory_sales)}</span></div>
       <div class="flex justify-between"><span class="text-smoke/60">Propinas (pass-through)</span><span class="text-amber-400">${fmt(data.total_tips)}</span></div>
       <div class="flex justify-between"><span class="text-smoke/60">Comisiones</span><span class="text-red-400">-${fmt(data.total_commissions)}</span></div>
-      <div class="flex justify-between"><span class="text-smoke/60">Egresos</span><span class="text-red-400">-${fmt(data.total_expenses)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Egresos${data.frank_payment ? ' (sin pago Franko)' : ''}</span><span class="text-red-400">-${fmt(data.total_expenses - (data.frank_payment ? data.frank_payment.amount : 0))}</span></div>
+      ${data.frank_payment ? `
+      <div class="flex justify-between"><span class="text-smoke/60">Pago a Franko</span><span class="text-amber-400">-${fmt(data.frank_payment.amount)}${Math.round(data.frank_payment.amount) !== Math.round(data.frank_payment.suggested_amount) ? ` <span class="text-smoke/40 text-[0.65rem]">(sugerido ${fmt(data.frank_payment.suggested_amount)})</span>` : ''}</span></div>
+      ` : ''}
       <div class="flex justify-between border-t border-white/10 pt-2 mt-2 font-bold">
         <span class="text-gold uppercase tracking-widest text-[0.65rem]">Ingreso neto</span>
         <span class="text-gold text-base">${fmt(data.net_income)}</span>
       </div>
     </div>
   `;
+  // Efectivo (el pago de Franko sale solo de aquí)
+  if (data.cash_summary) {
+    html += `
+    <div class="bg-black/30 border border-emerald-500/20 rounded p-4 mb-5 text-sm space-y-2">
+      <div class="cf-section-title" style="margin-bottom:0.25rem;">Efectivo en caja</div>
+      <div class="flex justify-between"><span class="text-smoke/60">Efectivo recibido (con propinas)</span><span class="text-white">${fmt(data.cash_summary.cash_income)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Pago a Franko (solo efectivo)</span><span class="text-red-400">-${fmt(data.cash_summary.frank_paid)}</span></div>
+      <div class="flex justify-between border-t border-white/10 pt-2 font-bold">
+        <span class="text-emerald-400 uppercase tracking-widest text-[0.65rem]">Efectivo neto en caja</span>
+        <span class="${data.cash_summary.cash_net < 0 ? 'text-red-400' : 'text-emerald-400'} text-base">${fmt(data.cash_summary.cash_net)}</span>
+      </div>
+    </div>
+    `;
+  }
   // Barbers
   if (data.barbers && data.barbers.length) {
     html += '<div class="cf-section-title">Por barbero</div><div class="space-y-2 mb-5">';
@@ -1361,7 +1515,7 @@ function renderCloseDetail(data) {
 // ═══ BORRAR CIERRE (superadmin) ════════════════════════
 {% if user_role == 'superadmin' %}
 window.deleteDailyClose = function(closeId, dateStr) {
-  if (!confirm(`¿BORRAR el cierre del ${dateStr}?\n\nLas ventas y egresos volverán a pendientes.`)) return;
+  if (!confirm(`¿BORRAR el cierre del ${dateStr}?\n\nLas ventas y egresos volverán a pendientes.\n\nOJO: si Franko ya recibió su pago en físico, al re-cerrar se volverá a sugerir el monto — ajústalo manualmente en el modal de cierre.`)) return;
   fetch(`/api/admin/cashflow/daily-close/${closeId}/delete/`, {
     method: 'DELETE',
     headers: { 'X-CSRFToken': CSRF }
@@ -1379,10 +1533,81 @@ window.deleteDailyClose = function(closeId, dateStr) {
 };
 {% endif %}
 
+// ═══ HISTORIAL DE CIERRES (filtrable) ═══════════════════
+function _cfFmtLocalDate(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+window.cfCloseRange = function(preset) {
+  const now = new Date();
+  let from = new Date(now), to = new Date(now);
+  if (preset === 'yesterday') { from.setDate(now.getDate() - 1); to.setDate(now.getDate() - 1); }
+  else if (preset === 'week') { const day = (now.getDay() + 6) % 7; from.setDate(now.getDate() - day); }
+  else if (preset === 'month') { from.setDate(1); }
+  document.getElementById('cf-close-from').value = _cfFmtLocalDate(from);
+  document.getElementById('cf-close-to').value = _cfFmtLocalDate(to);
+  cfLoadCloses();
+};
+window.cfClearCloseFilter = function() {
+  document.getElementById('cf-close-from').value = '';
+  document.getElementById('cf-close-to').value = '';
+  cfLoadCloses();
+};
+function cfLoadCloses() {
+  const container = document.getElementById('cf-close-list');
+  if (!container) return;
+  const from = document.getElementById('cf-close-from').value;
+  const to = document.getElementById('cf-close-to').value;
+  const params = new URLSearchParams();
+  if (from) params.set('date_from', from);
+  if (to) params.set('date_to', to);
+  const qs = params.toString();
+  fetch('/api/admin/cashflow/daily-closes/' + (qs ? '?' + qs : ''))
+    .then(r => r.json())
+    .then(data => {
+      const closes = data.closes || [];
+      if (!closes.length) {
+        container.innerHTML = '<div class="cf-empty">' + (data.is_filtered ? 'No hay cierres en ese rango.' : 'No hay cierres registrados aún.') + '</div>';
+        return;
+      }
+      const canDelete = USER_ROLE === 'superadmin';
+      container.innerHTML = closes.map(c => {
+        const safeDate = esc(c.date_display);
+        return `
+        <div class="bg-jet-card border border-white/5 rounded-md p-4 hover:border-gold/30 transition-colors flex flex-col">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <div class="text-white font-bold text-sm">${safeDate}</div>
+              <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest mt-0.5">${esc(c.closed_at_time)} · Cerró: ${esc(c.closed_by_name)}</div>
+            </div>
+            <span class="px-2 py-0.5 ${c.is_verified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gold/10 text-gold'} text-[0.55rem] uppercase tracking-widest font-bold rounded">${c.is_verified ? 'Verificado' : 'Cerrado'}</span>
+          </div>
+          <div class="space-y-1 text-[0.7rem] border-t border-white/5 pt-2 mt-1 mb-3">
+            <div class="flex justify-between"><span class="text-smoke/50">Ventas</span><span class="text-white">${fmt(c.total_sales)}</span></div>
+            <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-red-400">-${fmt(c.total_commissions)}</span></div>
+            <div class="flex justify-between"><span class="text-smoke/50">Egresos</span><span class="text-red-400">-${fmt(c.total_expenses)}</span></div>
+            ${c.frank_paid != null ? `<div class="flex justify-between"><span class="text-smoke/50">Pago Franko</span><span class="text-amber-400">-${fmt(c.frank_paid)}</span></div>` : ''}
+            <div class="flex justify-between border-t border-white/5 pt-1.5 mt-1.5 font-bold">
+              <span class="text-gold uppercase tracking-widest text-[0.6rem]">Neto</span>
+              <span class="text-gold text-sm">${fmt(c.net_income)}</span>
+            </div>
+          </div>
+          <div class="mt-auto flex gap-2">
+            <button onclick="showDailyCloseDetails(${c.id})" class="flex-1 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/5 hover:border-gold/30 py-2 rounded transition-colors">Detalle</button>
+            ${canDelete ? `<button onclick="deleteDailyClose(${c.id}, '${safeDate.replace(/'/g, "\\'")}')" class="px-3 py-2 text-smoke/30 hover:text-red-400 border border-transparent hover:border-red-400/30 rounded transition-all" title="Borrar Cierre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => { container.innerHTML = '<div class="cf-empty text-red-400">Error al cargar los cierres.</div>'; });
+}
+window.cfLoadCloses = cfLoadCloses;
+
 // ═══ REFRESH ORQUESTADO ═════════════════════════════════
 function cfRefreshAll() {
   cfLoadLive();
   fetchBarberPayments();
+  cfLoadCloses();
 }
 // Auto-refresh cada 60s
 clearInterval(cfRefreshTimer);

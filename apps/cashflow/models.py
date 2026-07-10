@@ -132,7 +132,11 @@ class Commission(models.Model):
         help_text='100% de propinas va para el barbero')
     total_earnings = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     
-    # Banderas para aislar flujo de pago
+    # Banderas para aislar flujo de pago.
+    # OJO (Frank): para él `is_paid` significa "procesada por un cierre diario",
+    # NO "pagada en su totalidad" — el cierre puede pagar un monto distinto al
+    # devengado y la diferencia se arrastra como saldo. Su deuda/saldo real se
+    # deriva SIEMPRE con services.compute_frank_ledger(), nunca desde estos flags.
     is_paid = models.BooleanField(default=False, help_text='¿Ya fue pagada esta comisión al barbero?')
     paid_at = models.DateTimeField(null=True, blank=True)
     is_paid_in_daily_close = models.BooleanField(default=False, help_text='Usado para liquidaciones diarias automatizadas (ej. Frank)')
@@ -188,6 +192,13 @@ class BarberAdvance(models.Model):
         default=False, help_text='¿Ya fue descontado en una liquidación al barbero?'
     )
     settled_at = models.DateTimeField(null=True, blank=True)
+    # Cierre diario en el que se liquidó (solo Frank). Permite revertir la
+    # liquidación si el cierre se elimina.
+    settled_in_daily_close = models.ForeignKey(
+        'DailyClose', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='settled_advances',
+        help_text='Cierre diario en el que se liquidó este vale (solo Frank)'
+    )
 
     class Meta:
         verbose_name = 'Adelanto / Vale de Barbero'
@@ -197,6 +208,46 @@ class BarberAdvance(models.Model):
     def __str__(self):
         name = self.barber.display_name if self.barber else '?'
         return f'Vale ${self.amount:,.0f} — {name}'
+
+
+class BarberPayment(models.Model):
+    """Pago real de dinero a un barbero. Hoy solo lo genera el cierre diario
+    para Frank (el pago manual a los demás barberos sigue siendo por flags).
+
+    El saldo corriente de Frank se DERIVA, nunca se almacena:
+        saldo = Σ Commission.total_earnings − Σ BarberAdvance.amount − Σ BarberPayment.amount
+    (ver services.compute_frank_ledger). `daily_close` es CASCADE a propósito:
+    al borrar un cierre el pago desaparece y el saldo derivado se restaura solo.
+    """
+    barber = models.ForeignKey(
+        'barbers.Barber', on_delete=models.CASCADE, related_name='payments'
+    )
+    daily_close = models.ForeignKey(
+        'DailyClose', null=True, blank=True, on_delete=models.CASCADE,
+        related_name='barber_payments'
+    )
+    expense = models.ForeignKey(
+        'Expense', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='barber_payments'
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=0)
+    suggested_amount = models.DecimalField(max_digits=12, decimal_places=0, default=0,
+        help_text='Saldo sugerido por el sistema al momento del pago')
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='barber_payments_made'
+    )
+    notes = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Pago a Barbero'
+        verbose_name_plural = 'Pagos a Barberos'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        name = self.barber.display_name if self.barber else '?'
+        return f'Pago ${self.amount:,.0f} — {name}'
 
 
 class InventorySale(models.Model):
@@ -264,6 +315,28 @@ class Expense(models.Model):
         verbose_name = 'Egreso'
         verbose_name_plural = 'Egresos'
         ordering = ['-date', '-created_at']
+
+
+class CashflowAlertLog(models.Model):
+    """Dedup de alertas programadas: una fila por (tipo, día).
+
+    El `create()` contra el UniqueConstraint es el candado entre múltiples
+    workers de gunicorn (cada proceso corre su propio scheduler): el primero
+    inserta y envía, los demás reciben IntegrityError y no re-envían.
+    """
+    alert_type = models.CharField(max_length=30)  # ej. 'close_reminder'
+    date = models.DateField(default=timezone.localdate)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Alerta de Caja Enviada'
+        verbose_name_plural = 'Alertas de Caja Enviadas'
+        constraints = [
+            models.UniqueConstraint(fields=['alert_type', 'date'], name='uniq_cashflow_alert_per_day'),
+        ]
+
+    def __str__(self):
+        return f'{self.alert_type} — {self.date}'
 
 
 class DailyClose(models.Model):

@@ -47,6 +47,8 @@ class Booking(models.Model):
     
     survey_sent = models.BooleanField(default=False)
     reminder_sent = models.BooleanField(default=False)
+    # Alerta interna "servicio sin cerrar" (~3h después de la cita sin checkout).
+    close_alert_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
