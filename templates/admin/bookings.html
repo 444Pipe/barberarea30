@@ -131,7 +131,6 @@
   </div>
   <div id="empty-state" class="hidden text-center py-12 text-smoke/30 text-sm">No se encontraron reservas</div>
 </div>
-</div>
 
 <!-- Walk-in Modal Global -->
 <div id="walkin-modal"
@@ -436,7 +435,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       'Hoy': [],
       'Mañana': [],
       'Pasado mañana': [],
-      'Más adelantadas': [],
+      'Próximas': [],
       'Anteriores': []
     };
 
@@ -445,7 +444,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       else if (b.date === strTomorrow) groups['Mañana'].push(b);
       else if (b.date === strDayAfter) groups['Pasado mañana'].push(b);
       else if (b.date < strToday) groups['Anteriores'].push(b);
-      else groups['Más adelantadas'].push(b);
+      else groups['Próximas'].push(b);
     });
 
     const renderRow = (b) => `
@@ -464,7 +463,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       </td>
       <td class="px-4 py-3 text-smoke/60">${b.date}</td>
       <td class="px-4 py-3 text-smoke/60">${formatTime12(b.time)}</td>
-      <td class="px-4 py-3 text-emerald-400 font-medium">$${(b.price || 0).toLocaleString('es-CO')}</td>
+      <td class="px-4 py-3 text-emerald-400 font-medium">$${Number(b.price || 0).toLocaleString('es-CO')}</td>
       <td class="px-4 py-3">${statusBadge[b.status] || statusBadge.pending}</td>
       <td class="px-4 py-3">
         <div class="flex flex-col gap-1.5 items-start">
@@ -540,7 +539,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
   `;
 
     let html = '';
-    const order = ['Hoy', 'Mañana', 'Pasado mañana', 'Más adelantadas', 'Anteriores'];
+    const order = ['Hoy', 'Mañana', 'Pasado mañana', 'Próximas', 'Anteriores'];
 
     order.forEach(groupName => {
       const groupBookings = groups[groupName];
@@ -565,7 +564,13 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
       body: JSON.stringify({ status: newStatus })
-    }).then(() => loadBookings());
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      if (ok && !data.error) loadBookings();
+      else alert('Error: ' + (data.error || data.detail || 'No se pudo cambiar el estado.'));
+    })
+    .catch(() => alert('Error de conexión al cambiar el estado.'));
   }
 
   function cancelBookingRow(id, name) {
@@ -608,21 +613,6 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     });
   }
 
-  function deleteAllBookings() {
-    if (!confirm("⚠️ ¡ADVERTENCIA CRÍTICA!\n¿Estás SEGURO de que deseas ELIMINAR TODAS LAS RESERVAS del sistema? Esta acción destruirá el historial completo y NO SE PUEDE DESHACER.")) return;
-    fetch('/api/admin/bookings/bulk-delete/', {
-      method: 'DELETE',
-      headers: { 'X-CSRFToken': getCSRF() }
-    }).then(r => {
-      if (r.ok) {
-        alert('Todas las reservas han sido eliminadas exitosamente.');
-        loadBookings();
-      } else {
-        alert('Error al intentar eliminar las reservas.');
-      }
-    });
-  }
-
   function openCheckout(id) {
     // Los datos se leen del índice en memoria, no de argumentos interpolados
     // en el HTML, para no exponer datos del cliente a XSS.
@@ -635,6 +625,25 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
 
     document.getElementById('checkout-booking-id').value = id;
     document.getElementById('checkout-client-name').textContent = clientName;
+
+    // Reset explícito de cada campo del cobro: viven fuera de <form id="checkout-form">
+    // (que solo envuelve el footer), así que form.reset() no los limpia y se
+    // arrastraban los valores del cobro anterior.
+    document.getElementById('checkout-payment-method').value = '';
+    document.getElementById('checkout-reference').value = '';
+    document.getElementById('checkout-tip').value = 0;
+    document.getElementById('checkout-discount').value = 0;
+    document.getElementById('checkout-assumed-by').value = 'none';
+    document.getElementById('checkout-notes').value = '';
+    document.getElementById('checkout-has-added-value').checked = false;
+    document.getElementById('checkout-added-value-container').classList.add('hidden');
+    document.getElementById('checkout-added-value').value = 0;
+    document.getElementById('checkout-added-value-desc').value = '';
+    document.getElementById('checkout-has-frank-materials').checked = false;
+    document.getElementById('checkout-frank-materials-fields').classList.add('hidden');
+    document.getElementById('checkout-materials-value').value = 0;
+    document.getElementById('checkout-labor-value').value = 0;
+
     window._checkoutBasePrice = price;
     updateCheckoutTotal();
 
@@ -797,6 +806,15 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     e.preventDefault();
     const id = document.getElementById('checkout-booking-id').value;
     const btn = document.querySelector('#checkout-form [type="submit"]');
+
+    // El <select required> está fuera del <form>, así que la validación nativa
+    // no se dispara: verificamos el método de pago manualmente antes de enviar.
+    const paymentMethodEl = document.getElementById('checkout-payment-method');
+    if (!paymentMethodEl.value) {
+      alert('Debe seleccionar un método de pago.');
+      paymentMethodEl.focus();
+      return;
+    }
 
     const payload = {
       payment_method_id: document.getElementById('checkout-payment-method').value,
@@ -1146,7 +1164,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="px-5 py-3 border-t border-white/5 flex gap-3 justify-end bg-jet-lighter">
       <button type="button" onclick="closeRescheduleModal()" class="px-4 py-2 text-sm text-smoke/60 hover:text-white transition-colors">Cancelar</button>
-      <button type="button" onclick="submitReschedule()" id="reschedule-submit-btn" class="px-6 py-2 bg-amber-600 text-white font-bold text-xs tracking-widest uppercase rounded hover:bg-amber-500 transition-colors">Confirmar Reagendo</button>
+      <button type="button" onclick="submitReschedule()" id="reschedule-submit-btn" class="px-6 py-2 bg-amber-600 text-white font-bold text-xs tracking-widest uppercase rounded hover:bg-amber-500 transition-colors">Confirmar reagendamiento</button>
     </div>
   </div>
 </div>
@@ -1316,7 +1334,7 @@ function submitReschedule() {
   })
   .finally(() => {
     btn.disabled = false;
-    btn.textContent = 'Confirmar Reagendo';
+    btn.textContent = 'Confirmar reagendamiento';
   });
 }
 </script>

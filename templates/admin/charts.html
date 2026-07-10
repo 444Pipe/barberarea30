@@ -60,6 +60,35 @@
 <script>
 let revenueChart = null, servicesChart = null;
 
+const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// "2026-04" -> "Abr 2026"; deja intacto lo que no calce
+function formatMonthLabel(m) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(m || ''));
+  if (!match) return m;
+  const year = match[1];
+  const idx = parseInt(match[2], 10) - 1;
+  if (idx < 0 || idx > 11) return m;
+  return `${MESES_ES[idx]} ${year}`;
+}
+
+// Abrevia montos COP: 1200000 -> "$1,2M", 800000 -> "$800K"
+function formatCompactCOP(v) {
+  const n = Number(v) || 0;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1000000) return sign + '$' + (abs / 1000000).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + 'M';
+  if (abs >= 1000) return sign + '$' + (abs / 1000).toLocaleString('es-CO', { maximumFractionDigits: 0 }) + 'K';
+  return sign + '$' + abs.toLocaleString('es-CO');
+}
+
+// Genera n colores ciclando la paleta base
+function buildColors(base, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+  return out;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   fetch('/api/barbers/').then(r => r.json()).then(barbers => {
     const sel = document.getElementById('revenue-barber-filter');
@@ -86,7 +115,7 @@ function loadRevenue() {
       revenueChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: data.months.map(m => m.month),
+          labels: data.months.map(m => formatMonthLabel(m.month)),
           datasets: [{ label: 'Ingresos (COP)', data: data.months.map(m => m.revenue),
             backgroundColor: 'rgba(212, 175, 55, 0.3)', borderColor: '#D4AF37', borderWidth: 1, borderRadius: 4 }]
         },
@@ -95,7 +124,7 @@ function loadRevenue() {
             tooltip: { callbacks: { label: c => ' $' + c.parsed.y.toLocaleString('es-CO') + ' COP' } } },
           scales: {
             x: { ticks: { color: '#888' }, grid: { display: false } },
-            y: { ticks: { color: '#555', callback: v => '$' + v.toLocaleString('es-CO') }, grid: { color: '#1a1a1a' } }
+            y: { ticks: { color: '#555', callback: v => formatCompactCOP(v) }, grid: { color: '#1a1a1a' } }
           }
         }
       });
@@ -107,12 +136,31 @@ function loadServices() {
     .then(r => r.json())
     .then(data => {
       const ctx = document.getElementById('servicesChart');
-      const colors = ['#D4AF37', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#06b6d4', '#ec4899'];
+      if (servicesChart) servicesChart.destroy();
+      const rows = Array.isArray(data) ? data : [];
+
+      // Sin datos: limpia el canvas y muestra un mensaje centrado
+      if (!rows.length) {
+        const canvas = ctx;
+        const c = canvas.getContext('2d');
+        c.clearRect(0, 0, canvas.width, canvas.height);
+        c.save();
+        c.fillStyle = '#666';
+        c.font = '12px sans-serif';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText('Sin datos', canvas.width / 2, canvas.height / 2);
+        c.restore();
+        return;
+      }
+
+      const palette = ['#D4AF37', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#06b6d4', '#ec4899'];
+      const colors = buildColors(palette, rows.length);
       servicesChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: data.map(s => s.service__name),
-          datasets: [{ data: data.map(s => s.count), backgroundColor: colors.slice(0, data.length), borderWidth: 0 }]
+          labels: rows.map(s => s.service__name),
+          datasets: [{ data: rows.map(s => s.count), backgroundColor: colors, borderWidth: 0 }]
         },
         options: { plugins: { legend: { labels: { color: '#888', font: { size: 10 } } } } }
       });

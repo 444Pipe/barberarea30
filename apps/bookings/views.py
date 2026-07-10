@@ -1,8 +1,10 @@
 """Bookings views — public creation and admin CRUD with filters."""
 import csv
+import logging
 from datetime import datetime
 
 from django.http import HttpResponse, Http404
+from django.db import transaction
 from django.utils import timezone
 from django.core.signing import Signer, BadSignature
 from django.shortcuts import render, get_object_or_404, redirect
@@ -20,6 +22,8 @@ from apps.barbers.models import BarberUnavailability
 from apps.services.models import Service
 from .models import Booking, BlockedDate
 from .serializers import BookingCreateSerializer, BookingAdminSerializer, BlockedDateSerializer
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Public ──────────────────────────────────────────────
@@ -41,16 +45,19 @@ class HomeView(TemplateView):
 def public_blocked_dates_list(request):
     """GET /api/blocked-dates/ — listar fechas bloqueadas para el frontend."""
     try:
-        blocked = BlockedDate.objects.filter(date__gte=timezone.now().date())
+        # BIZ-11: usar la fecha local (America/Bogota), no la UTC. Con timezone.now()
+        # la fecha "avanzaba" de noche y el bloqueo de "hoy" desaparecía del listado.
+        blocked = BlockedDate.objects.filter(date__gte=timezone.localdate())
         serializer = BlockedDateSerializer(blocked, many=True)
         return Response(serializer.data)
-    except Exception as e:
-        import traceback
+    except Exception:
+        # SEC-11: no exponer el traceback en la respuesta. Se registra en el log
+        # del servidor y al cliente se le devuelve un mensaje genérico.
         from django.http import JsonResponse
+        logger.exception('Error al listar fechas bloqueadas públicas')
         return JsonResponse({
-            'ok': False, 
-            'error': str(e), 
-            'trace': traceback.format_exc()
+            'ok': False,
+            'error': 'No se pudieron cargar las fechas bloqueadas.',
         }, status=500)
 
 
@@ -59,8 +66,11 @@ def public_blocked_dates_list(request):
 @permission_classes([AllowAny])
 def create_booking_view(request):
     """POST /api/bookings/ — crear nueva reserva desde el frontend público."""
-    data = request.data
-    
+    # BIZ-17: request.data puede ser un QueryDict inmutable (form-data), y más abajo
+    # mutamos claves en el flujo walk-in. Copiamos a un dict mutable para evitar el
+    # AttributeError ('QueryDict instance is immutable') preservando el comportamiento.
+    data = request.data.copy()
+
     is_walk_in = str(data.get('is_walk_in', '')).lower() == 'true'
     # En walk-in (presencial) el barbero/admin puede forzar el agendamiento sobre
     # su propio bloqueo de inactividad, con confirmación previa (force=true).
@@ -216,83 +226,94 @@ def create_booking_view(request):
             return Response({'error': 'Barbero no disponible'}, status=400)
 
     # ── Nivel 2: Validación explícita de doble agendamiento (Con overlaps) ───────────────────
-    requested_date = data.get('date')
-    requested_time_str = data.get('time')
-    effective_duration = barber.effective_duration_minutes(service)
-    try:
-        from datetime import datetime as _dt, timedelta
-        req_time = _dt.strptime(requested_time_str, '%H:%M').time()
-        req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
-        req_end = req_start + timedelta(minutes=effective_duration)
+    # BIZ-06: el chequeo de solape y la creación se serializan por barbero con
+    # select_for_update dentro de una transacción para evitar la condición de
+    # carrera. Dos requests concurrentes para el mismo barbero se ordenan: el
+    # segundo espera el commit del primero y así su chequeo ya ve la reserva
+    # recién creada (el UniqueConstraint solo cubre la hora de inicio exacta).
+    with transaction.atomic():
+        # Lock sobre el barbero ya determinado, antes del chequeo de solape.
+        Barber.objects.select_for_update().filter(id=barber.id).first()
 
-        # ── Nivel 2a: Validar bloqueos globales del local (BlockedDate) ─────────
-        # Si la fecha tiene un BlockedDate sin horario → todo el día está cerrado.
-        # Si tiene start_time/end_time → solo se atiende en esa franja; el
-        # servicio completo debe caber adentro (start..end - duration).
+        requested_date = data.get('date')
+        requested_time_str = data.get('time')
+        effective_duration = barber.effective_duration_minutes(service)
         try:
-            blocked = BlockedDate.objects.get(date=req_start.date())
-        except BlockedDate.DoesNotExist:
-            blocked = None
+            from datetime import datetime as _dt, timedelta
+            req_time = _dt.strptime(requested_time_str, '%H:%M').time()
+            req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
+            req_end = req_start + timedelta(minutes=effective_duration)
 
-        if blocked is not None:
-            if not blocked.start_time or not blocked.end_time:
-                desc = f' ({blocked.description})' if blocked.description else ''
-                return Response({
-                    'ok': False,
-                    'error': (
-                        f'El {requested_date} la barbería está cerrada{desc}. '
-                        f'Por favor elige otra fecha.'
-                    )
-                }, status=409)
-            # Franja parcial: la reserva debe caber dentro de [start_time, end_time]
-            if req_time < blocked.start_time or req_end.time() > blocked.end_time \
-                    or req_end.date() != req_start.date():
-                return Response({
-                    'ok': False,
-                    'error': (
-                        f'El {requested_date} solo se atiende de '
-                        f'{blocked.start_time.strftime("%I:%M %p")} a '
-                        f'{blocked.end_time.strftime("%I:%M %p")}. '
-                        f'El horario que elegiste no cabe en esa franja.'
-                    )
-                }, status=409)
-        # ────────────────────────────────────────────────────────────────────────
-        
-        existing_bookings = Booking.objects.filter(
-            barber=barber,
-            date=requested_date,
-            status__in=['pending', 'confirmed']
-        ).values_list('time', 'duration_minutes')
-        
-        duplicate = False
-        for bk_time, bk_duration in existing_bookings:
-            bk_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), bk_time)
-            bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk_duration))
+            # ── Nivel 2a: Validar bloqueos globales del local (BlockedDate) ─────────
+            # Si la fecha tiene un BlockedDate sin horario → todo el día está cerrado.
+            # Si tiene start_time/end_time → solo se atiende en esa franja; el
+            # servicio completo debe caber adentro (start..end - duration).
+            try:
+                blocked = BlockedDate.objects.get(date=req_start.date())
+            except BlockedDate.DoesNotExist:
+                blocked = None
 
-            if req_start < bk_end and req_end > bk_start:
-                duplicate = True
-                break
-    except Exception:
-        duplicate = Booking.objects.filter(
-            barber=barber,
-            date=requested_date,
-            time=requested_time_str,
-            status__in=['pending', 'confirmed'],
-        ).exists()
+            if blocked is not None:
+                if not blocked.start_time or not blocked.end_time:
+                    desc = f' ({blocked.description})' if blocked.description else ''
+                    return Response({
+                        'ok': False,
+                        'error': (
+                            f'El {requested_date} la barbería está cerrada{desc}. '
+                            f'Por favor elige otra fecha.'
+                        )
+                    }, status=409)
+                # Franja parcial: la reserva debe caber dentro de [start_time, end_time]
+                if req_time < blocked.start_time or req_end.time() > blocked.end_time \
+                        or req_end.date() != req_start.date():
+                    return Response({
+                        'ok': False,
+                        'error': (
+                            f'El {requested_date} solo se atiende de '
+                            f'{blocked.start_time.strftime("%I:%M %p")} a '
+                            f'{blocked.end_time.strftime("%I:%M %p")}. '
+                            f'El horario que elegiste no cabe en esa franja.'
+                        )
+                    }, status=409)
+            # ────────────────────────────────────────────────────────────────────────
 
-    if duplicate:
-        return Response({
-            'ok': False,
-            'error': (
-                f'{barber.display_name} ya tiene una cita activa que se cruza con las '
-                f'{requested_time_str} el {requested_date}. '
-                f'Por favor elige otro horario u otro barbero.'
-            )
-        }, status=409)
-    # ─────────────────────────────────────────────────────────────────────────
+            existing_bookings = Booking.objects.filter(
+                barber=barber,
+                date=requested_date,
+                status__in=['pending', 'confirmed']
+            ).values_list('time', 'duration_minutes')
 
-    serializer = BookingCreateSerializer(data=data)
-    if serializer.is_valid():
+            duplicate = False
+            for bk_time, bk_duration in existing_bookings:
+                bk_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), bk_time)
+                bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk_duration))
+
+                if req_start < bk_end and req_end > bk_start:
+                    duplicate = True
+                    break
+        except Exception:
+            duplicate = Booking.objects.filter(
+                barber=barber,
+                date=requested_date,
+                time=requested_time_str,
+                status__in=['pending', 'confirmed'],
+            ).exists()
+
+        if duplicate:
+            return Response({
+                'ok': False,
+                'error': (
+                    f'{barber.display_name} ya tiene una cita activa que se cruza con las '
+                    f'{requested_time_str} el {requested_date}. '
+                    f'Por favor elige otro horario u otro barbero.'
+                )
+            }, status=409)
+        # ─────────────────────────────────────────────────────────────────────────
+
+        serializer = BookingCreateSerializer(data=data)
+        if not serializer.is_valid():
+            return Response({'ok': False, 'errors': serializer.errors}, status=400)
+
         booking = serializer.save(
             barber=barber,
             service=service,
@@ -306,35 +327,35 @@ def create_booking_view(request):
             booking.notes = f'{booking.notes}\n{extra}'.strip() if booking.notes else extra
             booking.save(update_fields=['notes'])
 
-        import threading
-        def send_emails_async():
+    # Fuera de la transacción (ya commiteada): recién ahora se lanza el hilo de
+    # correos, para que la consulta desde el otro hilo/conexión sí encuentre la
+    # reserva. Antes, dentro del atomic, el correo podía correr antes del commit.
+    import threading
+    def send_emails_async():
+        try:
+            from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
+            send_booking_confirmation_email(booking)
+            # Enviar notificación al admin local directamente para evitar el reenviador de Hostinger
+            send_admin_new_booking_notification(booking)
+            send_barber_new_booking_notification(booking)
+        except Exception as e:
+            print("Error enviando email:", e)
+        finally:
             try:
                 from django.db import connection
-                from .emails import send_booking_confirmation_email, send_admin_new_booking_notification, send_barber_new_booking_notification
-                send_booking_confirmation_email(booking)
-                # Enviar notificación al admin local directamente para evitar el reenviador de Hostinger
-                send_admin_new_booking_notification(booking)
-                send_barber_new_booking_notification(booking)
-            except Exception as e:
-                print("Error enviando email:", e)
-            finally:
-                try:
-                    from django.db import connection
-                    connection.close()
-                except Exception:
-                    pass
+                connection.close()
+            except Exception:
+                pass
 
-        threading.Thread(target=send_emails_async).start()
+    threading.Thread(target=send_emails_async).start()
 
-        return Response({
-            'ok': True,
-            'id': booking.id,
-            'barber_assigned': barber.id,
-            'barber_name': barber.display_name,
-            'message': 'Reserva creada exitosamente'
-        }, status=201)
-
-    return Response({'ok': False, 'errors': serializer.errors}, status=400)
+    return Response({
+        'ok': True,
+        'id': booking.id,
+        'barber_assigned': barber.id,
+        'barber_name': barber.display_name,
+        'message': 'Reserva creada exitosamente'
+    }, status=201)
 
 
 @api_view(['POST'])
@@ -485,25 +506,32 @@ def admin_bookings_list_view(request):
             queryset = queryset.none()
 
     # Filters
+    has_filters = False
+
     barber_id = request.query_params.get('barber')
     if barber_id:
         queryset = queryset.filter(barber_id=barber_id)
+        has_filters = True
 
     status_filter = request.query_params.get('status')
     if status_filter:
         queryset = queryset.filter(status=status_filter)
+        has_filters = True
 
     service_id = request.query_params.get('service')
     if service_id:
         queryset = queryset.filter(service_id=service_id)
+        has_filters = True
 
     date_from = request.query_params.get('date_from')
     if date_from:
         queryset = queryset.filter(date__gte=date_from)
+        has_filters = True
 
     date_to = request.query_params.get('date_to')
     if date_to:
         queryset = queryset.filter(date__lte=date_to)
+        has_filters = True
 
     search = request.query_params.get('search')
     if search:
@@ -511,8 +539,16 @@ def admin_bookings_list_view(request):
         queryset = queryset.filter(
             Q(client_name__icontains=search) | Q(client_phone__icontains=search)
         )
+        has_filters = True
 
-    serializer = BookingAdminSerializer(queryset[:200], many=True)
+    # ADM-09: antes se truncaba siempre a 200 (queryset[:200]) perdiendo histórico
+    # en silencio. Si hay CUALQUIER filtro aplicado devolvemos todo lo que matchea
+    # (el usuario ya acotó la búsqueda); sin filtros elevamos el tope a 500. Se
+    # mantiene una lista JSON plana para no romper el frontend (sin paginación DRF).
+    if has_filters:
+        serializer = BookingAdminSerializer(queryset, many=True)
+    else:
+        serializer = BookingAdminSerializer(queryset[:500], many=True)
     return Response(serializer.data)
 
 
@@ -565,6 +601,18 @@ def admin_booking_detail_view(request, booking_id):
 
         # Edición de campos básicos: permitida a superadmin y operational_admin (Frank)
         is_operational_or_super = profile and profile.role in ('superadmin', 'operational_admin')
+
+        # ADM-06: si un rol sin permiso intenta editar la fecha/hora u otros datos
+        # sensibles de la reserva, no los ignoramos en silencio (devolvería 200 y
+        # dejaría la UI desincronizada): respondemos 403 explícito.
+        restricted_fields = (
+            'barber', 'date', 'time', 'client_name',
+            'client_phone', 'client_email', 'service', 'price',
+        )
+        if not is_operational_or_super and any(k in data for k in restricted_fields):
+            return Response({
+                'error': 'No tienes permiso para modificar la fecha, hora o los datos de la reserva.'
+            }, status=403)
 
         if 'status' in data:
             booking.status = data['status']
@@ -723,35 +771,42 @@ def admin_reschedule_booking_view(request, booking_id):
                 }, status=409)
 
     # Validar conflictos de horario (overlap)
-    if booking.barber:
-        conflict_qs = Booking.objects.filter(
-            barber=booking.barber,
-            date=req_date,
-            status__in=['pending', 'confirmed'],
-        ).exclude(pk=booking.pk)
+    # BIZ-06: el chequeo de solape y el guardado se serializan por barbero con
+    # select_for_update dentro de una transacción para evitar la condición de
+    # carrera entre dos reagendamientos concurrentes del mismo barbero.
+    with transaction.atomic():
+        if booking.barber:
+            # Lock sobre el barbero antes del chequeo de solape.
+            Barber.objects.select_for_update().filter(id=booking.barber.id).first()
 
-        for bk in conflict_qs:
-            # SQLite puede devolver strings en lugar de objetos date/time
-            bk_d = bk.date if not isinstance(bk.date, str) else _dt.strptime(bk.date, '%Y-%m-%d').date()
-            bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
+            conflict_qs = Booking.objects.filter(
+                barber=booking.barber,
+                date=req_date,
+                status__in=['pending', 'confirmed'],
+            ).exclude(pk=booking.pk)
 
-            bk_start = _dt.combine(bk_d, bk_t)
-            bk_end = bk_start + timedelta(minutes=booking.barber.occupied_minutes(bk.duration_minutes))
-            if req_start < bk_end and req_end > bk_start:
-                return Response({
-                    'ok': False,
-                    'error': (
-                        f'{booking.barber.display_name} ya tiene una cita que se cruza con las '
-                        f'{new_time} el {new_date}. Por favor elige otra hora.'
-                    )
-                }, status=409)
+            for bk in conflict_qs:
+                # SQLite puede devolver strings en lugar de objetos date/time
+                bk_d = bk.date if not isinstance(bk.date, str) else _dt.strptime(bk.date, '%Y-%m-%d').date()
+                bk_t = bk.time if not isinstance(bk.time, str) else _dt.strptime(str(bk.time)[:5], '%H:%M').time()
 
-    old_date = str(booking.date)
-    old_time = booking.time.strftime('%H:%M')
+                bk_start = _dt.combine(bk_d, bk_t)
+                bk_end = bk_start + timedelta(minutes=booking.barber.occupied_minutes(bk.duration_minutes))
+                if req_start < bk_end and req_end > bk_start:
+                    return Response({
+                        'ok': False,
+                        'error': (
+                            f'{booking.barber.display_name} ya tiene una cita que se cruza con las '
+                            f'{new_time} el {new_date}. Por favor elige otra hora.'
+                        )
+                    }, status=409)
 
-    booking.date = req_date
-    booking.time = req_time
-    booking.save(update_fields=['date', 'time'])
+        old_date = str(booking.date)
+        old_time = booking.time.strftime('%H:%M')
+
+        booking.date = req_date
+        booking.time = req_time
+        booking.save(update_fields=['date', 'time'])
 
     # Registrar en auditoría
     if profile and profile.is_admin:
@@ -778,8 +833,10 @@ def admin_bookings_export_csv(request):
     """GET /api/admin/bookings/export/ — exportar a CSV."""
     bookings = Booking.objects.select_related('barber', 'service').all()
 
+    # BIZ-17: incluir 'operational_admin' (Frank) junto a admin/superadmin para que
+    # exporte todo lo que ve en el listado JSON (allí ya ve todas las reservas).
     profile = getattr(request.user, 'profile', None)
-    if profile and profile.role not in ('admin', 'superadmin'):
+    if profile and profile.role not in ('admin', 'superadmin', 'operational_admin'):
         barber_profile = getattr(request.user, 'barber_profile', None)
         if barber_profile:
             bookings = bookings.filter(barber=barber_profile)

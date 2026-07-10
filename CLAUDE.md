@@ -13,6 +13,7 @@ Language of the domain, models, comments, and UI is **Spanish**. Keep new user-f
 [manage.py](manage.py) defaults `DJANGO_SETTINGS_MODULE` to **`config.settings.production`**, not `development`. The production module is tolerant — it falls back to `sqlite:///bookings.db` when `DATABASE_URL` is unset and turns `DEBUG=True` when local — so most commands "just work" without `DATABASE_URL`. But this means:
 
 - Local SQLite for `manage.py` lives in `bookings.db`, **not** `db.sqlite3`. The latter is what `config.settings.development` uses.
+- **IMPORTANTE — `bookings.db` es solo para pruebas locales.** Su contenido (reservas, ventas, usuarios) es data de prueba desechable, **no** datos reales de producción (producción corre en PostgreSQL vía `DATABASE_URL`). No trates sus filas como fuente de verdad y, salvo que se pida explícitamente, **no commitees** los cambios de `bookings.db` (migraciones aplicadas localmente o filas de prueba): es ruido local, no cambios de código.
 - To force the dev settings (real `db.sqlite3`, permissive CORS): `DJANGO_SETTINGS_MODULE=config.settings.development python manage.py <cmd>`.
 - [config/settings/build.py](config/settings/build.py) exists only for the Railway/Docker build phase (`collectstatic`) and uses in-memory SQLite + dummy email so the build doesn't need runtime secrets.
 

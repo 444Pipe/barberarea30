@@ -9,6 +9,7 @@ urlpatterns = [
     path('gallery/', TemplateView.as_view(template_name='public/gallery.html'), name='gallery'),
     path('booking/', TemplateView.as_view(template_name='public/booking.html'), name='booking'),
     path('reserva/<str:signed_id>/', client_booking_detail_view, name='client_booking_detail'),
+    path('politica-datos/', TemplateView.as_view(template_name='public/politica_datos.html'), name='politica_datos'),
     # Compatibilidad sin trailing slash
     path('services', TemplateView.as_view(template_name='public/services.html')),
     path('gallery', TemplateView.as_view(template_name='public/gallery.html')),

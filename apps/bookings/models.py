@@ -47,6 +47,8 @@ class Booking(models.Model):
     
     survey_sent = models.BooleanField(default=False)
     reminder_sent = models.BooleanField(default=False)
+    # Alerta interna "servicio sin cerrar" (~3h después de la cita sin checkout).
+    close_alert_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -98,17 +100,17 @@ class Booking(models.Model):
 
     @property
     def can_cancel(self):
-        """Se puede cancelar si la cita no ha empezado aún y no está completada ni cancelada."""
+        """Se puede cancelar solo con al menos 2 horas de anticipación y si no está completada ni cancelada."""
         if self.status in ['completed', 'cancelled']:
             return False
-        
+
         # Combine date and time
         booking_datetime = timezone.make_aware(
-            datetime.combine(self.date, self.time), 
+            datetime.combine(self.date, self.time),
             timezone.get_current_timezone()
         )
-        # Allow cancellation up until the moment of the appointment
-        return timezone.now() < booking_datetime
+        # No permitir cancelar con menos de 2 horas de anticipación (ni una vez pasada la cita)
+        return timezone.now() <= booking_datetime - timedelta(hours=2)
 
 
 class Review(models.Model):

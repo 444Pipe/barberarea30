@@ -28,8 +28,13 @@ DEBUG = os.environ.get('DEBUG', 'True' if IS_LOCAL else 'False').lower() == 'tru
 
 ALLOWED_HOSTS = _split_env(os.environ.get(
     'ALLOWED_HOSTS',
-    'www.area30barberclub.com,area30barberclub.com,barberarea30-production.up.railway.app,localhost,127.0.0.1'
+    'www.area30barberclub.com,area30barberclub.com,barberarea30-production.up.railway.app'
 ))
+# En local (sin DATABASE_URL) estas settings de producción se usan para dev,
+# así que se permiten los hosts locales; en producción real NO van en el
+# default (solo entrarían por la variable de entorno ALLOWED_HOSTS).
+if IS_LOCAL:
+    ALLOWED_HOSTS += ['localhost', '127.0.0.1', 'testserver']
 
 # ── Database (PostgreSQL via DATABASE_URL) ───────────────────────
 _db_url = os.environ.get('DATABASE_URL', f"sqlite:///{BASE_DIR / 'bookings.db'}")
@@ -69,17 +74,22 @@ for origin in _split_env(_raw_csrf):
 WHITENOISE_USE_FINDERS = True
 
 # ── Cloudinary (media storage) ────────────────────────────────
+# staticfiles siempre por WhiteNoise; el default de media queda en filesystem
+# salvo que Cloudinary esté configurado.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 if os.environ.get('CLOUDINARY_CLOUD_NAME'):
     CLOUDINARY_STORAGE = {
         'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
         'API_KEY': os.environ.get('CLOUDINARY_API_KEY', ''),
         'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', ''),
     }
-STORAGES = {
-    'default': {
+    STORAGES['default'] = {
         'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
-    },
-    'staticfiles': {
-        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-    },
-}
+    }

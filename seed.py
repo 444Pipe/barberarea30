@@ -119,10 +119,19 @@ services_data = [
 Service.objects.update(is_active=False)
 
 for i, svc in enumerate(services_data):
-    Service.objects.update_or_create(
-        slug=svc['slug'],
-        defaults={**svc, 'display_order': i, 'is_active': True}
-    )
+    fields = {**svc, 'display_order': i, 'is_active': True}
+    slug = fields.pop('slug')
+    existing = Service.objects.filter(slug=slug).first()
+    if existing:
+        # No sobreescribir el precio de un servicio existente: lo gestiona el
+        # superadmin desde el panel (can_modify_prices). Antes cada deploy lo
+        # revertía al valor hardcodeado. El resto de campos sí se sincroniza.
+        fields.pop('price', None)
+        for key, value in fields.items():
+            setattr(existing, key, value)
+        existing.save()
+    else:
+        Service.objects.create(slug=slug, **fields)
 
 # Limpiar barberos de prueba si existen
 Barber.objects.filter(display_name__in=['Barbero Prueba', 'Juan Pérez', 'Carlos Estilista']).delete()
@@ -229,6 +238,111 @@ except Exception:
     except Exception as e:
         print("⚠ No se pudo crear la tabla de BarberAdvance manualmente:", e)
 
+# --- Autocuración para la tabla cashflow_barberpayment (ledger de pagos) ---
+from apps.cashflow.models import BarberPayment as _BarberPayment
+try:
+    _BarberPayment.objects.exists()
+except Exception:
+    print("⚠ Tabla 'cashflow_barberpayment' no encontrada. Intentando crearla...")
+    try:
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(_BarberPayment)
+        print("✓ Tabla de BarberPayment creada limpiamente vía Schema Editor")
+    except Exception as e:
+        print("⚠ No se pudo crear la tabla de BarberPayment manualmente:", e)
+
+# --- Autocuración para cashflow_barberadvance.settled_in_daily_close ---
+try:
+    _BarberAdvance.objects.filter(settled_in_daily_close__isnull=True).exists()
+except Exception:
+    print("⚠ Columna 'settled_in_daily_close' no encontrada en cashflow_barberadvance. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.ForeignKey(
+                'cashflow.DailyClose', null=True, blank=True,
+                on_delete=_dj_models.SET_NULL, related_name='settled_advances',
+            )
+            _f.set_attributes_from_name('settled_in_daily_close')
+            schema_editor.add_field(_BarberAdvance, _f)
+        print("✓ Columna 'settled_in_daily_close' creada exitosamente.")
+    except Exception as e:
+        print("⚠ No se pudo crear la columna manualmente:", e)
+
+# --- Autocuración para la tabla cashflow_cashflowalertlog (dedup de alertas) ---
+from apps.cashflow.models import CashflowAlertLog as _CFAlertLog
+try:
+    _CFAlertLog.objects.exists()
+except Exception:
+    print("⚠ Tabla 'cashflow_cashflowalertlog' no encontrada. Intentando crearla...")
+    try:
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(_CFAlertLog)
+        print("✓ Tabla de CashflowAlertLog creada limpiamente vía Schema Editor")
+    except Exception as e:
+        print("⚠ No se pudo crear la tabla de CashflowAlertLog manualmente:", e)
+
+# --- Autocuración para bookings_booking.close_alert_sent ---
+from apps.bookings.models import Booking as _BkAlert
+try:
+    _BkAlert.objects.filter(close_alert_sent=False).exists()
+except Exception:
+    print("⚠ Columna 'close_alert_sent' no encontrada en bookings_booking. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.BooleanField(default=False)
+            _f.set_attributes_from_name('close_alert_sent')
+            schema_editor.add_field(_BkAlert, _f)
+        print("✓ Columna 'close_alert_sent' creada exitosamente.")
+    except Exception as e:
+        print("⚠ No se pudo crear la columna manualmente:", e)
+
+# --- Comisión canónica de Frank: 50% (idempotente) ---
+try:
+    from apps.barbers.models import Barber as _FrankBarber
+    from decimal import Decimal as _Dec
+    _fixed_pct = _FrankBarber.objects.filter(
+        display_name__icontains='frank'
+    ).exclude(commission_percentage=_Dec('50.00')).update(commission_percentage=_Dec('50.00'))
+    if _fixed_pct:
+        print(f"✓ Comisión de Frank fijada al 50% ({_fixed_pct} fila/s)")
+except Exception as _e:
+    print("⚠ No se pudo fijar la comisión de Frank al 50%:", _e)
+
+# --- Backfill del ledger de Frank (BarberPayment) desde egresos históricos ---
+# Cada cierre viejo pagó a Frank su devengado exacto vía el egreso
+# "Pago Diario: Franko". Sin estas filas, el saldo derivado (ganado − vales −
+# pagos) daría un falso saldo gigante a favor de Frank. Idempotente por
+# (barber, daily_close). DEBE correr después de los schema-repairs de arriba.
+try:
+    from apps.cashflow.models import Expense as _FrankExpense
+    from apps.cashflow.services import get_frank_barber as _get_frank
+    _frank_b = _get_frank()
+    if _frank_b:
+        _bf_created = 0
+        _frank_pay_expenses = _FrankExpense.objects.filter(
+            description__startswith='Pago Diario: Franko',
+            included_in_daily_close__isnull=False,
+        ).select_related('included_in_daily_close')
+        for _exp in _frank_pay_expenses:
+            _, _was_created = _BarberPayment.objects.get_or_create(
+                barber=_frank_b,
+                daily_close=_exp.included_in_daily_close,
+                defaults={
+                    'amount': _exp.amount,
+                    'suggested_amount': _exp.amount,
+                    'expense': _exp,
+                    'notes': 'Backfill histórico (pago automático legacy)',
+                },
+            )
+            if _was_created:
+                _bf_created += 1
+        if _bf_created:
+            print(f"✓ Backfill BarberPayment: {_bf_created} pago/s histórico/s de Frank registrados")
+except Exception as _e:
+    print("⚠ No se pudo hacer el backfill de BarberPayment:", _e)
+
 # --- Normalizar duración de las citas ACTIVAS de Frank a 2h (regla de negocio) ---
 # Frank ocupa siempre 2h; citas antiguas pudieron quedar con 30/60 min y eso
 # permitía agendar otra cita pegada. Se corrige de forma idempotente.
@@ -295,22 +409,28 @@ try:
     camilo_user = User.objects.filter(username='camilorf').first()
     jd_user = User.objects.filter(username='juandavid.castro').first()
     
-    # 2. Eliminar socios duplicados o con alias (manteniendo solo los que tengan estos usuarios)
+    # 2. Desactivar socios no canónicos (duplicados, con alias o con user=None).
+    #    NO se borran: eliminar en cascada arrastraría PartnerInvestment /
+    #    PartnerMonthlyShare y se perderían datos históricos. En su lugar se
+    #    marcan is_active=False para que no cuenten como socios activos al 50%.
     valid_users = [u for u in [camilo_user, jd_user] if u]
-    Partner.objects.exclude(user__in=valid_users).delete()
-    
-    # 3. Crear/Asegurar socio Camilo
+    Partner.objects.exclude(user__in=valid_users).update(is_active=False)
+    # Los socios con user=None no entran en el exclude anterior (NULL NOT IN → NULL),
+    # así que se desactivan aparte para no dejar "socios zombis" activos al 50%.
+    Partner.objects.filter(user__isnull=True).update(is_active=False)
+
+    # 3. Crear/Asegurar socio Camilo (reactivándolo si estaba inactivo)
     if camilo_user:
         Partner.objects.update_or_create(
             user=camilo_user,
-            defaults={'display_name': 'Camilo', 'share_percentage': 50.00}
+            defaults={'display_name': 'Camilo', 'share_percentage': 50.00, 'is_active': True}
         )
-        
-    # 4. Crear/Asegurar socio Juan David
+
+    # 4. Crear/Asegurar socio Juan David (reactivándolo si estaba inactivo)
     if jd_user:
         Partner.objects.update_or_create(
             user=jd_user,
-            defaults={'display_name': 'Juan David', 'share_percentage': 50.00}
+            defaults={'display_name': 'Juan David', 'share_percentage': 50.00, 'is_active': True}
         )
 except Exception as e:
     print(f"Error gestionando los socios únicos: {e}")

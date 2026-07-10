@@ -15,10 +15,40 @@
         </button>
     </div>
 
+    <!-- Filtro por fechas -->
+    <div class="bg-jet-card border border-white/5 rounded-sm p-4">
+        <form method="get" id="expense-filter-form" class="flex flex-wrap items-end gap-3">
+            <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="setExpenseRange('today')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Hoy</button>
+                <button type="button" onclick="setExpenseRange('yesterday')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Ayer</button>
+                <button type="button" onclick="setExpenseRange('week')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Esta semana</button>
+                <button type="button" onclick="setExpenseRange('month')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Este mes</button>
+            </div>
+            <div>
+                <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Desde</label>
+                <input type="date" name="date_from" id="filter-date-from" value="{{ date_from_str }}" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all">
+            </div>
+            <div>
+                <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Hasta</label>
+                <input type="date" name="date_to" id="filter-date-to" value="{{ date_to_str }}" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all">
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-[0.65rem] tracking-widest uppercase transition-colors">Buscar</button>
+            {% if is_filtered %}
+            <a href="{% url 'admin_expenses' %}" class="px-4 py-2 text-smoke/60 hover:text-white border border-white/10 rounded-sm text-[0.65rem] tracking-widest uppercase transition-colors">Limpiar ✕</a>
+            {% endif %}
+        </form>
+        {% if is_filtered %}
+        <div class="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            <div><span class="text-[0.6rem] uppercase tracking-widest text-smoke/50">Total del período</span> <span class="text-red-400 font-serif font-bold text-lg ml-2">-${{ filtered_total|floatformat:0 }}</span></div>
+            <div class="text-smoke/50 text-xs">{{ filtered_count }} egreso{{ filtered_count|pluralize }}</div>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Expenses List -->
     <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
         <div class="px-5 py-4 border-b border-white/5 bg-jet">
-            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">Historial Reciente</h2>
+            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">{% if is_filtered %}Egresos del período{% else %}Historial Reciente (últimos 50){% endif %}</h2>
         </div>
         
         {% if expenses %}
@@ -31,7 +61,7 @@
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Tipo</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Registrado Por</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold text-right">Monto</th>
-                        {% if user_role == 'superadmin' %}
+                        {% if user_role == 'superadmin' or user_role == 'operational_admin' %}
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold text-right">Acc.</th>
                         {% endif %}
                     </tr>
@@ -39,7 +69,10 @@
                 <tbody class="divide-y divide-white/5">
                     {% for exp in expenses %}
                     <tr class="hover:bg-white/[0.02] transition-colors">
-                        <td class="px-5 py-4 text-sm text-smoke/80">{{ exp.created_at|date:"d M Y, g:i A" }}</td>
+                        <td class="px-5 py-4 text-sm text-smoke/80">
+                            {{ exp.date|date:"d M Y" }}
+                            <div class="text-[10px] text-smoke/40">{{ exp.created_at|date:"g:i A" }}</div>
+                        </td>
                         <td class="px-5 py-4">
                             <div class="text-sm text-white font-medium">{{ exp.description }}</div>
                             {% if exp.notes %}<div class="text-[10px] text-smoke/40 mt-1">{{ exp.notes }}</div>{% endif %}
@@ -65,12 +98,34 @@
                         <td class="px-5 py-4 text-sm font-serif font-bold text-red-400 text-right">
                             -${{ exp.amount|floatformat:0 }}
                         </td>
-                        {% if user_role == 'superadmin' %}
+                        {% if user_role == 'superadmin' or user_role == 'operational_admin' %}
                         <td class="px-5 py-4 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                            {% if 'Pago Diario: Franko' in exp.description or '(venta #' in exp.description %}
+                                <span class="p-1.5 text-smoke/20" title="Egreso automático del sistema — no editable">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </span>
+                            {% elif user_role == 'superadmin' or exp.expense_type == 'variable' %}
+                                {% if exp.included_in_daily_close_id and user_role != 'superadmin' %}
+                                <span class="p-1.5 text-smoke/20" title="Incluido en un cierre — solo un superadmin puede corregirlo">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </span>
+                                {% else %}
+                                <button onclick="openEditExpense(this)"
+                                    data-id="{{ exp.id }}" data-desc="{{ exp.description }}" data-amount="{{ exp.amount|floatformat:0 }}"
+                                    data-type="{{ exp.expense_type }}" data-notes="{{ exp.notes }}" data-closed="{% if exp.included_in_daily_close_id %}1{% endif %}"
+                                    class="p-1.5 rounded text-smoke/30 hover:text-gold hover:bg-gold/10 transition-all duration-200" title="Editar egreso{% if exp.included_in_daily_close_id %} (en cierre: solo descripción/notas){% endif %}">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
+                                {% endif %}
+                            {% endif %}
+                            {% if user_role == 'superadmin' %}
                             <button onclick="confirmDeleteExpense({{ exp.id }}, '{{ exp.description|escapejs }}', {{ exp.amount|floatformat:0 }})"
                                 class="p-1.5 rounded text-smoke/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" title="Eliminar egreso">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
+                            {% endif %}
+                            </div>
                         </td>
                         {% endif %}
                     </tr>
@@ -138,6 +193,57 @@
         </div>
     </div>
 </div>
+<!-- Modal Editar Egreso -->
+<div id="modal-edit-expense" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeEditExpense()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+        <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl overflow-hidden p-6">
+            <h3 class="text-xl font-serif text-white mb-1">Editar Egreso</h3>
+            <p id="edit-expense-closed-note" class="hidden text-amber-400/80 text-xs mb-3">Este egreso ya está en un cierre: el monto y el tipo no se pueden cambiar.</p>
+
+            <form id="form-edit-expense" class="space-y-4 mt-3" enctype="multipart/form-data">
+                <input type="hidden" name="expense_id" id="edit-exp-id">
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Descripción</label>
+                    <input type="text" name="description" id="edit-exp-desc" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Monto ($)</label>
+                    <input type="number" name="amount" id="edit-exp-amount" min="1" step="1" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all disabled:opacity-40">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Tipo de Egreso</label>
+                    <select name="expense_type" id="edit-exp-type" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none disabled:opacity-40">
+                        <option value="variable">Gasto Variable (Día a Día)</option>
+                        {% if user_role == 'superadmin' %}
+                        <option value="fixed">Gasto Fijo (Arriendo, Servicios)</option>
+                        <option value="inventory">Compra de Inventario</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Notas (opcional)</label>
+                    <textarea name="notes" id="edit-exp-notes" rows="2" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Reemplazar soporte / foto (opcional)</label>
+                    <input type="file" name="image" accept="image/*" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke/70 rounded-sm focus:border-gold transition-all file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-gold/10 file:text-gold hover:file:bg-gold/20 cursor-pointer">
+                </div>
+                <p class="text-smoke/30 text-[10px]">El cambio quedará registrado en el log de auditoría (quién y qué cambió).</p>
+                <div class="flex gap-3 justify-end pt-2">
+                    <button type="button" class="px-5 py-2 text-smoke hover:text-white transition-colors text-xs tracking-widest uppercase" onclick="closeEditExpense()">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-submit-edit-expense" class="px-6 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-xs tracking-widest uppercase transition-colors">
+                        Guardar Cambios
+                    </button>
+                </div>
+                <div id="edit-expense-error" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded-sm"></div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% if user_role == 'superadmin' %}
 <!-- Delete Expense Confirmation Modal -->
 <div id="modal-delete-expense" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
@@ -211,6 +317,79 @@
                 btnSubmit.innerHTML = originalText;
                 btnSubmit.disabled = false;
             });
+        });
+    });
+
+    // ── Filtro de fechas (atajos) ──
+    function _fmtLocalDate(d) {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+    function setExpenseRange(preset) {
+        const now = new Date();
+        let from = new Date(now), to = new Date(now);
+        if (preset === 'yesterday') {
+            from.setDate(now.getDate() - 1);
+            to.setDate(now.getDate() - 1);
+        } else if (preset === 'week') {
+            const day = (now.getDay() + 6) % 7;  // lunes = 0
+            from.setDate(now.getDate() - day);
+        } else if (preset === 'month') {
+            from.setDate(1);
+        }
+        document.getElementById('filter-date-from').value = _fmtLocalDate(from);
+        document.getElementById('filter-date-to').value = _fmtLocalDate(to);
+        document.getElementById('expense-filter-form').submit();
+    }
+
+    // ── Edición de egresos ──
+    function openEditExpense(btn) {
+        const d = btn.dataset;
+        document.getElementById('edit-exp-id').value = d.id;
+        document.getElementById('edit-exp-desc').value = d.desc;
+        document.getElementById('edit-exp-amount').value = d.amount;
+        document.getElementById('edit-exp-type').value = d.type;
+        document.getElementById('edit-exp-notes').value = d.notes || '';
+        const isClosed = d.closed === '1';
+        document.getElementById('edit-exp-amount').disabled = isClosed;
+        document.getElementById('edit-exp-type').disabled = isClosed;
+        document.getElementById('edit-expense-closed-note').classList.toggle('hidden', !isClosed);
+        const err = document.getElementById('edit-expense-error');
+        err.classList.add('hidden'); err.textContent = '';
+        document.getElementById('form-edit-expense').querySelector('input[name="image"]').value = '';
+        document.getElementById('modal-edit-expense').classList.remove('hidden');
+    }
+    function closeEditExpense() {
+        document.getElementById('modal-edit-expense').classList.add('hidden');
+    }
+    document.getElementById('form-edit-expense').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btn-submit-edit-expense');
+        const errorDiv = document.getElementById('edit-expense-error');
+        const id = document.getElementById('edit-exp-id').value;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Guardando...';
+        btn.disabled = true;
+        const formData = new FormData(this);  // los campos disabled no viajan
+        formData.delete('expense_id');
+        fetch(`/api/admin/cashflow/expenses/${id}/edit/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        })
+        .then(r => r.json().then(body => ({status: r.status, body})))
+        .then(res => {
+            if (res.body.ok) {
+                window.location.reload();
+            } else {
+                throw new Error(res.body.error || 'Error al guardar');
+            }
+        })
+        .catch(err => {
+            errorDiv.textContent = err.message;
+            errorDiv.classList.remove('hidden');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
         });
     });
 

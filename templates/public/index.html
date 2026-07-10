@@ -516,18 +516,18 @@
           Club</a>
         <a href="#servicios"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Servicios</a>
-        <a href="gallery.html"
+        <a href="/gallery/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Galería</a>
         <a href="/reels/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Reels</a>
         <a href="/profesionales/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Profesionales</a>
-        <a href="booking.html"
+        <a href="/booking/"
           class="px-6 py-2.5 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm">Reserva tu Cita</a>
       </div>
 
       <!-- Mobile Button -->
-      <button class="md:hidden p-2 text-gold hover:text-gold-light transition-colors" id="menu-toggle">
+      <button class="md:hidden p-2 text-gold hover:text-gold-light transition-colors" id="menu-toggle" aria-label="Abrir menú de navegación">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg>
@@ -541,13 +541,13 @@
         Club</a>
       <a href="#servicios"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Servicios</a>
-      <a href="gallery.html"
+      <a href="/gallery/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Galería</a>
       <a href="/reels/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Reels</a>
       <a href="/profesionales/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Profesionales</a>
-      <a href="booking.html"
+      <a href="/booking/"
         class="block mt-6 px-4 py-3 gold-btn text-xs tracking-widest uppercase font-semibold text-center rounded-sm mx-8">Reserva
         tu Cita</a>
     </div>
@@ -557,7 +557,7 @@
   <section class="hero-section relative min-h-screen flex items-center justify-center px-4 overflow-hidden pt-20">
     <!-- Background Image with Parallax & Lujo -->
     <div class="absolute inset-0 z-0 hero-bg" id="hero-bg">
-      <img src="{% static 'images/hero_luxury.png' %}" alt="Área 30 Club" class="w-full h-full object-cover">
+      <img src="{% static 'images/hero_luxury.webp' %}" alt="Área 30 Club" class="w-full h-full object-cover" fetchpriority="high" width="1920" height="815">
       <div class="absolute inset-0 bg-gradient-to-r from-jet via-jet/40 to-transparent z-10"></div>
       <div class="absolute inset-0 bg-gradient-to-b from-jet/60 via-transparent to-jet z-10"></div>
       <div class="absolute top-1/2 left-0 w-full h-1/2 bg-gold/5 blur-[120px] -translate-y-1/2 z-10"></div>
@@ -583,7 +583,7 @@
           </p>
 
           <div class="flex flex-col sm:flex-row gap-8 items-start">
-            <a href="booking.html" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
+            <a href="/booking/" class="group relative px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
               <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold flex items-center gap-3">
                 Reserva Tu Lugar
                 <span class="btn-icon text-sm">→</span>
@@ -658,7 +658,7 @@
             </div>
             <video id="club-video" src="{% static 'images/videoarea30.mp4' %}" autoplay muted loop playsinline
               class="w-full h-full object-cover"></video>
-            <button id="unmute-btn" onclick="toggleMute()"
+            <button id="unmute-btn" onclick="toggleMute()" aria-label="Activar o silenciar el sonido del video"
               class="absolute bottom-4 right-4 z-20 w-10 h-10 bg-black/60 hover:bg-gold/80 rounded-full flex items-center justify-center text-white transition-colors">
               <svg id="mute-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -824,7 +824,7 @@
     <div class="max-w-6xl mx-auto relative z-10">
       <div class="flex items-center gap-6 mb-16 reveal-up">
         <div class="flex flex-col">
-          <span class="text-gold tracking-[0.6em] uppercase text-[0.65rem] font-black mb-2 select-none">// ENCONTRÁNOS
+          <span class="text-gold tracking-[0.6em] uppercase text-[0.65rem] font-black mb-2 select-none">// ENCUÉNTRANOS
             AQUÍ</span>
           <div class="h-[2px] w-24 bg-gradient-to-r from-gold to-transparent"></div>
         </div>
@@ -844,8 +844,8 @@
             class="absolute inset-0 bg-gradient-to-tr from-gold/0 via-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none z-20">
           </div>
 
-          <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3845.159330468472!2d-73.5643613!3d4.2584017!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e3fd3dc559d0e9b%3A0x72ec03db6b5c4f56!2s%C3%81rea%2030%20Barber%20Cub!5e0!3m2!1ses!2sco!4v1746100000000!5m2!1ses!2sco"
+          <iframe title="Ubicación de Área 30 Barber Club"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3845.159330468472!2d-73.5643613!3d4.2584017!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e3fd3dc559d0e9b%3A0x72ec03db6b5c4f56!2s%C3%81rea%2030%20Barber%20Club!5e0!3m2!1ses!2sco!4v1746100000000!5m2!1ses!2sco"
             width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"
             referrerpolicy="no-referrer-when-downgrade"></iframe>
         </div>
@@ -943,8 +943,8 @@
         class="text-center sm:flex sm:justify-between sm:text-left text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">
         <p>&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
         <div class="mt-4 sm:mt-0 flex gap-6 justify-center">
-          <a href="#" class="hover:text-gold transition-colors">Términos</a>
-          <a href="#" class="hover:text-gold transition-colors">Privacidad</a>
+          <a href="/politica-datos/" class="hover:text-gold transition-colors">Términos</a>
+          <a href="/politica-datos/" class="hover:text-gold transition-colors">Privacidad</a>
           <a href="/admin-panel/login/" class="hover:text-gold transition-colors font-medium">Acceso Staff</a>
         </div>
       </div>
@@ -973,7 +973,7 @@
         </svg>
       </a>
     </div>
-    <button id="fab-main" class="fab-main">
+    <button id="fab-main" class="fab-main" aria-label="Abrir redes sociales">
       30
     </button>
   </div>
@@ -1139,6 +1139,12 @@
         document.querySelectorAll('#services-grid .menu-row').forEach(r => rowsIO.observe(r));
 
         if (window.A30Reveal) window.A30Reveal.refresh();
+      })
+      .catch(() => {
+        const grid = document.getElementById('services-grid');
+        if (grid) {
+          grid.innerHTML = '<p class="text-smoke/40 text-sm col-span-full py-8 text-center">No pudimos cargar los servicios. Intenta de nuevo más tarde.</p>';
+        }
       });
 
     // JS for Suggestion Box
@@ -1231,6 +1237,7 @@
       })
       .catch(() => {
         document.getElementById('reviews-loader').style.display = 'none';
+        document.getElementById('reviews-empty').classList.remove('hidden');
       });
   </script>
   <script src="{% static 'js/animations.js' %}"></script>

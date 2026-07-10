@@ -48,12 +48,12 @@
       <!-- Barber Rating -->
       <div>
         <label class="block text-xs tracking-widest uppercase font-bold text-smoke/70 mb-3">¿Cómo te fue con tu barbero?</label>
-        <div class="flex justify-center gap-2" id="barber-stars">
-          <button type="button" class="star-btn active text-3xl" data-val="1">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="2">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="3">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="4">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="5">★</button>
+        <div class="flex justify-center gap-2" id="barber-stars" role="group" aria-label="Calificación de tu barbero">
+          <button type="button" class="star-btn active text-3xl" data-val="1" aria-label="1 estrella">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="2" aria-label="2 estrellas">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="3" aria-label="3 estrellas">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="4" aria-label="4 estrellas">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="5" aria-label="5 estrellas">★</button>
         </div>
         <input type="hidden" id="barber_rating" value="5">
       </div>
@@ -61,12 +61,12 @@
       <!-- Shop Rating -->
       <div>
         <label class="block text-xs tracking-widest uppercase font-bold text-smoke/70 mb-3">¿Qué tal las instalaciones y el club?</label>
-        <div class="flex justify-center gap-2" id="shop-stars">
-          <button type="button" class="star-btn active text-3xl" data-val="1">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="2">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="3">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="4">★</button>
-          <button type="button" class="star-btn active text-3xl" data-val="5">★</button>
+        <div class="flex justify-center gap-2" id="shop-stars" role="group" aria-label="Calificación de las instalaciones y el club">
+          <button type="button" class="star-btn active text-3xl" data-val="1" aria-label="1 estrella">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="2" aria-label="2 estrellas">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="3" aria-label="3 estrellas">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="4" aria-label="4 estrellas">★</button>
+          <button type="button" class="star-btn active text-3xl" data-val="5" aria-label="5 estrellas">★</button>
         </div>
         <input type="hidden" id="shop_rating" value="5">
       </div>
@@ -126,7 +126,9 @@
       const comment = document.getElementById('comment').value;
 
       const btn = e.target.querySelector('button[type="submit"]');
+      if (btn.disabled) return;
       const originalText = btn.innerHTML;
+      btn.disabled = true;
       btn.innerHTML = 'Enviando...';
 
       fetch(`/api/bookings/${token}/review/`, {
@@ -148,6 +150,7 @@
           status.classList.remove('hidden');
           status.className = 'text-xs text-red-400 mt-4';
           status.innerText = data.error || 'Error enviando calificación';
+          btn.disabled = false;
           btn.innerHTML = originalText;
         }
       })
@@ -156,6 +159,7 @@
         status.classList.remove('hidden');
         status.className = 'text-xs text-red-400 mt-4';
         status.innerText = 'Error de red';
+        btn.disabled = false;
         btn.innerHTML = originalText;
       });
     }
