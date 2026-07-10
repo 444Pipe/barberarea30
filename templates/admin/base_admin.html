@@ -262,6 +262,15 @@
   </div>
 
   <script>
+    // Escapa datos dinámicos (nombre/teléfono/email/notas del cliente, etc.)
+    // antes de inyectarlos como HTML con innerHTML, para evitar XSS almacenado.
+    // Disponible globalmente para todas las páginas del panel.
+    window.esc = function (s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
     function toggleSidebar() {
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('sidebar-overlay');

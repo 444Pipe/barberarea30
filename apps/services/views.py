@@ -6,13 +6,13 @@ from .serializers import ServiceSerializer
 
 
 from django.utils.text import slugify
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from apps.users.permissions import IsSuperAdminOrReadOnly
 
 class ServiceListView(generics.ListCreateAPIView):
-    """GET /api/services/ — lista pública, POST crea nuevo servicio."""
+    """GET /api/services/ — lista pública, POST crea nuevo servicio (solo superadmin)."""
     queryset = Service.objects.filter(is_active=True).order_by('price')
     serializer_class = ServiceSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsSuperAdminOrReadOnly]
     pagination_class = None
 
     def perform_create(self, serializer):
@@ -28,10 +28,10 @@ class ServiceListView(generics.ListCreateAPIView):
 
 
 class ServiceDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET/PUT/DELETE /api/services/{id}/"""
+    """GET/PUT/DELETE /api/services/{id}/ — escritura solo superadmin."""
     queryset = Service.objects.filter(is_active=True)
     serializer_class = ServiceSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsSuperAdminOrReadOnly]
 
 from django.core.serializers.json import DjangoJSONEncoder
 

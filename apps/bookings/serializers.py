@@ -10,9 +10,12 @@ class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = ['id', 'client_name', 'client_phone', 'client_email',
-                  'barber', 'service_id', 'date', 'time', 'notes', 'price',
+                  'barber', 'service_id', 'date', 'time', 'notes',
                   'status', 'created_at', 'is_walk_in', 'privacy_accepted']
         read_only_fields = ['id', 'status', 'created_at', 'barber']
+        # 'price' se omite deliberadamente: el precio siempre lo fija el servidor
+        # desde Service.price. Ajustes de precio se hacen en checkout/reagendado
+        # (con permiso de rol), nunca desde el request público.
 
     def validate(self, data):
         # Si no es walk-in, requiere aceptar privacidad

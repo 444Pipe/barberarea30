@@ -401,6 +401,11 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     const tbody = document.getElementById('bookings-table');
     const empty = document.getElementById('empty-state');
 
+    // Índice por id para que openCheckout no reciba datos del cliente
+    // interpolados en atributos onclick (evita XSS/roturas de atributo).
+    window.__bookingsById = {};
+    bookings.forEach(b => { window.__bookingsById[b.id] = b; });
+
     if (!bookings.length) {
       tbody.innerHTML = '';
       empty.classList.remove('hidden');
@@ -446,15 +451,15 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     const renderRow = (b) => `
     <tr class="hover:bg-white/[0.02] transition-colors">
       <td class="px-4 py-3">
-        <div class="text-white font-medium">${b.client_name}</div>
-        ${b.client_email ? `<div class="text-[0.6rem] text-smoke/30">${b.client_email}</div>` : ''}
+        <div class="text-white font-medium">${esc(b.client_name)}</div>
+        ${b.client_email ? `<div class="text-[0.6rem] text-smoke/30">${esc(b.client_email)}</div>` : ''}
       </td>
       <td class="px-4 py-3">${phoneCell(b.client_phone)}</td>
-      <td class="px-4 py-3 text-smoke/80">${b.service_name || ''}</td>
+      <td class="px-4 py-3 text-smoke/80">${esc(b.service_name || '')}</td>
       <td class="px-4 py-3">
         <span class="inline-flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full" style="background: ${b.barber_color || '#D4AF37'}"></span>
-          <span class="text-smoke/80">${b.barber_name || ''}</span>
+          <span class="w-2 h-2 rounded-full" style="background: ${escAttr(b.barber_color || '#D4AF37')}"></span>
+          <span class="text-smoke/80">${esc(b.barber_name || '')}</span>
         </span>
       </td>
       <td class="px-4 py-3 text-smoke/60">${b.date}</td>
@@ -464,7 +469,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       <td class="px-4 py-3">
         <div class="flex flex-col gap-1.5 items-start">
           ${b.status !== 'completed' && b.status !== 'cancelled' ? `
-            <button onclick="openCheckout(${b.id}, '${b.client_name.replace(/'/g, "\\'")}', ${b.price}, '${(b.barber_name || '').replace(/'/g, "\\'")}', ${b.manual_labor_cost || 0}, ${b.manual_materials_cost || 0})"
+            <button onclick="openCheckout(${b.id})"
               class="w-full px-3 py-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded text-[0.6rem] hover:bg-emerald-600/40 transition-colors font-bold tracking-wider">
               💰 COBRAR
             </button>
@@ -618,7 +623,16 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     });
   }
 
-  function openCheckout(id, clientName, price, barberName, manualLabor = 0, manualMaterials = 0) {
+  function openCheckout(id) {
+    // Los datos se leen del índice en memoria, no de argumentos interpolados
+    // en el HTML, para no exponer datos del cliente a XSS.
+    const b = (window.__bookingsById && window.__bookingsById[id]) || {};
+    const clientName = b.client_name || '';
+    const price = b.price || 0;
+    const barberName = b.barber_name || '';
+    const manualLabor = b.manual_labor_cost || 0;
+    const manualMaterials = b.manual_materials_cost || 0;
+
     document.getElementById('checkout-booking-id').value = id;
     document.getElementById('checkout-client-name').textContent = clientName;
     window._checkoutBasePrice = price;

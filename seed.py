@@ -251,23 +251,36 @@ from apps.cashflow.models import PaymentMethod
 pm1, _ = PaymentMethod.objects.get_or_create(slug='efectivo', defaults={'name': 'Efectivo', 'is_active': True, 'requires_reference': False})
 pm2, _ = PaymentMethod.objects.get_or_create(slug='transferencia', defaults={'name': 'Transferencia (Nequi/Bancolombia)', 'is_active': True, 'requires_reference': True})
 
-# Crear superusuarios automáticamente para Railway
+# Crear superusuarios automáticamente para Railway.
+# Las contraseñas vienen de variables de entorno y SOLO se asignan al crear el
+# usuario (o cuando se provee un override por env para rotarla). Nunca se
+# reimponen en cada boot: si un socio cambia su clave desde el panel, el
+# siguiente deploy la respeta.
+import secrets as _secrets
+
 users_to_create = [
-    {'username': 'camilorf', 'password': 'area30*', 'email': 'camilo@area30.co'},
-    {'username': 'juandavid.castro', 'password': 'Liam2711*', 'email': 'juandavid@area30.co'},
-    {'username': 'soporte_tecnico', 'password': 'soporte_tecnico_pass', 'email': 'soporte@area30.co'}, # Assuming some pass or keeping existing
+    {'username': 'camilorf', 'env': 'SEED_CAMILO_PASSWORD', 'email': 'camilo@area30.co'},
+    {'username': 'juandavid.castro', 'env': 'SEED_JUANDAVID_PASSWORD', 'email': 'juandavid@area30.co'},
+    {'username': 'soporte_tecnico', 'env': 'SEED_SOPORTE_PASSWORD', 'email': 'soporte@area30.co'},
 ]
 
 for user_data in users_to_create:
     try:
         uname = user_data['username']
         user, created = User.objects.get_or_create(username=uname, defaults={'email': user_data['email']})
-        user.set_password(user_data['password'])
+        env_pwd = os.environ.get(user_data['env'])
+        if created or env_pwd:
+            # En primera creación sin env: contraseña aleatoria impresa al log
+            # (el operador la rota); nunca una clave fija versionada en el repo.
+            new_pwd = env_pwd or _secrets.token_urlsafe(12)
+            user.set_password(new_pwd)
+            if created and not env_pwd:
+                print(f"⚠ Usuario {uname} creado con contraseña ALEATORIA temporal: {new_pwd} — cámbiala.")
         user.is_staff = True
         user.is_superuser = True
         user.save()
         UserProfile.objects.get_or_create(user=user, defaults={'role': 'superadmin'})
-        print(f"OK: Usuario {uname} {'creado' if created else 'actualizado'} correctamente.")
+        print(f"OK: Usuario {uname} {'creado' if created else 'actualizado (clave sin cambios)'} correctamente.")
     except Exception as e:
         print(f"No se pudo procesar al usuario {uname}: {e}")
 

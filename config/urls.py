@@ -1,4 +1,6 @@
 """Root URL configuration for Área 30 Barber Club."""
+import os
+
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
@@ -6,6 +8,13 @@ from django.urls import path, include
 from django.http import HttpResponse
 
 def init_soporte_view(request):
+    # Endpoint de recuperación: protegido con un token secreto (INIT_SOPORTE_TOKEN).
+    # Si el token no está configurado, el endpoint queda deshabilitado — nunca
+    # debe poder ejecutarlo un anónimo, ya que recrea un superadmin.
+    expected = os.environ.get('INIT_SOPORTE_TOKEN')
+    if not expected or request.GET.get('token') != expected:
+        return HttpResponse('No autorizado.', status=403, content_type='text/plain')
+
     from django.core.management import call_command
     from io import StringIO
     out = StringIO()
