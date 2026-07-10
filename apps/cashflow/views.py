@@ -120,8 +120,11 @@ def daily_close_view(request):
         # Comisiones
         commissions = Commission.objects.filter(sale__in=pending_sales)
         
-        # Separar a Franko
-        frank_commissions = commissions.filter(barber__display_name__icontains='frank')
+        # Separar a Franko. Solo las comisiones NO pagadas: si una ya se liquidó
+        # (o el cierre se rehízo), no se debe volver a pagar.
+        frank_commissions = commissions.filter(
+            barber__display_name__icontains='frank', is_paid=False
+        )
         frank_total_comm = frank_commissions.aggregate(total=Sum('commission_amount'))['total'] or 0
         frank_total_tips = frank_commissions.aggregate(total=Sum('tip_amount'))['total'] or 0
         frank_pay = frank_total_comm + frank_total_tips
@@ -311,17 +314,31 @@ def daily_close_detail_view(request, close_id):
 @permission_classes([IsSuperAdmin])
 def delete_daily_close_view(request, close_id):
     """DELETE /api/admin/cashflow/daily-close/<id>/delete/ - Eliminar cierre de caja (solo superadmin)."""
-    from apps.cashflow.models import DailyClose
+    from apps.cashflow.models import DailyClose, Commission
+    from django.db import transaction
     try:
         daily_close = DailyClose.objects.get(pk=close_id)
         date_str = daily_close.date.strftime('%Y-%m-%d')
-        
-        # Desvincular ventas y egresos
-        daily_close.sales.update(included_in_daily_close=None)
-        daily_close.inventory_sales.update(included_in_daily_close=None)
-        daily_close.expenses.update(included_in_daily_close=None)
-        
-        daily_close.delete()
+
+        with transaction.atomic():
+            # Revertir el pago automático de Frank ANTES de desvincular: si no,
+            # al recerrar se crearía un segundo "Pago Diario: Franko" y se
+            # duplicaría el egreso. Se hace mientras las ventas/egresos siguen
+            # ligados a este cierre.
+            Commission.objects.filter(
+                sale__included_in_daily_close=daily_close,
+                is_paid_in_daily_close=True,
+            ).update(is_paid=False, is_paid_in_daily_close=False, paid_at=None)
+            daily_close.expenses.filter(
+                description__icontains='Pago Diario: Franko'
+            ).delete()
+
+            # Desvincular las ventas y egresos restantes (vuelven a pendientes).
+            daily_close.sales.update(included_in_daily_close=None)
+            daily_close.inventory_sales.update(included_in_daily_close=None)
+            daily_close.expenses.update(included_in_daily_close=None)
+
+            daily_close.delete()
         
         log_audit(
             user=request.user,
@@ -1104,6 +1121,14 @@ def pay_barber_view(request, barber_id):
         barber = Barber.objects.get(id=barber_id)
     except Barber.DoesNotExist:
         return Response({'error': 'Barbero no encontrado'}, status=404)
+
+    # El pago de Frank se automatiza en el cierre diario ("Pago Diario: Franko").
+    # Liquidarlo también por aquí lo pagaría dos veces.
+    if 'frank' in (barber.display_name or '').lower():
+        return Response(
+            {'error': 'El pago de Frank se automatiza en el cierre diario; no se liquida desde aquí.'},
+            status=400,
+        )
 
     with transaction.atomic():
         unpaid = Commission.objects.filter(

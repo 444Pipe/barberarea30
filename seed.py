@@ -119,10 +119,19 @@ services_data = [
 Service.objects.update(is_active=False)
 
 for i, svc in enumerate(services_data):
-    Service.objects.update_or_create(
-        slug=svc['slug'],
-        defaults={**svc, 'display_order': i, 'is_active': True}
-    )
+    fields = {**svc, 'display_order': i, 'is_active': True}
+    slug = fields.pop('slug')
+    existing = Service.objects.filter(slug=slug).first()
+    if existing:
+        # No sobreescribir el precio de un servicio existente: lo gestiona el
+        # superadmin desde el panel (can_modify_prices). Antes cada deploy lo
+        # revertía al valor hardcodeado. El resto de campos sí se sincroniza.
+        fields.pop('price', None)
+        for key, value in fields.items():
+            setattr(existing, key, value)
+        existing.save()
+    else:
+        Service.objects.create(slug=slug, **fields)
 
 # Limpiar barberos de prueba si existen
 Barber.objects.filter(display_name__in=['Barbero Prueba', 'Juan Pérez', 'Carlos Estilista']).delete()

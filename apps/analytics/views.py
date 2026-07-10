@@ -139,9 +139,9 @@ def dashboard_stats_view(request):
         try:
             today = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
-            today = date.today()
+            today = timezone.localdate()
     else:
-        today = date.today()
+        today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())
     month_start = today.replace(day=1)
 

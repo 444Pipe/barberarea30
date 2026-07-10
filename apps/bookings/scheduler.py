@@ -15,32 +15,51 @@ def send_upcoming_reminders():
         from apps.bookings.models import Booking
         from apps.bookings.emails import send_booking_reminder_email
 
+        import datetime
+
         now = timezone.now()
         target_start = now + timedelta(hours=1, minutes=45)  # Ventana: entre 1h 45m
         target_end = now + timedelta(hours=2, minutes=15)    # y 2h 15m → ≈2 horas
 
-        # Buscar reservas pendientes o confirmadas dentro de esa ventana y que NO tengan el reminder enviado
-        from django.db.models import Q
-        import datetime
+        tz = timezone.get_current_timezone()
+        # Solo escanear las fechas (en hora local) que puede tocar la ventana,
+        # en vez de recorrer toda la tabla histórica de reservas.
+        candidate_dates = {
+            timezone.localtime(target_start).date(),
+            timezone.localtime(target_end).date(),
+        }
 
         bookings_to_remind = Booking.objects.filter(
             status__in=['pending', 'confirmed'],
             reminder_sent=False,
-            client_email__isnull=False
+            date__in=candidate_dates,
+            client_email__isnull=False,
         ).exclude(client_email='')
 
         count = 0
         for booking in bookings_to_remind:
             # Combinar fecha y hora de la cita
             booking_dt = timezone.make_aware(
-                datetime.datetime.combine(booking.date, booking.time),
-                timezone.get_current_timezone()
+                datetime.datetime.combine(booking.date, booking.time), tz
             )
-            if target_start <= booking_dt <= target_end:
+            if not (target_start <= booking_dt <= target_end):
+                continue
+
+            # Reclamar el envío de forma atómica: si otro worker/proceso ya marcó
+            # este recordatorio, update() devuelve 0 y no se envía por duplicado.
+            claimed = Booking.objects.filter(
+                pk=booking.pk, reminder_sent=False
+            ).update(reminder_sent=True)
+            if not claimed:
+                continue
+
+            try:
                 send_booking_reminder_email(booking)
-                booking.reminder_sent = True
-                booking.save(update_fields=['reminder_sent'])
                 count += 1
+            except Exception as send_err:
+                # Revertir la marca para reintentar en la próxima corrida.
+                Booking.objects.filter(pk=booking.pk).update(reminder_sent=False)
+                logger.error(f"[Recordatorios] Falló el envío a la reserva {booking.pk}: {send_err}")
 
         if count:
             logger.info(f"[Recordatorios] Enviados {count} correos de recordatorio.")

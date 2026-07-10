@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from decimal import Decimal
 
 
@@ -244,7 +245,9 @@ class Expense(models.Model):
     description = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=12, decimal_places=0)
     expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPES, default='variable')
-    date = models.DateField(auto_now_add=True)
+    # Fecha local (America/Bogota), no la del servidor en UTC: un egreso
+    # registrado de noche debe contar en el día/mes correcto para el ROI.
+    date = models.DateField(default=timezone.localdate)
     registered_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True
     )

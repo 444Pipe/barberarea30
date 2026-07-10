@@ -95,7 +95,10 @@ def admin_dashboard_view(request):
     )
 
     pending_approvals_count = 0
-    if profile and profile.role in ('operational_admin', 'superadmin', 'admin'):
+    # Solo quienes pueden confirmar ventas (operational_admin/superadmin) ven el
+    # panel de aprobaciones; el rol 'admin' recibía 403 del backend y el panel
+    # quedaba roto.
+    if profile and profile.role in ('operational_admin', 'superadmin'):
         pending_approvals_count = Sale.objects.filter(approval_status=Sale.STATUS_PENDING, included_in_daily_close__isnull=True).count()
 
     context = {

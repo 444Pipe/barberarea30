@@ -105,8 +105,8 @@
 
   <!-- ═══ PANEL DE APROBACIONES ═══
        Siempre presente en el DOM — JS lo muestra/oculta según haya ventas pendientes.
-       Visible solo para operational_admin, admin y superadmin. -->
-  {% if user_role == 'operational_admin' or user_role == 'superadmin' or user_role == 'admin' %}
+       Visible solo para quienes pueden confirmar ventas: operational_admin y superadmin. -->
+  {% if user_role == 'operational_admin' or user_role == 'superadmin' %}
   <div id="approvals-section" class="bg-red-500/10 border border-red-500/20 rounded-xl p-6 hidden">
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-xs tracking-[0.3em] uppercase text-red-400 font-bold flex items-center gap-2">
@@ -234,8 +234,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // ── Panel de Aprobaciones (solo para administradores) ────────────────────────
-  {% if user_role == 'operational_admin' or user_role == 'superadmin' or user_role == 'admin' %}
+  // ── Panel de Aprobaciones (solo quienes confirman ventas) ────────────────────
+  {% if user_role == 'operational_admin' or user_role == 'superadmin' %}
 
   function loadApprovals() {
     fetch('/api/admin/cashflow/pending-approvals/')
