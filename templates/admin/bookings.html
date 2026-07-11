@@ -618,10 +618,12 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
     // en el HTML, para no exponer datos del cliente a XSS.
     const b = (window.__bookingsById && window.__bookingsById[id]) || {};
     const clientName = b.client_name || '';
-    const price = b.price || 0;
+    // El API serializa los decimales como string ("30000"); sin parseFloat,
+    // el total concatenaba en vez de sumar ("30000" + 5000 = "300005000").
+    const price = parseFloat(b.price) || 0;
     const barberName = b.barber_name || '';
-    const manualLabor = b.manual_labor_cost || 0;
-    const manualMaterials = b.manual_materials_cost || 0;
+    const manualLabor = parseFloat(b.manual_labor_cost) || 0;
+    const manualMaterials = parseFloat(b.manual_materials_cost) || 0;
 
     document.getElementById('checkout-booking-id').value = id;
     document.getElementById('checkout-client-name').textContent = clientName;
@@ -704,7 +706,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
   }
 
   function updateCheckoutTotal() {
-    let basePrice = window._checkoutBasePrice || 0;
+    let basePrice = parseFloat(window._checkoutBasePrice) || 0;
 
     const hasFrankMaterials = document.getElementById('checkout-has-frank-materials').checked;
     if (hasFrankMaterials) {
