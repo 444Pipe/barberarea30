@@ -412,13 +412,20 @@ def daily_close_detail_view(request, close_id):
             'approved_by': inv_sale.sold_by.username if inv_sale.sold_by else 'N/A'
         })
 
-    # Detalle de egresos
+    # Detalle de egresos. Los materiales se marcan aparte para poder mostrarlos
+    # como su propio rubro: siguen sumando en total_expenses igual que antes.
     expenses_data = []
+    total_materials = 0.0
     for exp in expenses:
+        amt = float(exp.amount)
+        is_materials = cashflow_services.is_materials_expense(exp.description)
+        if is_materials:
+            total_materials += amt
         expenses_data.append({
             'description': exp.description,
-            'amount': float(exp.amount),
-            'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
+            'amount': amt,
+            'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type,
+            'is_materials': is_materials,
         })
 
     # Pago real a Frank en este cierre (ledger) y resumen del efectivo.
@@ -447,6 +454,8 @@ def daily_close_detail_view(request, close_id):
         'total_tips': float(daily_close.total_tips),
         'total_commissions': float(daily_close.total_commissions),
         'total_expenses': float(daily_close.total_expenses),
+        # Subconjunto de total_expenses, no un rubro nuevo: informativo.
+        'total_materials': total_materials,
         'net_income': float(daily_close.net_income),
         'barbers': list(barbers_data.values()),
         'payment_methods': payment_methods_data,
@@ -630,15 +639,20 @@ def live_cashflow_detail_view(request):
 
     expenses_data = []
     total_expenses_overall = 0
+    total_materials = 0.0
     for exp in expenses:
         amt = float(exp.amount)
         total_expenses_overall += amt
+        is_materials = cashflow_services.is_materials_expense(exp.description)
+        if is_materials:
+            total_materials += amt
         expenses_data.append({
             'description': exp.description,
             'amount': amt,
-            'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type
+            'type': exp.get_expense_type_display() if hasattr(exp, 'get_expense_type_display') else exp.expense_type,
+            'is_materials': is_materials,
         })
-        
+
     # El rubro sintético del pago a Frank refleja el DEVENGADO DEL DÍA
     # (comisión + propinas de hoy), para que el KPI "Egresos" sea comparable
     # con el del cierre (que registra el egreso del día). El saldo corriente
@@ -675,6 +689,8 @@ def live_cashflow_detail_view(request):
         'total_tips': total_tips_overall,
         'total_commissions': total_commissions_overall,
         'total_expenses': total_expenses_overall,
+        # Subconjunto de total_expenses, no un rubro nuevo: informativo.
+        'total_materials': total_materials,
         'net_income': net_income,
         'pending_approvals_count': pending_approvals_count,
         'frank_ledger': {
@@ -1603,8 +1619,13 @@ def pay_barber_view(request, barber_id):
 
     Marca como pagadas las comisiones pendientes y como liquidados los vales/adelantos
     pendientes. El monto que recibe el barbero es el neto (acumulado − vales).
+
+    Deja constancia en un `BarberPayment` (con `daily_close` nulo, que es lo que
+    lo distingue del pago automático de Frank) y enlaza a él las comisiones y
+    vales que cubrió, para que un superadmin pueda revertir exactamente este
+    pago sin tocar liquidaciones anteriores (ver delete_barber_payment_view).
     """
-    from apps.cashflow.models import Commission, BarberAdvance
+    from apps.cashflow.models import Commission, BarberAdvance, BarberPayment
     from apps.barbers.models import Barber
     from django.utils import timezone
     from django.db import transaction
@@ -1645,17 +1666,30 @@ def pay_barber_view(request, barber_id):
             }, status=400)
 
         now = timezone.now()
-        unpaid.update(is_paid=True, paid_at=now)
-        advances.update(is_settled=True, settled_at=now)
+
+        # El pago se crea ANTES de los updates: las comisiones y vales lo
+        # referencian, y los querysets filtran por is_paid/is_settled, así que
+        # marcarlos primero los vaciaría antes de poder enlazarlos.
+        payment = BarberPayment.objects.create(
+            barber=barber,
+            daily_close=None,
+            amount=net_amount,
+            suggested_amount=net_amount,
+            created_by=request.user,
+            notes=f'Liquidación manual (acumulado ${earnings:,.0f}, vales ${total_advances:,.0f})',
+        )
+
+        unpaid.update(is_paid=True, paid_at=now, paid_in_payment=payment)
+        advances.update(is_settled=True, settled_at=now, settled_in_payment=payment)
 
         msg = f"Liquidó a {barber.display_name}: ${net_amount:,.0f} neto (acumulado ${earnings:,.0f}"
         if total_advances > 0:
             msg += f" − vales ${total_advances:,.0f}"
-        msg += ")"
+        msg += f") — pago #{payment.id}"
         log_audit(
             user=request.user,
-            action='update',
-            obj=None,
+            action='payment',
+            obj=payment,
             changes={'is_paid': True},
             request=request,
             extra_data={'msg': msg}
@@ -1665,6 +1699,184 @@ def pay_barber_view(request, barber_id):
         'ok': True,
         'message': f'Liquidación de ${net_amount:,.0f} netos registrada para {barber.display_name} (acumulado ${earnings:,.0f}, vales ${total_advances:,.0f}).'
     })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsSuperAdmin])
+def delete_barber_payment_view(request, payment_id):
+    """DELETE /api/admin/cashflow/barber-payments/payment/<id>/delete/ - Anula una liquidación.
+
+    Solo superadmin (Camilo / Juan David): sirve para corregir un pago
+    registrado de más. Revierte exactamente lo que este pago liquidó —las
+    comisiones y vales que lo referencian— y vuelve a dejar el saldo pendiente.
+
+    El pago de Frank NO se anula por aquí: nace del cierre diario y su reverso
+    correcto (que además devuelve el egreso y el efectivo) es eliminar el cierre.
+    """
+    from apps.cashflow.models import BarberPayment
+    from django.db import transaction
+
+    try:
+        payment = BarberPayment.objects.select_related(
+            'barber', 'daily_close'
+        ).get(pk=payment_id)
+    except BarberPayment.DoesNotExist:
+        return Response({'error': 'Pago no encontrado'}, status=404)
+
+    if payment.daily_close_id is not None:
+        fecha = payment.daily_close.date.strftime('%Y-%m-%d')
+        return Response({
+            'error': f'Este pago se generó en el cierre diario del {fecha}. '
+                     f'Para anularlo elimina ese cierre, así también se revierten '
+                     f'el egreso y el efectivo del día.'
+        }, status=400)
+
+    barber_name = payment.barber.display_name if payment.barber else '?'
+    amount = float(payment.amount)
+
+    with transaction.atomic():
+        # Revertir solo lo que ESTE pago cubrió. Las liquidaciones anteriores
+        # apuntan a otros BarberPayment y no se tocan.
+        commissions_reverted = payment.commissions.update(
+            is_paid=False, paid_at=None, paid_in_payment=None
+        )
+        advances_reverted = payment.settled_advances.update(
+            is_settled=False, settled_at=None, settled_in_payment=None
+        )
+
+        log_audit(
+            user=request.user,
+            action='delete',
+            obj=None,
+            changes={},
+            request=request,
+            extra_data={'msg': (
+                f"Eliminó el pago #{payment.id} de ${amount:,.0f} a {barber_name} "
+                f"({commissions_reverted} comisiones y {advances_reverted} vales "
+                f"vuelven a quedar pendientes)"
+            )}
+        )
+        payment.delete()
+
+    return Response({
+        'ok': True,
+        'message': (
+            f'Pago de ${amount:,.0f} a {barber_name} eliminado. '
+            f'{commissions_reverted} comisiones y {advances_reverted} vales '
+            f'volvieron a quedar pendientes.'
+        )
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def barber_payment_detail_view(request, barber_id):
+    """GET /api/admin/cashflow/barber-payments/<id>/detail/ - Desglose del saldo de un barbero.
+
+    Responde "¿de qué está compuesto este pago?": los servicios uno por uno
+    (cliente, servicio, hora, base, % y comisión), los vales que se restan y
+    los pagos ya hechos. La tarjeta de la pantalla solo muestra los totales.
+    """
+    from apps.cashflow.models import Commission, BarberAdvance, BarberPayment, Sale
+    from apps.barbers.models import Barber
+    from django.utils import timezone
+
+    try:
+        barber = Barber.objects.get(id=barber_id)
+    except Barber.DoesNotExist:
+        return Response({'error': 'Barbero no encontrado'}, status=404)
+
+    is_frank = 'frank' in (barber.display_name or '').lower()
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
+
+    # Servicios que componen el acumulado pendiente. Para Frank, `is_paid`
+    # significa "ya procesada por un cierre", así que este listado es igualmente
+    # lo que aún no ha entrado a ningún cierre.
+    commissions = Commission.objects.filter(
+        barber=barber, is_paid=False, sale__approval_status=Sale.STATUS_APPROVED
+    ).select_related('sale', 'sale__booking', 'sale__service', 'sale__payment_method').order_by('-created_at')
+
+    services = []
+    for c in commissions:
+        sale = c.sale
+        created = timezone.localtime(c.created_at)
+        services.append({
+            'sale_id': sale.id,
+            'date': created.strftime('%Y-%m-%d'),
+            'time': created.strftime('%I:%M %p'),
+            'client_name': sale.booking.client_name if sale.booking else 'N/A',
+            'service_name': sale.service.name if sale.service else 'General',
+            'base_price': float(sale.base_price),
+            'final_price': float(sale.final_price),
+            'basis_amount': float(c.basis_amount),
+            'percentage': float(c.percentage),
+            'commission_amount': float(c.commission_amount),
+            'tip_amount': float(c.tip_amount),
+            'total_earnings': float(c.total_earnings),
+            'payment_method': sale.payment_method.name if sale.payment_method else '—',
+        })
+
+    advances_qs = BarberAdvance.objects.filter(
+        barber=barber, is_settled=False
+    ).select_related('created_by').order_by('-created_at')
+    advances = [{
+        'id': a.id,
+        'amount': float(a.amount),
+        'reason': a.reason,
+        'date': timezone.localtime(a.created_at).strftime('%Y-%m-%d'),
+        'by': (a.created_by.get_full_name() or a.created_by.username) if a.created_by else '—',
+    } for a in advances_qs]
+
+    # Pagos ya realizados. Los que nacieron de un cierre solo se revierten
+    # borrando ese cierre, por eso no son borrables desde aquí.
+    payments_qs = BarberPayment.objects.filter(
+        barber=barber
+    ).select_related('created_by', 'daily_close').order_by('-created_at')[:50]
+    payments = [{
+        'id': p.id,
+        'amount': float(p.amount),
+        'suggested_amount': float(p.suggested_amount),
+        'date': timezone.localtime(p.created_at).strftime('%Y-%m-%d %I:%M %p'),
+        'by': (p.created_by.get_full_name() or p.created_by.username) if p.created_by else '—',
+        'notes': p.notes,
+        'from_daily_close': p.daily_close_id is not None,
+        'daily_close_date': p.daily_close.date.strftime('%Y-%m-%d') if p.daily_close else None,
+        'can_delete': is_superadmin and p.daily_close_id is None,
+    } for p in payments_qs]
+
+    totals = {
+        'commissions': sum(s['commission_amount'] for s in services),
+        'tips': sum(s['tip_amount'] for s in services),
+        'earnings': sum(s['total_earnings'] for s in services),
+        'advances': sum(a['amount'] for a in advances),
+        'services_count': len(services),
+    }
+    totals['net_payable'] = totals['earnings'] - totals['advances']
+
+    data = {
+        'barber_id': barber.id,
+        'barber_name': barber.display_name,
+        'is_frank': is_frank,
+        'is_superadmin': is_superadmin,
+        'services': services,
+        'advances': advances,
+        'payments': payments,
+        'totals': totals,
+    }
+
+    # El saldo de Frank es el del ledger (arrastra días anteriores), no la suma
+    # de lo pendiente. Mostrar otra cosa aquí contradiría su tarjeta.
+    if is_frank:
+        ledger = cashflow_services.compute_frank_ledger()
+        data['ledger'] = {
+            'earnings_total': float(ledger['earnings_total']),
+            'advances_total': float(ledger['advances_total']),
+            'payments_total': float(ledger['payments_total']),
+            'balance': float(ledger['balance']),
+        }
+
+    return Response(data)
 
 
 @api_view(['POST'])
