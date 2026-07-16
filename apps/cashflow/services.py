@@ -23,6 +23,23 @@ from apps.inventory.models import ServiceInventoryItem, InventoryMovement
 from apps.analytics.models import log_audit
 
 
+# Prefijo del egreso que genera la casilla "Materiales" del checkout. Es un
+# identificador semántico: los detalles de caja lo usan para separar el costo
+# de materiales del resto de egresos (ver is_materials_expense).
+MATERIALS_EXPENSE_PREFIX = 'Materiales Servicio:'
+
+
+def is_materials_expense(description):
+    """¿Este egreso es el costo de materiales de un servicio?
+
+    Los materiales no son un gasto operativo más (arriendo, servicios): son el
+    insumo de una venta concreta. Se separan en los detalles de caja para poder
+    responder "¿de qué se compone este monto?" sin cambiar cómo se calculan los
+    totales — sigue entrando en total_expenses como siempre.
+    """
+    return (description or '').startswith(MATERIALS_EXPENSE_PREFIX)
+
+
 def _to_decimal(value):
     """Convierte cualquier entrada (None, int, float, Decimal, str) a Decimal."""
     if value is None:
@@ -205,7 +222,7 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                 # pueda eliminar EXACTAMENTE este egreso (no el de otra venta
                 # del mismo cliente).
                 Expense.objects.create(
-                    description=f"Materiales Servicio: {booking.client_name} (venta #{sale.id})",
+                    description=f"{MATERIALS_EXPENSE_PREFIX} {booking.client_name} (venta #{sale.id})",
                     amount=Decimal(str(frank_materials_cost)),
                     expense_type='variable',
                     registered_by=confirmed_by

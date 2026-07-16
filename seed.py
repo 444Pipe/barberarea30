@@ -269,6 +269,45 @@ except Exception:
     except Exception as e:
         print("⚠ No se pudo crear la columna manualmente:", e)
 
+# --- Autocuración para cashflow_barberadvance.settled_in_payment ---
+# Enlaza el vale con el pago que lo descontó, para poder revertirlo si un
+# superadmin elimina ese pago. Sin la columna, la pantalla de pagos no carga.
+try:
+    _BarberAdvance.objects.filter(settled_in_payment__isnull=True).exists()
+except Exception:
+    print("⚠ Columna 'settled_in_payment' no encontrada en cashflow_barberadvance. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.ForeignKey(
+                'cashflow.BarberPayment', null=True, blank=True,
+                on_delete=_dj_models.SET_NULL, related_name='settled_advances',
+            )
+            _f.set_attributes_from_name('settled_in_payment')
+            schema_editor.add_field(_BarberAdvance, _f)
+        print("✓ Columna 'settled_in_payment' creada exitosamente.")
+    except Exception as e:
+        print("⚠ No se pudo crear la columna manualmente:", e)
+
+# --- Autocuración para cashflow_commission.paid_in_payment ---
+from apps.cashflow.models import Commission as _Commission
+try:
+    _Commission.objects.filter(paid_in_payment__isnull=True).exists()
+except Exception:
+    print("⚠ Columna 'paid_in_payment' no encontrada en cashflow_commission. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.ForeignKey(
+                'cashflow.BarberPayment', null=True, blank=True,
+                on_delete=_dj_models.SET_NULL, related_name='commissions',
+            )
+            _f.set_attributes_from_name('paid_in_payment')
+            schema_editor.add_field(_Commission, _f)
+        print("✓ Columna 'paid_in_payment' creada exitosamente.")
+    except Exception as e:
+        print("⚠ No se pudo crear la columna manualmente:", e)
+
 # --- Autocuración para la tabla cashflow_cashflowalertlog (dedup de alertas) ---
 from apps.cashflow.models import CashflowAlertLog as _CFAlertLog
 try:

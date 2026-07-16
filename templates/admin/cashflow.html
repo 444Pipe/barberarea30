@@ -557,6 +557,25 @@
   </div>
 </div>
 
+<!-- Modal: Detalle del pago a un barbero -->
+<div id="cf-modal-pay-detail" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closePaymentDetail()"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-3xl mx-auto">
+    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl max-h-[85vh] flex flex-col">
+      <div class="px-5 py-3 border-b border-white/5 flex items-center justify-between shrink-0">
+        <div>
+          <h3 class="text-sm font-bold text-white tracking-widest uppercase">Detalle del pago</h3>
+          <p class="text-[0.65rem] text-smoke/40 mt-0.5" id="cf-pay-detail-barber"></p>
+        </div>
+        <button onclick="closePaymentDetail()" class="text-smoke/40 hover:text-white">✕</button>
+      </div>
+      <div class="p-5 overflow-y-auto" id="cf-pay-detail-body">
+        <div class="cf-empty">Cargando detalle...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Detalle cierre histórico -->
 <div id="modal-close-detail" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('modal-close-detail').classList.add('hidden')"></div>
@@ -793,7 +812,7 @@ function cfRenderTrazabilidad() {
       kind: 'expense',
       time: '—',
       title: e.description,
-      subtitle: e.type,
+      subtitle: e.is_materials ? 'Materiales' : e.type,
       amount: e.amount,
       raw: e,
     }));
@@ -1287,6 +1306,10 @@ function fetchBarberPayments() {
             </details>
           ` : ''}
           <div class="mt-auto pt-3 flex flex-wrap gap-2">
+            <button onclick="openPaymentDetail(${p.barber_id}, '${safeName}')"
+              class="flex-1 min-w-[7rem] py-2 bg-white/[0.03] border border-white/15 text-smoke/80 hover:text-gold hover:border-gold/40 font-bold tracking-wider text-[0.65rem] uppercase rounded transition-colors whitespace-nowrap">
+              Ver detalle
+            </button>
             <button onclick="openAdvanceModal(${p.barber_id}, '${safeName}', ${p.net_payable}, ${p.is_frank ? 'true' : 'false'})"
               class="flex-1 min-w-[7rem] py-2 bg-amber-600/15 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 font-bold tracking-wider text-[0.65rem] uppercase rounded transition-colors whitespace-nowrap">
               Dar vale
@@ -1323,6 +1346,169 @@ window.payBarber = function(barberId, barberName, netAmount) {
       fetchBarberPayments();
     } else {
       alert(data.error || 'Error.');
+    }
+  })
+  .catch(() => alert('Error de conexión.'));
+};
+
+// ═══ DETALLE DEL PAGO ═══════════════════════════════════
+// Responde "¿de qué está compuesto este saldo?": los servicios uno por uno,
+// los vales que se restan y los pagos ya hechos.
+let cfDetailBarberId = null;
+
+window.openPaymentDetail = function(barberId, barberName) {
+  cfDetailBarberId = barberId;
+  document.getElementById('cf-pay-detail-barber').textContent = barberName;
+  document.getElementById('cf-pay-detail-body').innerHTML = '<div class="cf-empty">Cargando detalle...</div>';
+  document.getElementById('cf-modal-pay-detail').classList.remove('hidden');
+  cfLoadPaymentDetail();
+};
+
+window.closePaymentDetail = function() {
+  document.getElementById('cf-modal-pay-detail').classList.add('hidden');
+  cfDetailBarberId = null;
+};
+
+function cfLoadPaymentDetail() {
+  if (!cfDetailBarberId) return;
+  fetch(`/api/admin/cashflow/barber-payments/${cfDetailBarberId}/detail/`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) {
+        document.getElementById('cf-pay-detail-body').innerHTML =
+          `<div class="cf-empty text-red-400">${escH(d.error)}</div>`;
+        return;
+      }
+      document.getElementById('cf-pay-detail-body').innerHTML = cfRenderPaymentDetail(d);
+    })
+    .catch(() => {
+      document.getElementById('cf-pay-detail-body').innerHTML =
+        '<div class="cf-empty text-red-400">Error al cargar el detalle.</div>';
+    });
+}
+
+function cfRenderPaymentDetail(d) {
+  const t = d.totals;
+  const row = (label, value, cls = 'text-white') =>
+    `<div class="flex justify-between"><span class="text-smoke/50">${label}</span><span class="${cls}">${value}</span></div>`;
+
+  // Resumen. Para Frank el saldo real es el del ledger (arrastra días
+  // anteriores), no la suma de lo pendiente, igual que en su tarjeta.
+  let resumen = `
+    <div class="bg-jet border border-white/5 rounded p-3 space-y-1 text-[0.72rem] mb-4">
+      ${row(`Servicios pendientes (${t.services_count})`, fmt(t.commissions))}
+      ${row('Propinas', '+' + fmt(t.tips), 'text-emerald-400')}
+      ${row('Acumulado', fmt(t.earnings))}
+      ${t.advances > 0 ? row('Vales / adelantos', '-' + fmt(t.advances), 'text-amber-400') : ''}
+      <div class="flex justify-between border-t border-white/10 pt-1 font-bold">
+        <span class="text-gold uppercase tracking-widest text-[0.6rem]">${d.is_frank ? 'Pendiente del período' : 'Neto a pagar'}</span>
+        <span class="text-gold">${fmt(t.net_payable)}</span>
+      </div>
+    </div>`;
+
+  if (d.is_frank && d.ledger) {
+    const neg = d.ledger.balance < 0;
+    resumen += `
+      <div class="bg-jet border ${neg ? 'border-red-500/30' : 'border-amber-500/20'} rounded p-3 space-y-1 text-[0.72rem] mb-4">
+        <div class="text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-1">Saldo corriente (histórico)</div>
+        ${row('Ganado total', fmt(d.ledger.earnings_total))}
+        ${row('Vales entregados', '-' + fmt(d.ledger.advances_total), 'text-amber-400')}
+        ${row('Pagos hechos', '-' + fmt(d.ledger.payments_total), 'text-emerald-400')}
+        <div class="flex justify-between border-t border-white/10 pt-1 font-bold">
+          <span class="${neg ? 'text-red-400' : 'text-gold'} uppercase tracking-widest text-[0.6rem]">Saldo</span>
+          <span class="${neg ? 'text-red-400' : 'text-gold'}">${fmt(d.ledger.balance)}</span>
+        </div>
+      </div>`;
+  }
+
+  // Servicios uno por uno: lo que el jefe pidió ver antes de pagar.
+  const servicios = d.services.length === 0
+    ? '<div class="cf-empty">Sin servicios pendientes.</div>'
+    : `<div class="overflow-x-auto -mx-1 px-1">
+        <table class="w-full text-[0.65rem] whitespace-nowrap">
+          <thead>
+            <tr class="text-smoke/40 uppercase tracking-widest text-[0.55rem] border-b border-white/5">
+              <th class="text-left py-1.5 pr-2">Fecha</th>
+              <th class="text-left py-1.5 pr-2">Cliente</th>
+              <th class="text-left py-1.5 pr-2">Servicio</th>
+              <th class="text-right py-1.5 pr-2">Base</th>
+              <th class="text-right py-1.5 pr-2">%</th>
+              <th class="text-right py-1.5 pr-2">Comisión</th>
+              <th class="text-right py-1.5 pr-2">Propina</th>
+              <th class="text-right py-1.5">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${d.services.map(s => `
+              <tr class="border-b border-white/[0.03]">
+                <td class="py-1.5 pr-2 text-smoke/60">${s.date}<span class="text-smoke/30 block text-[0.55rem]">${s.time}</span></td>
+                <td class="py-1.5 pr-2 text-white">${escH(s.client_name)}</td>
+                <td class="py-1.5 pr-2 text-smoke/70">${escH(s.service_name)}<span class="text-smoke/30 block text-[0.55rem]">${escH(s.payment_method)}</span></td>
+                <td class="py-1.5 pr-2 text-right text-smoke/60">${fmt(s.basis_amount)}</td>
+                <td class="py-1.5 pr-2 text-right text-smoke/40">${s.percentage}%</td>
+                <td class="py-1.5 pr-2 text-right text-white">${fmt(s.commission_amount)}</td>
+                <td class="py-1.5 pr-2 text-right text-emerald-400">${s.tip_amount > 0 ? '+' + fmt(s.tip_amount) : '—'}</td>
+                <td class="py-1.5 text-right text-gold font-bold">${fmt(s.total_earnings)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+  const vales = d.advances.length === 0 ? '' : `
+    <div class="mt-5">
+      <div class="text-[0.6rem] uppercase tracking-widest text-amber-400/60 mb-2">Vales / adelantos (${d.advances.length})</div>
+      <div class="space-y-1 text-[0.65rem]">
+        ${d.advances.map(a => `
+          <div class="flex justify-between bg-amber-500/[0.06] border border-amber-500/20 p-2 rounded">
+            <div class="min-w-0">
+              <div class="text-amber-300 font-medium">${fmt(a.amount)}</div>
+              <div class="text-smoke/40 text-[0.58rem]">${a.date}${a.reason ? ' · ' + escH(a.reason) : ''} · ${escH(a.by)}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  // Pagos ya hechos. El ✕ solo aparece si el backend marcó can_delete
+  // (superadmin y pago que no nació de un cierre) — el permiso real lo
+  // impone el endpoint, esto solo evita ofrecer un botón que fallaría.
+  const pagos = d.payments.length === 0 ? '' : `
+    <div class="mt-5">
+      <div class="text-[0.6rem] uppercase tracking-widest text-emerald-400/60 mb-2">Pagos realizados (${d.payments.length})</div>
+      <div class="space-y-1 text-[0.65rem]">
+        ${d.payments.map(p => `
+          <div class="flex justify-between items-center bg-emerald-500/[0.06] border border-emerald-500/20 p-2 rounded gap-2">
+            <div class="min-w-0">
+              <div class="text-emerald-300 font-medium">${fmt(p.amount)}</div>
+              <div class="text-smoke/40 text-[0.58rem]">
+                ${p.date} · ${escH(p.by)}${p.from_daily_close ? ` · <span class="text-smoke/50">cierre del ${p.daily_close_date}</span>` : ''}
+              </div>
+            </div>
+            ${p.can_delete
+              ? `<button onclick="deleteBarberPayment(${p.id}, ${p.amount})" class="text-red-400/60 hover:text-red-400 shrink-0 px-1 text-sm leading-none" title="Eliminar pago">✕</button>`
+              : (p.from_daily_close ? '<span class="text-smoke/25 text-[0.55rem] shrink-0">se anula con el cierre</span>' : '')}
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  return resumen
+    + `<div class="text-[0.6rem] uppercase tracking-widest text-smoke/40 mb-2">Servicios que componen el pago (${t.services_count})</div>`
+    + servicios + vales + pagos;
+}
+
+window.deleteBarberPayment = function(paymentId, amount) {
+  if (!confirm(`¿Eliminar el pago de ${fmt(amount)}?\n\nLas comisiones y vales que cubrió volverán a quedar pendientes.`)) return;
+  fetch(`/api/admin/cashflow/barber-payments/payment/${paymentId}/delete/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': CSRF }
+  })
+  .then(r => r.json().then(d => ({ ok: r.ok, d })))
+  .then(({ ok, d }) => {
+    if (ok && d.ok) {
+      alert(d.message);
+      cfLoadPaymentDetail();
+      fetchBarberPayments();
+    } else {
+      alert(d.error || 'No se pudo eliminar el pago.');
     }
   })
   .catch(() => alert('Error de conexión.'));
@@ -1424,6 +1610,9 @@ function renderCloseDetail(data) {
       <div class="flex justify-between"><span class="text-smoke/60">Propinas (pass-through)</span><span class="text-amber-400">${fmt(data.total_tips)}</span></div>
       <div class="flex justify-between"><span class="text-smoke/60">Comisiones</span><span class="text-red-400">-${fmt(data.total_commissions)}</span></div>
       <div class="flex justify-between"><span class="text-smoke/60">Egresos${data.frank_payment ? ' (sin pago Franko)' : ''}</span><span class="text-red-400">-${fmt(data.total_expenses - (data.frank_payment ? data.frank_payment.amount : 0))}</span></div>
+      ${data.total_materials > 0 ? `
+      <div class="flex justify-between text-[0.7rem] pl-3"><span class="text-smoke/40">↳ de los cuales, materiales</span><span class="text-smoke/50">${fmt(data.total_materials)}</span></div>
+      ` : ''}
       ${data.frank_payment ? `
       <div class="flex justify-between"><span class="text-smoke/60">Pago a Franko</span><span class="text-amber-400">-${fmt(data.frank_payment.amount)}${Math.round(data.frank_payment.amount) !== Math.round(data.frank_payment.suggested_amount) ? ` <span class="text-smoke/40 text-[0.65rem]">(sugerido ${fmt(data.frank_payment.suggested_amount)})</span>` : ''}</span></div>
       ` : ''}
@@ -1486,20 +1675,29 @@ function renderCloseDetail(data) {
     });
     html += '</div>';
   }
-  // Expenses
+  // Egresos, separando los materiales de los gastos operativos: son el insumo
+  // de una venta concreta, no un gasto del negocio como el arriendo.
   if (data.expenses && data.expenses.length) {
-    html += '<div class="cf-section-title">Egresos</div><div class="space-y-1.5 mb-5">';
-    data.expenses.forEach(e => {
-      html += `
-        <div class="bg-jet-lighter border border-white/5 rounded p-3 flex justify-between items-center">
+    const materiales = data.expenses.filter(e => e.is_materials);
+    const otros = data.expenses.filter(e => !e.is_materials);
+    const expenseRow = (e, accent) => `
+        <div class="bg-jet-lighter border ${accent ? 'border-sky-500/20' : 'border-white/5'} rounded p-3 flex justify-between items-center">
           <div>
-            <div class="text-white text-sm">${e.description}</div>
-            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${e.type}</div>
+            <div class="text-white text-sm">${esc(e.description)}</div>
+            <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest">${esc(e.type)}</div>
           </div>
           <span class="text-red-400 font-bold">-${fmt(e.amount)}</span>
         </div>`;
-    });
-    html += '</div>';
+
+    if (materiales.length) {
+      html += `<div class="cf-section-title">Materiales <span class="text-smoke/40 text-[0.65rem] normal-case tracking-normal">(${materiales.length} · ${fmt(data.total_materials || 0)})</span></div>`;
+      html += '<div class="space-y-1.5 mb-5">' + materiales.map(e => expenseRow(e, true)).join('') + '</div>';
+    }
+    if (otros.length) {
+      html += '<div class="cf-section-title">Egresos</div><div class="space-y-1.5 mb-5">';
+      html += otros.map(e => expenseRow(e, false)).join('');
+      html += '</div>';
+    }
   }
   // Payment methods
   if (data.payment_methods && Object.keys(data.payment_methods).length) {

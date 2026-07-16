@@ -140,7 +140,15 @@ class Commission(models.Model):
     is_paid = models.BooleanField(default=False, help_text='¿Ya fue pagada esta comisión al barbero?')
     paid_at = models.DateTimeField(null=True, blank=True)
     is_paid_in_daily_close = models.BooleanField(default=False, help_text='Usado para liquidaciones diarias automatizadas (ej. Frank)')
-    
+    # Liquidación manual (barberos no-Frank): pago concreto que saldó esta
+    # comisión. Sin esto, `is_paid` no dice CUÁL pago la cubrió y un pago
+    # eliminado no se podría revertir con precisión.
+    paid_in_payment = models.ForeignKey(
+        'BarberPayment', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='commissions',
+        help_text='Pago en el que se liquidó esta comisión (barberos no-Frank)'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -199,6 +207,13 @@ class BarberAdvance(models.Model):
         related_name='settled_advances',
         help_text='Cierre diario en el que se liquidó este vale (solo Frank)'
     )
+    # Liquidación manual (barberos no-Frank). Permite revertir el vale con
+    # precisión si un superadmin elimina ese pago.
+    settled_in_payment = models.ForeignKey(
+        'BarberPayment', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='settled_advances',
+        help_text='Pago en el que se descontó este vale (barberos no-Frank)'
+    )
 
     class Meta:
         verbose_name = 'Adelanto / Vale de Barbero'
@@ -211,13 +226,19 @@ class BarberAdvance(models.Model):
 
 
 class BarberPayment(models.Model):
-    """Pago real de dinero a un barbero. Hoy solo lo genera el cierre diario
-    para Frank (el pago manual a los demás barberos sigue siendo por flags).
+    """Pago real de dinero a un barbero. Dos orígenes, distinguidos por `daily_close`:
+
+    - Frank (`daily_close` presente): lo genera el cierre diario. CASCADE a
+      propósito: al borrar el cierre el pago desaparece y el saldo derivado se
+      restaura solo. NO se borra de forma individual — el camino es el cierre.
+    - Resto de barberos (`daily_close` nulo): lo genera `pay_barber_view` al
+      marcar pagado. Las comisiones y vales que cubrió apuntan aquí
+      (`commissions` / `settled_advances`), de modo que un superadmin puede
+      eliminarlo y revertir exactamente lo que ese pago liquidó.
 
     El saldo corriente de Frank se DERIVA, nunca se almacena:
         saldo = Σ Commission.total_earnings − Σ BarberAdvance.amount − Σ BarberPayment.amount
-    (ver services.compute_frank_ledger). `daily_close` es CASCADE a propósito:
-    al borrar un cierre el pago desaparece y el saldo derivado se restaura solo.
+    (ver services.compute_frank_ledger).
     """
     barber = models.ForeignKey(
         'barbers.Barber', on_delete=models.CASCADE, related_name='payments'
