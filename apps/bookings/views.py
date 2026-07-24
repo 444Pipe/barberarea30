@@ -546,9 +546,9 @@ def admin_bookings_list_view(request):
     # (el usuario ya acotó la búsqueda); sin filtros elevamos el tope a 500. Se
     # mantiene una lista JSON plana para no romper el frontend (sin paginación DRF).
     if has_filters:
-        serializer = BookingAdminSerializer(queryset, many=True)
+        serializer = BookingAdminSerializer(queryset, many=True, context={'request': request})
     else:
-        serializer = BookingAdminSerializer(queryset[:500], many=True)
+        serializer = BookingAdminSerializer(queryset[:500], many=True, context={'request': request})
     return Response(serializer.data)
 
 
@@ -569,7 +569,7 @@ def admin_booking_detail_view(request, booking_id):
             return Response({'error': 'Sin permisos'}, status=403)
 
     if request.method == 'GET':
-        serializer = BookingAdminSerializer(booking)
+        serializer = BookingAdminSerializer(booking, context={'request': request})
         return Response(serializer.data)
 
     elif request.method == 'PATCH':
@@ -676,7 +676,7 @@ def admin_booking_detail_view(request, booking_id):
                 extra_data={'msg': msg}
             )
             
-        serializer = BookingAdminSerializer(booking)
+        serializer = BookingAdminSerializer(booking, context={'request': request})
         return Response(serializer.data)
 
     elif request.method == 'DELETE':
@@ -823,7 +823,7 @@ def admin_reschedule_booking_view(request, booking_id):
         except Exception:
             pass
 
-    serializer = BookingAdminSerializer(booking)
+    serializer = BookingAdminSerializer(booking, context={'request': request})
     return Response({'ok': True, 'booking': serializer.data})
 
 

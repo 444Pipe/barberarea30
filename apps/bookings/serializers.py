@@ -36,8 +36,18 @@ class BookingAdminSerializer(serializers.ModelSerializer):
                   'barber', 'barber_name', 'barber_color',
                   'service', 'service_name', 'is_walk_in', 'privacy_accepted',
                   'date', 'time', 'duration_minutes', 'status',
-                  'notes', 'price', 'manual_labor_cost', 'manual_materials_cost', 
+                  'notes', 'price', 'manual_labor_cost', 'manual_materials_cost',
                   'created_at', 'updated_at', 'completed_at', 'can_cancel']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # El teléfono/WhatsApp del cliente solo es visible para admins y Frank
+        # (operational_admin). Los barberos comunes NO deben verlo.
+        request = self.context.get('request')
+        profile = getattr(getattr(request, 'user', None), 'profile', None)
+        if not (profile and profile.is_admin):
+            data['client_phone'] = ''
+        return data
 
 
 class ReviewSerializer(serializers.ModelSerializer):

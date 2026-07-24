@@ -115,7 +115,9 @@
         <thead>
           <tr class="bg-jet-lighter text-smoke/40 tracking-widest uppercase text-[0.6rem]">
             <th class="px-4 py-3 text-left">Cliente</th>
+            {% if user_role == 'superadmin' or user_role == 'admin' or user_role == 'operational_admin' %}
             <th class="px-4 py-3 text-left">Teléfono</th>
+            {% endif %}
             <th class="px-4 py-3 text-left">Servicio</th>
             <th class="px-4 py-3 text-left">Barbero</th>
             <th class="px-4 py-3 text-left">Fecha</th>
@@ -353,6 +355,8 @@
 let searchTimeout = null;
 const userIsSuperAdmin = {% if user_role == 'superadmin' %}true{% else %}false{% endif %};
 const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational_admin' %}true{% else %}false{% endif %};
+// El teléfono/WhatsApp del cliente solo es visible para admins y Frank, no para barberos.
+const userCanSeePhone = {% if user_role == 'superadmin' or user_role == 'admin' or user_role == 'operational_admin' %}true{% else %}false{% endif %};
 
   document.addEventListener('DOMContentLoaded', function () {
     fetch('/api/barbers/').then(r => r.json()).then(barbers => {
@@ -453,7 +457,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
         <div class="text-white font-medium">${esc(b.client_name)}</div>
         ${b.client_email ? `<div class="text-[0.6rem] text-smoke/30">${esc(b.client_email)}</div>` : ''}
       </td>
-      <td class="px-4 py-3">${phoneCell(b.client_phone)}</td>
+      ${userCanSeePhone ? `<td class="px-4 py-3">${phoneCell(b.client_phone)}</td>` : ''}
       <td class="px-4 py-3 text-smoke/80">${esc(b.service_name || '')}</td>
       <td class="px-4 py-3">
         <span class="inline-flex items-center gap-1">
@@ -546,7 +550,7 @@ const userCanEdit = {% if user_role == 'superadmin' or user_role == 'operational
       if (groupBookings.length > 0) {
         html += `
         <tr class="bg-jet border-y border-white/5">
-          <td colspan="9" class="px-4 py-3 text-xs font-serif font-bold text-gold tracking-widest">
+          <td colspan="${userCanSeePhone ? 9 : 8}" class="px-4 py-3 text-xs font-serif font-bold text-gold tracking-widest">
             ${groupName.toUpperCase()} <span class="text-smoke/50 text-[0.65rem] ml-2 normal-case font-sans">(${groupBookings.length} reservas)</span>
           </td>
         </tr>
