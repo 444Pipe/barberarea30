@@ -300,8 +300,9 @@ def admin_cashflow_view(request):
     inventory_items = InventoryItem.objects.filter(is_active=True).order_by('category', 'name')
     payment_methods = PaymentMethod.objects.filter(is_active=True).order_by('name')
 
-    # Control de caja del mes (efectivo/transferencia) y saldo derivado de Frank.
-    cash_box = cashflow_services.compute_cash_box()
+    # Control de caja del mes (efectivo/transferencia) con historial desglosado
+    # y saldo derivado de Frank.
+    cash_box = cashflow_services.compute_cash_box_detail()
     frank_ledger = cashflow_services.compute_frank_ledger()
 
     context = {

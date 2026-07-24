@@ -214,6 +214,97 @@ def compute_cash_box(reference_date=None):
     }
 
 
+def compute_cash_box_detail(reference_date=None):
+    """Igual que compute_cash_box pero con el HISTORIAL desglosado de cada
+    movimiento (entradas y salidas) por método, para mostrar de dónde sale y
+    entra la plata en efectivo y en transferencia.
+    """
+    from django.db.models import Q
+    from apps.cashflow.models import Sale, InventorySale, Expense, BarberPayment
+
+    today = reference_date or timezone.localdate()
+    month_start = today.replace(day=1)
+    zero = Decimal('0')
+
+    cash_q = Q(payment_method__isnull=True) | Q(payment_method__slug='efectivo')
+    transfer_q = Q(payment_method__slug='transferencia')
+
+    def build(method_q, source):
+        income, outflow = [], []
+
+        # ── ENTRADAS ──────────────────────────────────────────────
+        for s in Sale.objects.filter(
+            approval_status=Sale.STATUS_APPROVED, created_at__date__gte=month_start
+        ).filter(method_q).select_related('booking', 'service'):
+            amt = _to_decimal(s.final_price) + _to_decimal(s.tip_amount)
+            if amt == 0:
+                continue
+            dt = timezone.localtime(s.created_at)
+            income.append({
+                '_k': dt.isoformat(),
+                'date': dt.strftime('%d/%m'),
+                'label': s.booking.client_name if s.booking else 'Venta',
+                'sub': (s.service.name if s.service else 'Servicio') + (f' · propina ${s.tip_amount:,.0f}' if s.tip_amount else ''),
+                'amount': float(amt),
+            })
+        for i in InventorySale.objects.filter(
+            created_at__date__gte=month_start
+        ).filter(method_q).select_related('item'):
+            dt = timezone.localtime(i.created_at)
+            income.append({
+                '_k': dt.isoformat(),
+                'date': dt.strftime('%d/%m'),
+                'label': f'{i.quantity:g}x {i.item.name if i.item else "Producto"}',
+                'sub': 'Producto',
+                'amount': float(i.total_price),
+            })
+
+        # ── SALIDAS ───────────────────────────────────────────────
+        for e in Expense.objects.filter(
+            date__gte=month_start, payment_source=source
+        ).exclude(description__startswith=MATERIALS_EXPENSE_PREFIX):
+            outflow.append({
+                '_k': e.date.isoformat(),
+                'date': e.date.strftime('%d/%m'),
+                'label': e.description,
+                'sub': e.get_expense_type_display(),
+                'amount': float(e.amount),
+            })
+        for p in BarberPayment.objects.filter(
+            created_at__date__gte=month_start, payment_source=source, expense__isnull=True
+        ).select_related('barber'):
+            dt = timezone.localtime(p.created_at)
+            outflow.append({
+                '_k': dt.isoformat(),
+                'date': dt.strftime('%d/%m'),
+                'label': f'Pago a {p.barber.display_name if p.barber else "Barbero"}',
+                'sub': 'Pago a barbero',
+                'amount': float(p.amount),
+            })
+
+        income.sort(key=lambda x: x['_k'], reverse=True)
+        outflow.sort(key=lambda x: x['_k'], reverse=True)
+        for lst in (income, outflow):
+            for it in lst:
+                it.pop('_k', None)
+
+        income_total = _to_decimal(sum(x['amount'] for x in income))
+        out_total = _to_decimal(sum(x['amount'] for x in outflow))
+        return {
+            'income': income,
+            'outflow': outflow,
+            'income_total': income_total,
+            'out_total': out_total,
+            'balance': income_total - out_total,
+        }
+
+    return {
+        'month_start': month_start,
+        'cash': build(cash_q, 'cash'),
+        'transfer': build(transfer_q, 'transfer'),
+    }
+
+
 def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                      payment_reference='', tip_amount=0,
                      discount_amount=0, discount_assumed_by='none',

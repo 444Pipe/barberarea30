@@ -353,27 +353,73 @@
       <span class="text-[0.6rem] text-smoke/30 uppercase tracking-widest">Cuánto debe haber</span>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="bg-jet-card border border-emerald-500/20 rounded-md p-4">
+      <!-- Efectivo -->
+      <div class="bg-jet-card border border-emerald-500/20 rounded-md p-4 flex flex-col">
         <div class="flex items-center justify-between mb-3">
-          <span class="text-white font-serif text-base">💵 Efectivo</span>
-          <span class="text-emerald-400 font-bold text-lg">${{ cash_box.cash_balance|floatformat:0 }}</span>
+          <span class="text-white font-serif text-base">Efectivo</span>
+          <span class="text-emerald-400 font-bold text-lg">${{ cash_box.cash.balance|floatformat:0 }}</span>
         </div>
         <div class="space-y-1 text-[0.7rem]">
-          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.cash_income|floatformat:0 }}</span></div>
-          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.cash_out|floatformat:0 }}</span></div>
-          <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-emerald-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-emerald-400">${{ cash_box.cash_balance|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.cash.income_total|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.cash.out_total|floatformat:0 }}</span></div>
+          <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-emerald-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-emerald-400">${{ cash_box.cash.balance|floatformat:0 }}</span></div>
         </div>
+        <details class="mt-3">
+          <summary class="text-[0.6rem] text-emerald-400/70 uppercase tracking-widest cursor-pointer hover:text-emerald-400 select-none">Entradas ({{ cash_box.cash.income|length }})</summary>
+          <div class="mt-2 space-y-1 max-h-56 overflow-y-auto pr-1">
+            {% for m in cash_box.cash.income %}
+            <div class="flex justify-between items-start gap-2 bg-white/[0.02] rounded px-2 py-1.5">
+              <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
+              <span class="text-emerald-400 text-[0.68rem] shrink-0">+${{ m.amount|floatformat:0 }}</span>
+            </div>
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin entradas este mes.</div>{% endfor %}
+          </div>
+        </details>
+        <details class="mt-2">
+          <summary class="text-[0.6rem] text-red-400/70 uppercase tracking-widest cursor-pointer hover:text-red-400 select-none">Salidas ({{ cash_box.cash.outflow|length }})</summary>
+          <div class="mt-2 space-y-1 max-h-56 overflow-y-auto pr-1">
+            {% for m in cash_box.cash.outflow %}
+            <div class="flex justify-between items-start gap-2 bg-white/[0.02] rounded px-2 py-1.5">
+              <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
+              <span class="text-red-400 text-[0.68rem] shrink-0">-${{ m.amount|floatformat:0 }}</span>
+            </div>
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin salidas este mes.</div>{% endfor %}
+          </div>
+        </details>
       </div>
-      <div class="bg-jet-card border border-blue-500/20 rounded-md p-4">
+      <!-- Transferencia -->
+      <div class="bg-jet-card border border-blue-500/20 rounded-md p-4 flex flex-col">
         <div class="flex items-center justify-between mb-3">
-          <span class="text-white font-serif text-base">💳 Transferencia</span>
-          <span class="text-blue-400 font-bold text-lg">${{ cash_box.transfer_balance|floatformat:0 }}</span>
+          <span class="text-white font-serif text-base">Transferencia</span>
+          <span class="text-blue-400 font-bold text-lg">${{ cash_box.transfer.balance|floatformat:0 }}</span>
         </div>
         <div class="space-y-1 text-[0.7rem]">
-          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.transfer_income|floatformat:0 }}</span></div>
-          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.transfer_out|floatformat:0 }}</span></div>
-          <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-blue-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-blue-400">${{ cash_box.transfer_balance|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.transfer.income_total|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.transfer.out_total|floatformat:0 }}</span></div>
+          <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-blue-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-blue-400">${{ cash_box.transfer.balance|floatformat:0 }}</span></div>
         </div>
+        <details class="mt-3">
+          <summary class="text-[0.6rem] text-blue-400/70 uppercase tracking-widest cursor-pointer hover:text-blue-400 select-none">Entradas ({{ cash_box.transfer.income|length }})</summary>
+          <div class="mt-2 space-y-1 max-h-56 overflow-y-auto pr-1">
+            {% for m in cash_box.transfer.income %}
+            <div class="flex justify-between items-start gap-2 bg-white/[0.02] rounded px-2 py-1.5">
+              <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
+              <span class="text-blue-400 text-[0.68rem] shrink-0">+${{ m.amount|floatformat:0 }}</span>
+            </div>
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin entradas este mes.</div>{% endfor %}
+          </div>
+        </details>
+        <details class="mt-2">
+          <summary class="text-[0.6rem] text-red-400/70 uppercase tracking-widest cursor-pointer hover:text-red-400 select-none">Salidas ({{ cash_box.transfer.outflow|length }})</summary>
+          <div class="mt-2 space-y-1 max-h-56 overflow-y-auto pr-1">
+            {% for m in cash_box.transfer.outflow %}
+            <div class="flex justify-between items-start gap-2 bg-white/[0.02] rounded px-2 py-1.5">
+              <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
+              <span class="text-red-400 text-[0.68rem] shrink-0">-${{ m.amount|floatformat:0 }}</span>
+            </div>
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin salidas este mes.</div>{% endfor %}
+          </div>
+        </details>
       </div>
     </div>
     {% if frank_ledger.exists %}
