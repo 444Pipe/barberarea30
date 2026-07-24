@@ -508,11 +508,16 @@
     <div class="flex items-baseline justify-between mb-2">
       <div>
         <div class="cf-section-title" style="margin-bottom:0">Pagos pendientes a barberos</div>
-        <p class="text-[0.65rem] text-smoke/40 mt-0.5">Comisiones + propinas acumuladas de ventas aprobadas</p>
+        <p class="text-[0.65rem] text-smoke/40 mt-0.5">Acumulado del periodo · lo que pagas coincide con lo que ves</p>
       </div>
-      <button onclick="fetchBarberPayments()" class="text-smoke/40 hover:text-gold p-2 rounded" title="Actualizar">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-      </button>
+      <div class="flex items-center gap-2">
+        <select id="bp-period" onchange="fetchBarberPayments()" class="bg-jet-card border border-white/10 text-white text-[0.7rem] rounded px-2 py-1.5 focus:border-gold outline-none">
+          <option value="">Últimos 30 días</option>
+        </select>
+        <button onclick="fetchBarberPayments()" class="text-smoke/40 hover:text-gold p-2 rounded" title="Actualizar">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+      </div>
     </div>
     <div id="barber-payments-container" class="cf-pay-grid">
       <div class="cf-empty col-span-full">Cargando pagos...</div>
@@ -1341,10 +1346,34 @@ async function submitInventorySale() {
 // ═══ PAGOS A BARBEROS ═══════════════════════════════════
 const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// Rellena el selector con "Últimos 30 días" + los últimos 12 meses.
+function bpInitPeriods() {
+  const sel = document.getElementById('bp-period');
+  if (!sel || sel.dataset.filled) return;
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = `${meses[d.getMonth()]} ${d.getFullYear()}`;
+    sel.appendChild(opt);
+  }
+  sel.dataset.filled = '1';
+}
+
+function bpPeriodQuery() {
+  const sel = document.getElementById('bp-period');
+  const v = sel && sel.value ? sel.value : '';
+  return v ? ('?month=' + encodeURIComponent(v)) : '';
+}
+
 function fetchBarberPayments() {
+  bpInitPeriods();
   const container = document.getElementById('barber-payments-container');
   container.innerHTML = '<div class="cf-empty col-span-full">Cargando pagos...</div>';
-  fetch('/api/admin/cashflow/barber-payments/')
+  fetch('/api/admin/cashflow/barber-payments/' + bpPeriodQuery())
     .then(r => r.json())
     .then(data => {
       if (!data.payments || data.payments.length === 0) {
@@ -1365,15 +1394,26 @@ function fetchBarberPayments() {
             <span class="${isDebt ? 'text-red-400' : 'text-gold'} font-bold text-base">${fmt(p.net_payable)}</span>
           </div>
           ${isDebt ? `<div class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-[0.65rem] text-red-300">${escH(p.barber_name)} debe ${fmt(Math.abs(p.net_payable))} a la empresa. La deuda se descuenta en los próximos cierres.</div>` : ''}
+          ${p.is_frank ? `
+          <div class="space-y-1 text-[0.7rem]">
+            <div class="flex justify-between"><span class="text-smoke/50">Ganado (comisiones + propinas)</span><span class="text-white">${fmt(p.ledger_earnings)}</span></div>
+            ${p.ledger_advances > 0 ? `<div class="flex justify-between"><span class="text-amber-400/80">Vales entregados</span><span class="text-amber-400">-${fmt(p.ledger_advances)}</span></div>` : ''}
+            ${p.ledger_payments > 0 ? `<div class="flex justify-between"><span class="text-smoke/50">Pagado en cierres</span><span class="text-red-400">-${fmt(p.ledger_payments)}</span></div>` : ''}
+            <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="${isDebt ? 'text-red-400' : 'text-gold'} uppercase tracking-widest text-[0.6rem]">Saldo real ${isDebt ? '(debe)' : '(a favor)'}</span><span class="${isDebt ? 'text-red-400' : 'text-gold'}">${fmt(p.net_payable)}</span></div>
+            ${p.suggested_payment > 0 ? `<div class="flex justify-between text-[0.62rem] pt-0.5"><span class="text-smoke/40">Sugerido a pagar (últimos 30 días)</span><span class="text-amber-300">${fmt(p.suggested_payment)}</span></div>` : ''}
+          </div>
+          <div class="mt-2 text-[0.6rem] text-smoke/40 leading-snug">Frank se liquida en el <strong class="text-smoke/60">cierre diario</strong>, no aquí. Este es su saldo total acumulado (no depende del mes elegido).</div>
+          ` : `
           <div class="space-y-1 text-[0.7rem]">
             <div class="flex justify-between"><span class="text-smoke/50">Comisiones</span><span class="text-white">${fmt(p.total_commissions)}</span></div>
             <div class="flex justify-between"><span class="text-smoke/50">Propinas</span><span class="text-emerald-400">+${fmt(p.total_tips)}</span></div>
             <div class="flex justify-between border-t border-white/5 pt-1"><span class="text-smoke/50">Acumulado</span><span class="text-white">${fmt(p.total_earnings)}</span></div>
             ${hasAdvances ? `
             <div class="flex justify-between"><span class="text-amber-400/80">Vales / adelantos</span><span class="text-amber-400">-${fmt(p.total_advances)}</span></div>
-            <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="${isDebt ? 'text-red-400' : 'text-gold'} uppercase tracking-widest text-[0.6rem]">${p.is_frank ? 'Saldo corriente' : 'Neto a pagar'}</span><span class="${isDebt ? 'text-red-400' : 'text-gold'}">${fmt(p.net_payable)}</span></div>
+            <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-gold uppercase tracking-widest text-[0.6rem]">Neto a pagar</span><span class="text-gold">${fmt(p.net_payable)}</span></div>
             ` : ''}
           </div>
+          `}
           ${p.history && p.history.length > 0 ? `
             <details class="mt-2">
               <summary class="text-[0.6rem] text-smoke/40 uppercase tracking-widest cursor-pointer hover:text-white">Historial diario (${p.history.length})</summary>
@@ -1428,7 +1468,8 @@ function fetchBarberPayments() {
 window.fetchBarberPayments = fetchBarberPayments;
 window.payBarber = function(barberId, barberName, netAmount) {
   if (!confirm(`Liquidar ${fmt(netAmount)} (neto, ya descontados los vales) a ${barberName}?`)) return;
-  fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/`, {
+  // El mismo periodo del filtro: se liquida solo lo mostrado.
+  fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/` + bpPeriodQuery(), {
     method: 'POST',
     headers: { 'X-CSRFToken': CSRF }
   })

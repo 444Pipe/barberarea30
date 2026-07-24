@@ -29,6 +29,27 @@ def _cash_income_for(sales_qs, inventory_qs):
     i = inventory_qs.filter(cash_q).aggregate(t=Sum('total_price'))['t'] or Decimal('0')
     return Decimal(s) + Decimal(i)
 
+def _parse_barber_pay_period(request):
+    """Rango [start, end) para filtrar comisiones/vales en la sección de pagos.
+
+    Default: últimos 30 días. `?month=YYYY-MM` → ese mes calendario.
+    Devuelve (start, end, label) donde label es 'YYYY-MM' o '30d'.
+    """
+    from datetime import datetime, timedelta
+    now = tz.now()
+    month = (request.query_params.get('month') or '').strip()
+    if month:
+        try:
+            y, m = month.split('-')
+            y, m = int(y), int(m)
+            start = tz.make_aware(datetime(y, m, 1))
+            end = tz.make_aware(datetime(y + 1, 1, 1)) if m == 12 else tz.make_aware(datetime(y, m + 1, 1))
+            return start, end, month
+        except (ValueError, TypeError):
+            pass
+    return now - timedelta(days=30), now + timedelta(days=1), '30d'
+
+
 @api_view(['POST'])
 @permission_classes([IsBarberOrAbove])
 def checkout_booking_view(request, booking_id):
@@ -1411,11 +1432,16 @@ def unpaid_commissions_view(request):
     from django.db.models import Sum
     from django.db.models.functions import TruncDate
 
-    # Comisiones aprobadas y no pagadas, agrupadas por barbero.
+    # Periodo: últimos 30 días por defecto, o el mes elegido (?month=YYYY-MM).
+    period_start, period_end, period_label = _parse_barber_pay_period(request)
+
+    # Comisiones aprobadas y no pagadas DEL PERIODO, agrupadas por barbero.
     # Excluimos a Frank porque su pago se automatiza en el cierre diario.
     unpaid_commissions = Commission.objects.filter(
         is_paid=False,
-        sale__approval_status='approved'
+        sale__approval_status='approved',
+        created_at__gte=period_start,
+        created_at__lt=period_end,
     ).exclude(
         barber__display_name__icontains='frank'
     ).values('barber_id').annotate(
@@ -1425,9 +1451,11 @@ def unpaid_commissions_view(request):
     )
     comm_by_barber = {c['barber_id']: c for c in unpaid_commissions}
 
-    # Vales/adelantos pendientes de descontar, agrupados por barbero.
+    # Vales/adelantos pendientes DEL PERIODO, agrupados por barbero.
     unsettled_advances = BarberAdvance.objects.filter(
-        is_settled=False
+        is_settled=False,
+        created_at__gte=period_start,
+        created_at__lt=period_end,
     ).exclude(
         barber__display_name__icontains='frank'
     ).values('barber_id').annotate(
@@ -1452,11 +1480,13 @@ def unpaid_commissions_view(request):
         total_advances = float(adv_by_barber.get(barber_id, {}).get('total_advances') or 0)
         net_payable = total_earnings - total_advances
 
-        # Desglose diario de las ganancias (comisiones + propinas).
+        # Desglose diario de las ganancias del periodo (comisiones + propinas).
         daily_breakdown = Commission.objects.filter(
             barber_id=barber_id,
             is_paid=False,
-            sale__approval_status='approved'
+            sale__approval_status='approved',
+            created_at__gte=period_start,
+            created_at__lt=period_end,
         ).annotate(
             date=TruncDate('created_at')
         ).values('date').annotate(
@@ -1475,9 +1505,10 @@ def unpaid_commissions_view(request):
                     'tips': float(day['daily_tips'] or 0)
                 })
 
-        # Vales/adelantos pendientes (el "historial de vales" que se descuenta).
+        # Vales/adelantos pendientes del periodo (el "historial de vales").
         advances_qs = BarberAdvance.objects.filter(
-            barber_id=barber_id, is_settled=False
+            barber_id=barber_id, is_settled=False,
+            created_at__gte=period_start, created_at__lt=period_end,
         ).select_related('created_by').order_by('-created_at')
         advances = [{
             'id': adv.id,
@@ -1545,6 +1576,12 @@ def unpaid_commissions_view(request):
                 'total_earnings': float(ledger['unpaid_earnings']),
                 'total_advances': float(ledger['unsettled_advances']),
                 'net_payable': float(ledger['balance']),
+                # Ledger COMPLETO para que su tarjeta sea entendible:
+                #   ganado − vales − pagado en cierres = saldo real
+                'ledger_earnings': float(ledger['earnings_total']),
+                'ledger_advances': float(ledger['advances_total']),
+                'ledger_payments': float(ledger['payments_total']),
+                'suggested_payment': float(ledger['suggested_payment']),
                 'history': frank_history,
                 'advances': frank_advances,
             })
@@ -1552,7 +1589,7 @@ def unpaid_commissions_view(request):
     # Ordenar por nombre
     data.sort(key=lambda x: x['barber_name'])
 
-    return Response({'payments': data})
+    return Response({'payments': data, 'period': period_label})
 
 
 @api_view(['POST'])
@@ -1680,13 +1717,22 @@ def pay_barber_view(request, barber_id):
             status=400,
         )
 
+    # Solo se liquida el periodo mostrado (últimos 30 días o el mes elegido), para
+    # que lo que se paga coincida siempre con lo que se ve en la tarjeta.
+    period_start, period_end, _ = _parse_barber_pay_period(request)
+
     with transaction.atomic():
         unpaid = Commission.objects.filter(
             barber_id=barber_id,
             is_paid=False,
-            sale__approval_status='approved'
+            sale__approval_status='approved',
+            created_at__gte=period_start,
+            created_at__lt=period_end,
         )
-        advances = BarberAdvance.objects.filter(barber_id=barber_id, is_settled=False)
+        advances = BarberAdvance.objects.filter(
+            barber_id=barber_id, is_settled=False,
+            created_at__gte=period_start, created_at__lt=period_end,
+        )
 
         earnings = Decimal(unpaid.aggregate(total=Sum('total_earnings'))['total'] or 0)
         total_advances = Decimal(advances.aggregate(total=Sum('amount'))['total'] or 0)
