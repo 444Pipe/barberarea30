@@ -382,6 +382,23 @@ try:
 except Exception as _e:
     print("⚠ No se pudo hacer el backfill de BarberPayment:", _e)
 
+# --- Autocuración para payment_source en egresos y pagos a barberos ---
+from apps.cashflow.models import Expense as _Expense, BarberPayment as _BarberPayment
+for _Model, _col in ((_Expense, 'payment_source'), (_BarberPayment, 'payment_source')):
+    try:
+        _Model.objects.filter(**{_col: 'cash'}).exists()
+    except Exception:
+        print(f"⚠ Columna '{_col}' no encontrada en {_Model._meta.db_table}. Intentando crearla...")
+        try:
+            from django.db import models as _dj_models
+            with connection.schema_editor() as schema_editor:
+                _f = _dj_models.CharField(max_length=10, default='cash')
+                _f.set_attributes_from_name(_col)
+                schema_editor.add_field(_Model, _f)
+            print(f"  ✓ Columna '{_col}' creada en {_Model._meta.db_table}.")
+        except Exception as _e:
+            print(f"  ⚠ No se pudo crear '{_col}':", _e)
+
 # --- Normalizar duración de las citas ACTIVAS de Frank a 2h (regla de negocio) ---
 # Frank ocupa siempre 2h; citas antiguas pudieron quedar con 30/60 min y eso
 # permitía agendar otra cita pegada. Se corrige de forma idempotente.

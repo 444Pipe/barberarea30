@@ -346,6 +346,44 @@
     </div>
   </div>
 
+  <!-- ═══ CAJA DEL MES (Efectivo / Transferencia) ═══ -->
+  <div class="cf-section">
+    <div class="flex items-baseline justify-between mb-2">
+      <div class="cf-section-title" style="margin-bottom:0">Caja del mes</div>
+      <span class="text-[0.6rem] text-smoke/30 uppercase tracking-widest">Cuánto debe haber</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="bg-jet-card border border-emerald-500/20 rounded-md p-4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-white font-serif text-base">💵 Efectivo</span>
+          <span class="text-emerald-400 font-bold text-lg">${{ cash_box.cash_balance|floatformat:0 }}</span>
+        </div>
+        <div class="space-y-1 text-[0.7rem]">
+          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.cash_income|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.cash_out|floatformat:0 }}</span></div>
+          <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-emerald-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-emerald-400">${{ cash_box.cash_balance|floatformat:0 }}</span></div>
+        </div>
+      </div>
+      <div class="bg-jet-card border border-blue-500/20 rounded-md p-4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-white font-serif text-base">💳 Transferencia</span>
+          <span class="text-blue-400 font-bold text-lg">${{ cash_box.transfer_balance|floatformat:0 }}</span>
+        </div>
+        <div class="space-y-1 text-[0.7rem]">
+          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.transfer_income|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.transfer_out|floatformat:0 }}</span></div>
+          <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-blue-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-blue-400">${{ cash_box.transfer_balance|floatformat:0 }}</span></div>
+        </div>
+      </div>
+    </div>
+    {% if frank_ledger.exists %}
+    <div class="mt-2 text-[0.65rem] text-smoke/45">
+      Saldo real pendiente de Frank: <strong class="text-amber-400">${{ frank_ledger.balance|floatformat:0 }}</strong>
+      · sugerido a pagar (últimos 30 días): <strong class="text-amber-300">${{ frank_ledger.suggested_payment|floatformat:0 }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
   <!-- ═══ ALERTA APROBACIONES ═══ -->
   <div id="cf-approvals-alert" class="cf-section {% if not pending_approvals_count or pending_approvals_count == 0 %}hidden{% endif %}">
     <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
@@ -489,7 +527,14 @@
           <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Monto a pagar (editable)</label>
           <input type="number" id="frank-pay-amount" min="0" step="500" class="w-full bg-jet-lighter border border-white/10 text-white rounded px-3 py-2 focus:border-amber-400 outline-none">
         </div>
-        <div class="text-[0.7rem] text-smoke/50">Efectivo del día: <strong class="text-emerald-400" id="frank-cash-available"></strong> <span class="text-smoke/40">(el pago de Franko sale solo del efectivo)</span></div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">¿De dónde sale el pago?</label>
+          <select id="frank-pay-source" class="w-full bg-jet-lighter border border-white/10 text-white rounded px-3 py-2 focus:border-amber-400 outline-none">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+          </select>
+        </div>
+        <div class="text-[0.7rem] text-smoke/50">Efectivo del día: <strong class="text-emerald-400" id="frank-cash-available"></strong> <span class="text-smoke/40">(si el pago sale de efectivo no puede superarlo)</span></div>
         <div id="frank-cash-warning" class="hidden p-2 bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[0.7rem] rounded"></div>
       </div>
 
@@ -1152,9 +1197,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btnConfirm.disabled = true;
     errorDiv.classList.add('hidden');
     forceWrap.classList.add('hidden');
+    const frankSourceEl = document.getElementById('frank-pay-source');
     const body = {
       frank_pay_enabled: !!(frankCheck && frankCheck.checked),
       frank_pay_amount: parseInt(frankAmount && frankAmount.value, 10) || 0,
+      frank_pay_source: frankSourceEl ? frankSourceEl.value : 'cash',
       force_cash: !!forceCash,
     };
     fetch('/api/admin/cashflow/daily-close/', {
@@ -1633,6 +1680,19 @@ function renderCloseDetail(data) {
         <span class="text-emerald-400 uppercase tracking-widest text-[0.65rem]">Efectivo neto en caja</span>
         <span class="${data.cash_summary.cash_net < 0 ? 'text-red-400' : 'text-emerald-400'} text-base">${fmt(data.cash_summary.cash_net)}</span>
       </div>
+    </div>
+    `;
+  }
+  // Franko — pagado vs pendiente
+  if (data.frank_summary && (data.frank_summary.earned_here > 0 || data.frank_summary.paid_here > 0 || data.frank_summary.balance_now !== 0)) {
+    const fsrc = data.frank_summary.source === 'transfer' ? 'Transferencia' : (data.frank_summary.source === 'cash' ? 'Efectivo' : '');
+    html += `
+    <div class="bg-black/30 border border-amber-500/20 rounded p-4 mb-5 text-sm space-y-2">
+      <div class="cf-section-title" style="margin-bottom:0.25rem;">Franko — pagado vs pendiente</div>
+      <div class="flex justify-between"><span class="text-smoke/60">Ganó en este cierre</span><span class="text-white">${fmt(data.frank_summary.earned_here)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Se le pagó${data.frank_summary.paid_here > 0 && fsrc ? ` <span class="text-smoke/40 text-[0.65rem]">(${fsrc})</span>` : ''}</span><span class="text-emerald-400">${fmt(data.frank_summary.paid_here)}</span></div>
+      <div class="flex justify-between"><span class="text-smoke/60">Quedó sin pagar (de este día)</span><span class="text-amber-400">${fmt(data.frank_summary.pending_here)}</span></div>
+      <div class="flex justify-between border-t border-white/10 pt-2 font-bold"><span class="text-amber-300 uppercase tracking-widest text-[0.65rem]">Saldo total pendiente hoy</span><span class="${data.frank_summary.balance_now < 0 ? 'text-red-400' : 'text-amber-300'} text-base">${fmt(data.frank_summary.balance_now)}</span></div>
     </div>
     `;
   }

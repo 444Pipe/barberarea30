@@ -91,6 +91,7 @@
                             {% else %}
                                 <span class="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] uppercase tracking-widest rounded-sm border border-emerald-500/20">Inventario</span>
                             {% endif %}
+                            <div class="mt-1 text-[10px] text-smoke/40">{% if exp.payment_source == 'transfer' %}💳 Transferencia{% else %}💵 Efectivo{% endif %}</div>
                         </td>
                         <td class="px-5 py-4 text-sm text-smoke/60">
                             {{ exp.registered_by.get_full_name|default:exp.registered_by.username|default:"Sistema" }}
@@ -113,7 +114,7 @@
                                 {% else %}
                                 <button onclick="openEditExpense(this)"
                                     data-id="{{ exp.id }}" data-desc="{{ exp.description }}" data-amount="{{ exp.amount|floatformat:0 }}"
-                                    data-type="{{ exp.expense_type }}" data-notes="{{ exp.notes }}" data-closed="{% if exp.included_in_daily_close_id %}1{% endif %}"
+                                    data-type="{{ exp.expense_type }}" data-notes="{{ exp.notes }}" data-source="{{ exp.payment_source }}" data-closed="{% if exp.included_in_daily_close_id %}1{% endif %}"
                                     class="p-1.5 rounded text-smoke/30 hover:text-gold hover:bg-gold/10 transition-all duration-200" title="Editar egreso{% if exp.included_in_daily_close_id %} (en cierre: solo descripción/notas){% endif %}">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </button>
@@ -171,6 +172,14 @@
                 </div>
 
                 <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">¿De dónde sale el dinero?</label>
+                    <select name="payment_source" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none">
+                        <option value="cash">Efectivo</option>
+                        <option value="transfer">Transferencia</option>
+                    </select>
+                </div>
+
+                <div>
                     <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Notas (opcional)</label>
                     <textarea name="notes" rows="2" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Detalles extra..."></textarea>
                 </div>
@@ -219,6 +228,13 @@
                         <option value="fixed">Gasto Fijo (Arriendo, Servicios)</option>
                         <option value="inventory">Compra de Inventario</option>
                         {% endif %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">¿De dónde sale el dinero?</label>
+                    <select name="payment_source" id="edit-exp-source" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none">
+                        <option value="cash">Efectivo</option>
+                        <option value="transfer">Transferencia</option>
                     </select>
                 </div>
                 <div>
@@ -349,6 +365,7 @@
         document.getElementById('edit-exp-desc').value = d.desc;
         document.getElementById('edit-exp-amount').value = d.amount;
         document.getElementById('edit-exp-type').value = d.type;
+        document.getElementById('edit-exp-source').value = d.source || 'cash';
         document.getElementById('edit-exp-notes').value = d.notes || '';
         const isClosed = d.closed === '1';
         document.getElementById('edit-exp-amount').disabled = isClosed;

@@ -14,6 +14,7 @@ Toda la operación corre dentro de un bloque transaction.atomic(),
 garantizando que o todo sucede o nada sucede (rollback automático).
 """
 from decimal import Decimal
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -122,6 +123,21 @@ def compute_frank_ledger():
     unsettled_advances = BarberAdvance.objects.filter(
         barber=frank, is_settled=False).aggregate(t=Sum('amount'))['t'] or zero
 
+    # Sugerido a pagar: SOLO lo pendiente de los últimos 30 días, para no arrastrar
+    # backlog antiguo al cierre (los pagos "tomaban fechas anteriores"). La DEUDA
+    # real (balance) se mantiene completa: nada se pierde, solo no se sugiere de una.
+    WINDOW_DAYS = 30
+    cutoff = timezone.now() - timedelta(days=WINDOW_DAYS)
+    recent_unpaid = frank_commissions.filter(
+        is_paid=False, created_at__gte=cutoff
+    ).aggregate(t=Sum('total_earnings'))['t'] or zero
+    recent_advances = BarberAdvance.objects.filter(
+        barber=frank, is_settled=False, created_at__gte=cutoff
+    ).aggregate(t=Sum('amount'))['t'] or zero
+    suggested_30d = _to_decimal(recent_unpaid) - _to_decimal(recent_advances)
+    # Nunca sugerir más que la deuda real, ni menos que cero.
+    suggested = max(Decimal('0'), min(suggested_30d, max(balance, Decimal('0'))))
+
     return {
         'exists': True,
         'earnings_total': _to_decimal(earnings_total),
@@ -130,7 +146,71 @@ def compute_frank_ledger():
         'balance': balance,
         'unpaid_earnings': _to_decimal(unpaid_earnings),
         'unsettled_advances': _to_decimal(unsettled_advances),
-        'suggested_payment': max(balance, Decimal('0')),
+        'unpaid_earnings_30d': _to_decimal(recent_unpaid),
+        'suggested_window_days': WINDOW_DAYS,
+        'suggested_payment': suggested,
+    }
+
+
+def compute_cash_box(reference_date=None):
+    """Control de caja del MES en curso, separado por efectivo y transferencia.
+
+    Para cada método (efectivo / transferencia):
+      ingresos = ventas de servicios (precio final + propina) + ventas de
+                 inventario, sobre ventas APROBADAS del mes.
+      salidas  = egresos reales del mes (excluye el costo de materiales de
+                 servicios, que es insumo de una venta, no un retiro de caja)
+                 + pagos a barberos NO-Frank del mes (los de Frank ya están
+                 representados como egreso "Pago Diario", para no contar doble).
+      saldo    = ingresos − salidas  → cuánto DEBE haber físicamente.
+
+    Efectivo agrupa ventas sin método o con método 'efectivo' (paridad con el
+    resto del módulo). Transferencia agrupa 'transferencia'.
+    """
+    from django.db.models import Q, Sum, F
+    from apps.cashflow.models import Sale, InventorySale, Expense, BarberPayment
+
+    today = reference_date or timezone.localdate()
+    month_start = today.replace(day=1)
+    zero = Decimal('0')
+
+    approved = Sale.objects.filter(
+        approval_status=Sale.STATUS_APPROVED, created_at__date__gte=month_start
+    )
+    inv = InventorySale.objects.filter(created_at__date__gte=month_start)
+    exp = Expense.objects.filter(date__gte=month_start)
+    pays = BarberPayment.objects.filter(created_at__date__gte=month_start)
+
+    cash_q = Q(payment_method__isnull=True) | Q(payment_method__slug='efectivo')
+    transfer_q = Q(payment_method__slug='transferencia')
+
+    def income(method_q):
+        s = approved.filter(method_q).aggregate(
+            t=Sum(F('final_price') + F('tip_amount')))['t'] or zero
+        i = inv.filter(method_q).aggregate(t=Sum('total_price'))['t'] or zero
+        return _to_decimal(s) + _to_decimal(i)
+
+    def outflow(source):
+        e = exp.filter(payment_source=source).exclude(
+            description__startswith=MATERIALS_EXPENSE_PREFIX
+        ).aggregate(t=Sum('amount'))['t'] or zero
+        p = pays.filter(payment_source=source, expense__isnull=True).aggregate(
+            t=Sum('amount'))['t'] or zero
+        return _to_decimal(e) + _to_decimal(p)
+
+    cash_income = income(cash_q)
+    transfer_income = income(transfer_q)
+    cash_out = outflow('cash')
+    transfer_out = outflow('transfer')
+
+    return {
+        'month_start': month_start,
+        'cash_income': cash_income,
+        'transfer_income': transfer_income,
+        'cash_out': cash_out,
+        'transfer_out': transfer_out,
+        'cash_balance': cash_income - cash_out,
+        'transfer_balance': transfer_income - transfer_out,
     }
 
 

@@ -138,6 +138,9 @@ def daily_close_view(request):
     frank_pay_enabled = bool(body.get('frank_pay_enabled', False))
     frank_pay_amount = _safe_decimal(body.get('frank_pay_amount', 0))
     force_cash = bool(body.get('force_cash', False))
+    frank_pay_source = body.get('frank_pay_source', 'cash')
+    if frank_pay_source not in ('cash', 'transfer'):
+        frank_pay_source = 'cash'
     if frank_pay_enabled and frank_pay_amount < 0:
         return Response({'error': 'El monto del pago a Franko no puede ser negativo.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -195,8 +198,9 @@ def daily_close_view(request):
         frank_expense = None
         if frank_pay_enabled and frank_barber:
             frank_paid = frank_pay_amount
-            # El pago de Frank sale SOLO del efectivo del día.
-            if frank_paid > cash_income and not force_cash:
+            # Si el pago sale de EFECTIVO, no puede superar el efectivo del día.
+            # Si sale de TRANSFERENCIA, esa restricción no aplica.
+            if frank_pay_source == 'cash' and frank_paid > cash_income and not force_cash:
                 return Response({
                     'error': f'El pago a Franko (${frank_paid:,.0f}) supera el efectivo del día (${cash_income:,.0f}).',
                     'code': 'cash_exceeded',
@@ -207,6 +211,7 @@ def daily_close_view(request):
                     description="Pago Diario: Franko",
                     amount=frank_paid,
                     expense_type='variable',
+                    payment_source=frank_pay_source,
                     registered_by=request.user
                 )
 
@@ -254,6 +259,7 @@ def daily_close_view(request):
                 expense=frank_expense,
                 amount=frank_paid,
                 suggested_amount=frank_suggested,
+                payment_source=frank_pay_source,
                 created_by=request.user,
             )
             # Liquidar los vales pendientes de Frank: ya quedaron descontados
@@ -433,6 +439,24 @@ def daily_close_detail_view(request, close_id):
     cash_income = _cash_income_for(sales, inventory_sales)
     frank_paid = float(frank_payment.amount) if frank_payment else 0.0
 
+    # Resumen de Frank: cuánto ganó en este cierre, cuánto se le pagó y cuánto
+    # queda pendiente (de este día + su saldo real actual). Especialmente para
+    # ver de un vistazo lo que se le pagó y lo que no.
+    frank_barber = cashflow_services.get_frank_barber()
+    frank_summary = None
+    if frank_barber:
+        earned_here = float(Commission.objects.filter(
+            sale__in=sales, barber=frank_barber
+        ).aggregate(t=Sum('total_earnings'))['t'] or 0)
+        ledger = cashflow_services.compute_frank_ledger()
+        frank_summary = {
+            'earned_here': earned_here,
+            'paid_here': frank_paid,
+            'pending_here': max(earned_here - frank_paid, 0.0),
+            'balance_now': float(ledger['balance']),
+            'source': frank_payment.payment_source if frank_payment else None,
+        }
+
     return Response({
         'id': daily_close.id,
         'date': daily_close.date.strftime('%Y-%m-%d'),
@@ -442,8 +466,10 @@ def daily_close_detail_view(request, close_id):
         'frank_payment': {
             'amount': float(frank_payment.amount),
             'suggested_amount': float(frank_payment.suggested_amount),
+            'source': frank_payment.payment_source,
             'by': (frank_payment.created_by.get_full_name() or frank_payment.created_by.username) if frank_payment.created_by else '—',
         } if frank_payment else None,
+        'frank_summary': frank_summary,
         'cash_summary': {
             'cash_income': float(cash_income),
             'frank_paid': frank_paid,
@@ -718,6 +744,9 @@ def add_expense_view(request):
     amount = data.get('amount')
     expense_type = data.get('expense_type', 'variable')
     notes = data.get('notes', '')
+    payment_source = data.get('payment_source', 'cash')
+    if payment_source not in ('cash', 'transfer'):
+        payment_source = 'cash'
     image = request.FILES.get('image') if hasattr(request, 'FILES') else None
 
     # Validaciones
@@ -740,6 +769,7 @@ def add_expense_view(request):
             description=description,
             amount=amount,
             expense_type=expense_type,
+            payment_source=payment_source,
             notes=notes,
             registered_by=request.user,
             image=image
@@ -872,6 +902,11 @@ def edit_expense_view(request, expense_id):
     if new_notes is not None and new_notes != expense.notes:
         changes['notes'] = [expense.notes, new_notes]
         expense.notes = new_notes
+
+    new_source = data.get('payment_source') if 'payment_source' in data else None
+    if new_source in ('cash', 'transfer') and new_source != expense.payment_source:
+        changes['payment_source'] = [expense.payment_source, new_source]
+        expense.payment_source = new_source
 
     if new_image:
         changes['image'] = [expense.image.name if expense.image else '', new_image.name]

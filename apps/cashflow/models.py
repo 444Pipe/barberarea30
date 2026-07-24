@@ -4,6 +4,14 @@ from django.utils import timezone
 from decimal import Decimal
 
 
+# Origen del dinero para salidas de caja (egresos y pagos a barberos): permite
+# saber cuánto debe quedar realmente en efectivo y cuánto en transferencia.
+PAYMENT_SOURCE_CHOICES = [
+    ('cash', 'Efectivo'),
+    ('transfer', 'Transferencia'),
+]
+
+
 class PaymentMethod(models.Model):
     """Métodos de pago. Ej: Transferencia (Nequi, Bancolombia), Efectivo, Tarjeta."""
     name = models.CharField(max_length=50)
@@ -254,6 +262,10 @@ class BarberPayment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=0)
     suggested_amount = models.DecimalField(max_digits=12, decimal_places=0, default=0,
         help_text='Saldo sugerido por el sistema al momento del pago')
+    payment_source = models.CharField(
+        max_length=10, choices=PAYMENT_SOURCE_CHOICES, default='cash',
+        help_text='De dónde salió el dinero: efectivo o transferencia'
+    )
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='barber_payments_made'
@@ -317,6 +329,10 @@ class Expense(models.Model):
     description = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=12, decimal_places=0)
     expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPES, default='variable')
+    payment_source = models.CharField(
+        max_length=10, choices=PAYMENT_SOURCE_CHOICES, default='cash',
+        help_text='De dónde salió el dinero: efectivo o transferencia'
+    )
     # Fecha local (America/Bogota), no la del servidor en UTC: un egreso
     # registrado de noche debe contar en el día/mes correcto para el ROI.
     date = models.DateField(default=timezone.localdate)
