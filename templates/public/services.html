@@ -83,7 +83,11 @@
             const WA = '573112651032';
             data.servicios.forEach((servicio, index) => {
                 const delay = index * 100;
-                const formatPrice = parseFloat(servicio.price).toLocaleString('es-CO');
+                // Mostrar el valor en miles: 30.000 → "30", 25.000 → "25".
+                const priceK = parseFloat(servicio.price) / 1000;
+                const formatPrice = Number.isInteger(priceK)
+                  ? priceK.toString()
+                  : priceK.toLocaleString('es-CO', { maximumFractionDigits: 1 });
                 const slug = servicio.name.toLowerCase().replace(/[\s\W-]+/g, '-');
                 const isConsult = !!servicio.requires_consultation;
 
