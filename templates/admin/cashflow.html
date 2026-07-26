@@ -571,9 +571,19 @@
       <p class="text-smoke/60 text-sm mb-1">Se liquidan comisiones y se bloquean las ventas del día. Neto reportado: <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>.</p>
       <p class="text-[0.7rem] text-smoke/50 mb-4">Jornada a cerrar: <strong class="text-white" id="close-business-date">—</strong> <span id="close-prevday-note" class="hidden text-amber-300">(la jornada de ayer: aún no son las 5 a.m.)</span></p>
 
-      <!-- Motivos por los que no se puede cerrar -->
-      <div id="close-blockers" class="hidden mb-4 p-3 bg-amber-500/10 border border-amber-500/40 rounded space-y-2">
-        <p class="text-amber-300 text-xs font-bold">No se puede cerrar todavía</p>
+      {% if user_role == 'superadmin' %}
+      <!-- Solo los socios eligen la jornada: cierran el día que necesiten sin
+           depender de la hora ni del corte de jornada. -->
+      <div class="mb-4 p-3 bg-jet border border-gold/20 rounded">
+        <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1" for="close-date-input">Jornada del cierre</label>
+        <input type="date" id="close-date-input" class="w-full bg-jet-lighter border border-white/10 text-white rounded px-3 py-2 focus:border-gold outline-none">
+        <p class="text-[0.6rem] text-smoke/40 mt-1">Se incluirán todos los movimientos pendientes, sin importar la fecha en que se registraron.</p>
+      </div>
+      {% endif %}
+
+      <!-- Motivos por los que no se puede cerrar / advertencias -->
+      <div id="close-blockers" class="hidden mb-4 p-3 rounded space-y-2 border">
+        <p id="close-blockers-title" class="text-xs font-bold"></p>
         <ul id="close-blockers-list" class="text-[0.7rem] text-smoke/70 space-y-1 list-disc list-inside"></ul>
         <button id="btn-goto-approvals" class="hidden w-full px-3 py-2 bg-amber-500 hover:bg-amber-400 text-jet text-[0.65rem] font-bold tracking-widest uppercase rounded">Ir a aprobar ventas</button>
       </div>
@@ -1227,23 +1237,44 @@ document.addEventListener('DOMContentLoaded', () => {
   if (frankCheck) frankCheck.addEventListener('change', cfToggleFrankAmount);
   if (frankAmount) frankAmount.addEventListener('input', cfUpdateFrankCashWarning);
 
-  // Pinta los motivos por los que el cierre está bloqueado y apaga el botón
-  // de confirmar mientras existan. Fuente única: `blockers` del backend.
+  const closeDateInput = document.getElementById('close-date-input');
+
+  // Pinta los motivos por los que el cierre está bloqueado (o las advertencias)
+  // y apaga el botón de confirmar solo ante bloqueos reales. Fuente única:
+  // `blockers` del backend, con su `severity`.
   function cfRenderBlockers(data) {
     const wrap = document.getElementById('close-blockers');
+    const title = document.getElementById('close-blockers-title');
     const list = document.getElementById('close-blockers-list');
     const gotoBtn = document.getElementById('btn-goto-approvals');
     const dateEl = document.getElementById('close-business-date');
     const prevNote = document.getElementById('close-prevday-note');
     if (dateEl) dateEl.textContent = data.business_date_label || '—';
     if (prevNote) prevNote.classList.toggle('hidden', !data.is_previous_day);
+    if (closeDateInput) {
+      closeDateInput.max = data.max_close_date || '';
+      if (!closeDateInput.value) closeDateInput.value = data.business_date || '';
+    }
 
     const blockers = data.blockers || [];
+    const hard = blockers.filter(b => b.severity === 'block');
+    // Rojo si algo impide cerrar, ámbar si son solo advertencias.
+    wrap.className = 'mb-4 p-3 rounded space-y-2 border ' + (hard.length
+      ? 'bg-red-500/10 border-red-500/40'
+      : 'bg-amber-500/10 border-amber-500/40');
+    title.className = 'text-xs font-bold ' + (hard.length ? 'text-red-300' : 'text-amber-300');
+    title.textContent = hard.length ? 'No se puede cerrar todavía' : 'Ten en cuenta antes de cerrar';
     list.innerHTML = blockers.map(b => `<li>${escH(b.message)}</li>`).join('');
     wrap.classList.toggle('hidden', blockers.length === 0);
     gotoBtn.classList.toggle('hidden', !blockers.some(b => b.code === 'pending_approvals'));
-    btnConfirm.disabled = blockers.length > 0;
-    btnConfirm.style.opacity = blockers.length > 0 ? '0.4' : '1';
+    btnConfirm.disabled = hard.length > 0;
+    btnConfirm.style.opacity = hard.length > 0 ? '0.4' : '1';
+  }
+
+  // Al cambiar la jornada hay que revalidar: el bloqueo "ya tiene cierre"
+  // depende de la fecha elegida.
+  if (closeDateInput) {
+    closeDateInput.addEventListener('change', () => cfLoadClosePreview());
   }
 
   const gotoApprovals = document.getElementById('btn-goto-approvals');
@@ -1259,7 +1290,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function cfLoadClosePreview() {
-    fetch('/api/admin/cashflow/daily-close/preview/')
+    const chosen = closeDateInput && closeDateInput.value;
+    fetch('/api/admin/cashflow/daily-close/preview/' + (chosen ? '?date=' + encodeURIComponent(chosen) : ''))
       .then(r => r.json())
       .then(data => {
         cfClosePreview = data;
@@ -1303,6 +1335,8 @@ document.addEventListener('DOMContentLoaded', () => {
       frank_pay_source: frankSourceEl ? frankSourceEl.value : 'cash',
       force_cash: !!forceCash,
     };
+    // Solo los socios mandan fecha; para el resto el backend usa la jornada.
+    if (closeDateInput && closeDateInput.value) body.close_date = closeDateInput.value;
     fetch('/api/admin/cashflow/daily-close/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
@@ -1340,6 +1374,9 @@ document.addEventListener('DOMContentLoaded', () => {
       // habilita según los motivos que devuelva el backend.
       btnConfirm.disabled = true;
       btnConfirm.style.opacity = '0.4';
+      // Se limpia para que el preview vuelva a proponer la jornada en curso y
+      // no arrastre la fecha de una apertura anterior.
+      if (closeDateInput) closeDateInput.value = '';
       cfLoadClosePreview();
     });
   }

@@ -147,17 +147,34 @@ def daily_close_view(request):
       frank_pay_enabled: bool  — si se le paga hoy (chulo del modal)
       frank_pay_amount: int    — monto realmente entregado (editable)
       force_cash: bool         — confirma un pago que supera el efectivo del día
+      close_date: 'AAAA-MM-DD' — jornada a sellar. SOLO superadministradores:
+                                 los socios cierran el día que necesiten sin
+                                 depender de la hora. El resto usa la jornada
+                                 en curso.
     """
     from apps.cashflow.models import DailyClose, Expense, Sale, Commission, InventorySale, BarberAdvance, BarberPayment
     from django.db.models import Sum
     from django.db import transaction
     from django.utils import timezone
 
+    body = request.data or {}
+
     # Se sella con la JORNADA, no con la fecha del servidor: cerrar a las 00:20
     # corresponde al día anterior (ver cashflow.services.business_date).
+    # Los superadministradores (los socios) no tienen esa restricción: pueden
+    # elegir explícitamente qué día cierran.
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
     today = cashflow_services.business_date()
-
-    body = request.data or {}
+    requested_close_date = body.get('close_date')
+    if requested_close_date:
+        if not is_superadmin:
+            return Response({
+                'error': 'Solo los superadministradores pueden elegir la fecha del cierre.',
+            }, status=status.HTTP_403_FORBIDDEN)
+        today, date_error = cashflow_services.parse_close_date(requested_close_date)
+        if date_error:
+            return Response({'error': date_error}, status=status.HTTP_400_BAD_REQUEST)
     frank_pay_enabled = bool(body.get('frank_pay_enabled', False))
     frank_pay_amount = _safe_decimal(body.get('frank_pay_amount', 0))
     force_cash = bool(body.get('force_cash', False))
@@ -169,11 +186,13 @@ def daily_close_view(request):
 
     # Motivos de bloqueo — misma fuente que usa el modal, para que el mensaje
     # de error y lo que ve el operador nunca discrepen. Un día con solo egresos
-    # (o solo productos) SÍ se puede cerrar.
-    blockers = cashflow_services.close_blockers()
-    if blockers:
+    # (o solo productos) SÍ se puede cerrar. Para superadministradores todo lo
+    # que no sea el cierre ya existente queda como advertencia.
+    blockers = cashflow_services.close_blockers(target_date=today, relaxed=is_superadmin)
+    hard_blockers = [b for b in blockers if b['severity'] == 'block']
+    if hard_blockers:
         return Response({
-            'error': ' '.join(b['message'] for b in blockers),
+            'error': ' '.join(b['message'] for b in hard_blockers),
             'blockers': blockers,
         }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -317,14 +336,23 @@ def daily_close_view(request):
                 'frank_pay_enabled': frank_pay_enabled,
                 'frank_paid': str(frank_paid),
                 'frank_suggested': str(frank_suggested),
+                'close_date': str(today),
+                # Deja rastro de quién eligió la fecha a mano: es una facultad
+                # exclusiva de los socios y debe quedar auditada.
+                'manual_close_date': bool(requested_close_date),
             },
             request=request,
-            extra_data={'msg': f"Realizó el Cierre de Caja del {today} con Neto ${net_income:,.0f}{frank_msg}"}
+            extra_data={'msg': (
+                f"Realizó el Cierre de Caja del {today}"
+                f"{' (fecha elegida manualmente)' if requested_close_date else ''}"
+                f" con Neto ${net_income:,.0f}{frank_msg}"
+            )}
         )
 
     return Response({
         'message': 'Cierre de caja exitoso',
         'close_id': daily_close.id,
+        'close_date': today.strftime('%Y-%m-%d'),
         'net_income': daily_close.net_income,
     })
 
@@ -332,10 +360,13 @@ def daily_close_view(request):
 @api_view(['GET'])
 @permission_classes([IsOperationalAdminOrAbove])
 def daily_close_preview_view(request):
-    """GET /api/admin/cashflow/daily-close/preview/ - Datos para el modal de cierre.
+    """GET /api/admin/cashflow/daily-close/preview/[?date=AAAA-MM-DD]
 
-    Devuelve el saldo corriente de Frank (sugerido de pago) y el efectivo del
-    día, para que el operador decida el chulo y el monto antes de cerrar.
+    Datos para el modal de cierre: el saldo corriente de Frank (sugerido de
+    pago), el efectivo del día y los motivos de bloqueo.
+
+    `?date=` solo lo honran los superadministradores, que eligen qué jornada
+    cierran; para el resto siempre es la jornada en curso.
     """
     from apps.cashflow.models import Sale, InventorySale
 
@@ -348,8 +379,21 @@ def daily_close_preview_view(request):
     ).count()
 
     ledger = cashflow_services.compute_frank_ledger()
-    blockers = cashflow_services.close_blockers()
+
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
     jornada = cashflow_services.business_date()
+    date_error = None
+    requested = request.query_params.get('date')
+    if requested and is_superadmin:
+        parsed, date_error = cashflow_services.parse_close_date(requested)
+        if parsed:
+            jornada = parsed
+    blockers = cashflow_services.close_blockers(target_date=jornada, relaxed=is_superadmin)
+    if date_error:
+        blockers = [{
+            'code': 'invalid_date', 'message': date_error, 'count': 0, 'severity': 'block',
+        }] + blockers
 
     return Response({
         'frank': {
@@ -369,7 +413,10 @@ def daily_close_preview_view(request):
         'business_date_label': jornada.strftime('%d/%m/%Y'),
         'is_previous_day': jornada != tz.localtime().date(),
         'blockers': blockers,
-        'can_close': not blockers,
+        'can_close': not any(b['severity'] == 'block' for b in blockers),
+        # Los socios eligen la fecha; el tope es hoy (no se sella el futuro).
+        'can_choose_date': is_superadmin,
+        'max_close_date': tz.localtime().date().strftime('%Y-%m-%d'),
     })
 
 
