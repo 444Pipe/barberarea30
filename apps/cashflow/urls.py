@@ -28,6 +28,7 @@ urlpatterns = [
     path('cashflow/cash/starting-point/', views.cash_starting_point_view, name='cashflow_cash_starting_point_api'),
     path('cashflow/cash/cut/', views.close_cash_cut_view, name='cashflow_close_cash_cut_api'),
     path('cashflow/cash/cuts/', views.cash_cuts_list_view, name='cashflow_cash_cuts_api'),
+    path('cashflow/cash/cuts/<int:cut_id>/', views.cash_cut_detail_view, name='cashflow_cash_cut_detail_api'),
     path('cashflow/inventory-sales/', views.create_inventory_sale_view, name='cashflow_inventory_sales_api'),
     path('cashflow/pending-approvals/', views.pending_approvals_view, name='cashflow_pending_approvals_api'),
     path('cashflow/alerts/', views.cashflow_alerts_view, name='cashflow_alerts_api'),

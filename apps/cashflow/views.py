@@ -2286,13 +2286,95 @@ def cash_starting_point_view(request):
     })
 
 
+@api_view(['GET', 'DELETE'])
+@permission_classes([IsSuperAdmin])
+def cash_cut_detail_view(request, cut_id):
+    """GET/DELETE /api/admin/cashflow/cash/cuts/<id>/
+
+    GET  → simula qué pasaría al deshacer el corte (no escribe nada): saldos
+           antes y después, movimientos que se liberan y motivos de bloqueo.
+    DELETE → lo deshace.
+
+    Body del DELETE: money_left_the_box (bool). Si el corte registró un retiro,
+    decide si esa plata salió de verdad (se materializa como retiro real) o si
+    el retiro se marcó por error (la plata vuelve al saldo).
+    """
+    from apps.cashflow.models import CashCut
+
+    try:
+        cut = CashCut.objects.get(pk=cut_id)
+    except CashCut.DoesNotExist:
+        return Response({'error': 'Corte no encontrado'}, status=404)
+
+    if request.method == 'GET':
+        p = cashflow_services.preview_cash_cut_revert(cut)
+        return Response({k: (float(v) if isinstance(v, Decimal) else v) for k, v in p.items()})
+
+    data = request.data or {}
+    # El default conservador es True (no inventar dinero en la caja). Se usa
+    # también cuando la clave llega en null: `.get(k, True)` solo cubre la
+    # ausencia de la clave, no un null explícito.
+    elegido = data.get('money_left_the_box')
+    resumen, error = cashflow_services.revert_cash_cut(
+        cut_id=cut.id,
+        user=request.user,
+        money_left_the_box=True if elegido is None else bool(elegido),
+    )
+    if error:
+        # 404 si el corte se desvaneció; 409 si el estado cambió bajo los pies.
+        code = status.HTTP_404_NOT_FOUND if 'ya no existe' in error else status.HTTP_409_CONFLICT
+        return Response({'error': error}, status=code)
+
+    materializado = ''
+    if resumen['materialized']:
+        detalle = ', '.join(
+            f"${m['amount']:,.0f} en {'efectivo' if m['source'] == 'cash' else 'transferencia'}"
+            for m in resumen['materialized']
+        )
+        materializado = f'. Se dejó registrado el retiro real de {detalle}'
+    log_audit(
+        user=request.user, action='delete', obj=None,
+        changes={
+            'cut_id': resumen['cut_id'],
+            'closed_at': resumen['closed_at'],
+            'cash_balance': str(resumen['cash_balance']),
+            'transfer_balance': str(resumen['transfer_balance']),
+            'withdrew_cash': resumen['withdrew_cash'],
+            'withdrew_transfer': resumen['withdrew_transfer'],
+            'movements_released': resumen['movements_released'],
+        },
+        request=request,
+        extra_data={'msg': (
+            f"Deshizo el corte de caja del {resumen['closed_at']} "
+            f"(efectivo ${resumen['cash_balance']:,.0f}, transferencia "
+            f"${resumen['transfer_balance']:,.0f}). Volvieron "
+            f"{resumen['movements_released']} movimiento(s) al período en curso{materializado}"
+        )},
+    )
+
+    return Response({
+        'ok': True,
+        'message': f"Corte del {resumen['closed_at']} deshecho.",
+        'movements_released': resumen['movements_released'],
+        'materialized': resumen['materialized'],
+        'cash_balance': float(resumen['cash_balance_now']),
+        'transfer_balance': float(resumen['transfer_balance_now']),
+    })
+
+
 @api_view(['GET'])
 @permission_classes([IsOperationalAdminOrAbove])
 def cash_cuts_list_view(request):
     """GET /api/admin/cashflow/cash/cuts/ — historial de cortes de caja."""
     from apps.cashflow.models import CashCut
 
-    cuts = CashCut.objects.select_related('closed_by').order_by('-closed_at')[:60]
+    # can_revert también depende del ROL: esta vista la ve Frank
+    # (operational_admin), pero deshacer un corte es solo de los socios. Sin
+    # esto se le pintaba el botón y al pulsarlo recibía un 403.
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
+    latest = cashflow_services.current_cash_cut()
+    cuts = CashCut.objects.select_related('closed_by').order_by('-closed_at', '-id')[:60]
     return Response({'cuts': [{
         'id': c.id,
         'closed_at': tz.localtime(c.closed_at).strftime('%d/%m/%Y %I:%M %p'),
@@ -2305,6 +2387,12 @@ def cash_cuts_list_view(request):
         'opening_transfer': float(c.opening_transfer),
         'movements_count': c.movements.count(),
         'notes': c.notes,
+        'is_starting_point': c.is_starting_point,
+        # Solo el último se puede deshacer: revertir uno intermedio soltaría
+        # sus movimientos dentro del período en curso.
+        'can_revert': bool(
+            is_superadmin and latest and latest.pk == c.pk and not c.is_starting_point
+        ),
     } for c in cuts]})
 
 

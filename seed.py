@@ -415,6 +415,35 @@ for _Model in (_CashCut, _CashMovement):
         except Exception as _e:
             print(f"  ⚠ No se pudo crear {_Model._meta.db_table}:", _e)
 
+# Columna is_starting_point (migración 0014): marca el corte que no se puede
+# deshacer. Sin ella la pantalla de Caja revienta al listar los cortes.
+try:
+    _CashCut.objects.filter(is_starting_point=False).exists()
+except Exception:
+    print("⚠ Columna 'is_starting_point' no encontrada en cashflow_cashcut. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.BooleanField(default=False)
+            _f.set_attributes_from_name('is_starting_point')
+            schema_editor.add_field(_CashCut, _f)
+        print("  ✓ Columna 'is_starting_point' creada.")
+    except Exception as _e:
+        print("  ⚠ No se pudo crear 'is_starting_point':", _e)
+
+# Backfill idempotente: los cortes de punto de partida creados antes de que el
+# campo existiera quedarían revertibles, que es la operación que hay que
+# impedir. Se reconocen por su firma (retira ambas cajas, abre en cero, nota).
+try:
+    _marcados = _CashCut.objects.filter(
+        is_starting_point=False, withdrew_cash=True, withdrew_transfer=True,
+        opening_cash=0, opening_transfer=0, notes__startswith='Punto de partida',
+    ).update(is_starting_point=True)
+    if _marcados:
+        print(f"✓ {_marcados} corte/s de punto de partida marcados como no reversibles")
+except Exception as _e:
+    print("⚠ No se pudo marcar los cortes de punto de partida:", _e)
+
 # --- Horario dominical: 2 a 7 p.m. para todos los barberos ---
 # Autocuración: si la migración 0011 no corrió (el historial de migraciones en
 # Railway ha fallado antes), esto reimpone la ventana en cada boot. Los
