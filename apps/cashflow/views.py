@@ -147,15 +147,34 @@ def daily_close_view(request):
       frank_pay_enabled: bool  — si se le paga hoy (chulo del modal)
       frank_pay_amount: int    — monto realmente entregado (editable)
       force_cash: bool         — confirma un pago que supera el efectivo del día
+      close_date: 'AAAA-MM-DD' — jornada a sellar. SOLO superadministradores:
+                                 los socios cierran el día que necesiten sin
+                                 depender de la hora. El resto usa la jornada
+                                 en curso.
     """
     from apps.cashflow.models import DailyClose, Expense, Sale, Commission, InventorySale, BarberAdvance, BarberPayment
     from django.db.models import Sum
     from django.db import transaction
     from django.utils import timezone
 
-    today = timezone.localtime(timezone.now()).date()
-
     body = request.data or {}
+
+    # Se sella con la JORNADA, no con la fecha del servidor: cerrar a las 00:20
+    # corresponde al día anterior (ver cashflow.services.business_date).
+    # Los superadministradores (los socios) no tienen esa restricción: pueden
+    # elegir explícitamente qué día cierran.
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
+    today = cashflow_services.business_date()
+    requested_close_date = body.get('close_date')
+    if requested_close_date:
+        if not is_superadmin:
+            return Response({
+                'error': 'Solo los superadministradores pueden elegir la fecha del cierre.',
+            }, status=status.HTTP_403_FORBIDDEN)
+        today, date_error = cashflow_services.parse_close_date(requested_close_date)
+        if date_error:
+            return Response({'error': date_error}, status=status.HTTP_400_BAD_REQUEST)
     frank_pay_enabled = bool(body.get('frank_pay_enabled', False))
     frank_pay_amount = _safe_decimal(body.get('frank_pay_amount', 0))
     force_cash = bool(body.get('force_cash', False))
@@ -165,27 +184,33 @@ def daily_close_view(request):
     if frank_pay_enabled and frank_pay_amount < 0:
         return Response({'error': 'El monto del pago a Franko no puede ser negativo.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Buscar ventas que no estén en un cierre
-    pending_sales = Sale.objects.filter(included_in_daily_close__isnull=True)
+    # Motivos de bloqueo — misma fuente que usa el modal, para que el mensaje
+    # de error y lo que ve el operador nunca discrepen. Un día con solo egresos
+    # (o solo productos) SÍ se puede cerrar. Para superadministradores todo lo
+    # que no sea el cierre ya existente queda como advertencia.
+    blockers = cashflow_services.close_blockers(target_date=today, relaxed=is_superadmin)
+    hard_blockers = [b for b in blockers if b['severity'] == 'block']
+    if hard_blockers:
+        return Response({
+            'error': ' '.join(b['message'] for b in hard_blockers),
+            'blockers': blockers,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Ventas aprobadas que no estén en un cierre
+    pending_sales = Sale.objects.filter(
+        included_in_daily_close__isnull=True, approval_status=Sale.STATUS_APPROVED
+    )
     pending_inventory_sales = InventorySale.objects.filter(included_in_daily_close__isnull=True)
-    
-    if not pending_sales.exists() and not pending_inventory_sales.exists():
-        return Response({'error': 'No hay ventas pendientes por cerrar.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Validar si hay ventas esperando aprobación (pending)
-    unapproved_sales = pending_sales.filter(approval_status=Sale.STATUS_PENDING)
-    if unapproved_sales.exists():
-        return Response({'error': 'Hay ventas pendientes de aprobación. Por favor apruébelas o rechácelas antes de cerrar la caja.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Solo considerar las aprobadas
-    pending_sales = pending_sales.filter(approval_status=Sale.STATUS_APPROVED)
 
     with transaction.atomic():
-        # Solo un cierre por día. El chequeo va DENTRO del atomic (junto a la
-        # creación) para cerrar la ventana de carrera entre exists() y create();
-        # el UniqueConstraint sobre `date` es el respaldo definitivo en BD.
+        # Solo un cierre por jornada. El chequeo va DENTRO del atomic (junto a
+        # la creación) para cerrar la ventana de carrera entre exists() y
+        # create(); el UniqueConstraint sobre `date` es el respaldo en BD.
         if DailyClose.objects.filter(date=today).exists():
-            return Response({'error': 'El cierre de caja para el día de hoy ya fue generado.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': f'El cierre de la jornada del {today.strftime("%d/%m/%Y")} ya fue generado.',
+                'blockers': [{'code': 'already_closed', 'message': 'Cierre ya generado.', 'count': 1}],
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         total_tips = pending_sales.aggregate(total=Sum('tip_amount'))['total'] or 0
 
@@ -311,14 +336,23 @@ def daily_close_view(request):
                 'frank_pay_enabled': frank_pay_enabled,
                 'frank_paid': str(frank_paid),
                 'frank_suggested': str(frank_suggested),
+                'close_date': str(today),
+                # Deja rastro de quién eligió la fecha a mano: es una facultad
+                # exclusiva de los socios y debe quedar auditada.
+                'manual_close_date': bool(requested_close_date),
             },
             request=request,
-            extra_data={'msg': f"Realizó el Cierre de Caja del {today} con Neto ${net_income:,.0f}{frank_msg}"}
+            extra_data={'msg': (
+                f"Realizó el Cierre de Caja del {today}"
+                f"{' (fecha elegida manualmente)' if requested_close_date else ''}"
+                f" con Neto ${net_income:,.0f}{frank_msg}"
+            )}
         )
 
     return Response({
         'message': 'Cierre de caja exitoso',
         'close_id': daily_close.id,
+        'close_date': today.strftime('%Y-%m-%d'),
         'net_income': daily_close.net_income,
     })
 
@@ -326,10 +360,13 @@ def daily_close_view(request):
 @api_view(['GET'])
 @permission_classes([IsOperationalAdminOrAbove])
 def daily_close_preview_view(request):
-    """GET /api/admin/cashflow/daily-close/preview/ - Datos para el modal de cierre.
+    """GET /api/admin/cashflow/daily-close/preview/[?date=AAAA-MM-DD]
 
-    Devuelve el saldo corriente de Frank (sugerido de pago) y el efectivo del
-    día, para que el operador decida el chulo y el monto antes de cerrar.
+    Datos para el modal de cierre: el saldo corriente de Frank (sugerido de
+    pago), el efectivo del día y los motivos de bloqueo.
+
+    `?date=` solo lo honran los superadministradores, que eligen qué jornada
+    cierran; para el resto siempre es la jornada en curso.
     """
     from apps.cashflow.models import Sale, InventorySale
 
@@ -342,6 +379,21 @@ def daily_close_preview_view(request):
     ).count()
 
     ledger = cashflow_services.compute_frank_ledger()
+
+    profile = getattr(request.user, 'profile', None)
+    is_superadmin = bool(profile and profile.is_superadmin)
+    jornada = cashflow_services.business_date()
+    date_error = None
+    requested = request.query_params.get('date')
+    if requested and is_superadmin:
+        parsed, date_error = cashflow_services.parse_close_date(requested)
+        if parsed:
+            jornada = parsed
+    blockers = cashflow_services.close_blockers(target_date=jornada, relaxed=is_superadmin)
+    if date_error:
+        blockers = [{
+            'code': 'invalid_date', 'message': date_error, 'count': 0, 'severity': 'block',
+        }] + blockers
 
     return Response({
         'frank': {
@@ -356,6 +408,15 @@ def daily_close_preview_view(request):
         },
         'pending_sales_count': pending_sales.count() + pending_inventory_sales.count(),
         'pending_approvals_count': pending_approvals_count,
+        # Jornada que se va a sellar y por qué no se puede cerrar (si aplica).
+        'business_date': jornada.strftime('%Y-%m-%d'),
+        'business_date_label': jornada.strftime('%d/%m/%Y'),
+        'is_previous_day': jornada != tz.localtime().date(),
+        'blockers': blockers,
+        'can_close': not any(b['severity'] == 'block' for b in blockers),
+        # Los socios eligen la fecha; el tope es hoy (no se sella el futuro).
+        'can_choose_date': is_superadmin,
+        'max_close_date': tz.localtime().date().strftime('%Y-%m-%d'),
     })
 
 
@@ -1010,7 +1071,7 @@ def cashflow_alerts_view(request):
     - close_pending: ya son ≥9 pm, no hay cierre de hoy y quedan movimientos.
     """
     from django.utils import timezone
-    from apps.cashflow.models import DailyClose, Sale, InventorySale
+    from apps.cashflow.models import DailyClose, Sale, InventorySale, Expense
     from apps.cashflow.alerts import get_unclosed_bookings
 
     unclosed = get_unclosed_bookings()
@@ -1023,16 +1084,22 @@ def cashflow_alerts_view(request):
     } for b in unclosed]
 
     now_local = timezone.localtime()
+    # La jornada, no la fecha del servidor: a las 00:30 el cierre pendiente
+    # sigue siendo el del día anterior.
+    jornada = cashflow_services.business_date()
+    # La ventana de aviso llega hasta el corte de jornada (5 a.m.), así que
+    # sigue visible si se está cerrando pasada la medianoche.
+    en_ventana = now_local.hour >= 21 or now_local.hour < cashflow_services.BUSINESS_DAY_CUTOFF_HOUR
     close_pending = False
-    if now_local.hour >= 21 and not DailyClose.objects.filter(date=now_local.date()).exists():
-        # Solo hay algo cerrable si existen ventas APROBADAS o inventario
-        # pendientes (mismas condiciones que daily_close_view y el recordatorio
-        # por email); un egreso o una venta sin aprobar no habilita el cierre.
+    if en_ventana and not DailyClose.objects.filter(date=jornada).exists():
+        # Hay algo cerrable si quedan ventas aprobadas, productos o egresos
+        # pendientes (mismas condiciones que daily_close_view).
         close_pending = (
             Sale.objects.filter(
                 approval_status=Sale.STATUS_APPROVED, included_in_daily_close__isnull=True
             ).exists()
             or InventorySale.objects.filter(included_in_daily_close__isnull=True).exists()
+            or Expense.objects.filter(included_in_daily_close__isnull=True).exists()
         )
 
     return Response({

@@ -41,6 +41,120 @@ def is_materials_expense(description):
     return (description or '').startswith(MATERIALS_EXPENSE_PREFIX)
 
 
+# La jornada no termina a la medianoche. Un cierre hecho a las 00:20 del
+# domingo corresponde al sábado: antes se sellaba con la fecha del servidor y,
+# como DailyClose.date es único, consumía el cupo del día siguiente y dejaba la
+# caja bloqueada durante toda esa jornada.
+BUSINESS_DAY_CUTOFF_HOUR = 5
+
+
+def business_date(moment=None):
+    """Jornada (fecha de negocio) a la que pertenece un instante.
+
+    Entre medianoche y las 5 a.m. la jornada sigue siendo la del día anterior.
+    """
+    local = timezone.localtime(moment or timezone.now())
+    if local.hour < BUSINESS_DAY_CUTOFF_HOUR:
+        return (local - timedelta(days=1)).date()
+    return local.date()
+
+
+def close_blockers(target_date=None, relaxed=False):
+    """Motivos por los que el cierre de caja de `target_date` no se puede hacer.
+
+    Devuelve una lista de dicts `{code, message, count, severity}`. `severity`
+    es `'block'` (impide cerrar) o `'warn'` (solo advierte). La usan el preview
+    —para explicarlo en el modal— y el propio cierre, de modo que la UI y el
+    backend nunca discrepen sobre por qué está bloqueado.
+
+    `relaxed=True` es el modo superadministrador: los socios cierran cuando
+    quieran, así que todo lo que no sea una restricción real de base de datos
+    baja a advertencia. `already_closed` NUNCA baja: `DailyClose.date` es único
+    y el camino correcto es borrar el cierre previo.
+    """
+    from apps.cashflow.models import DailyClose, Expense, Sale, InventorySale
+
+    blockers = []
+    jornada = target_date or business_date()
+
+    def _sev(hard=False):
+        return 'block' if (hard or not relaxed) else 'warn'
+
+    existing = DailyClose.objects.filter(date=jornada).first()
+    if existing:
+        blockers.append({
+            'code': 'already_closed',
+            'message': (
+                f'La jornada del {jornada.strftime("%d/%m/%Y")} ya tiene cierre '
+                f'(generado el {timezone.localtime(existing.closed_at).strftime("%d/%m/%Y %I:%M %p")}). '
+                f'Si quedó mal, un superadministrador puede borrarlo desde el '
+                f'historial de cierres y volver a cerrar.'
+            ),
+            'count': 1,
+            'severity': _sev(hard=True),
+        })
+
+    unapproved = Sale.objects.filter(
+        included_in_daily_close__isnull=True, approval_status=Sale.STATUS_PENDING
+    ).count()
+    if unapproved:
+        blockers.append({
+            'code': 'pending_approvals',
+            'message': (
+                f'Hay {unapproved} venta(s) esperando aprobación. '
+                + ('Quedarán pendientes y entrarán en el siguiente cierre.'
+                   if relaxed else
+                   'Apruébalas o recházalas en la pestaña "Pendientes" antes de cerrar.')
+            ),
+            'count': unapproved,
+            'severity': _sev(),
+        })
+
+    has_movements = (
+        Sale.objects.filter(
+            included_in_daily_close__isnull=True, approval_status=Sale.STATUS_APPROVED
+        ).exists()
+        or InventorySale.objects.filter(included_in_daily_close__isnull=True).exists()
+        or Expense.objects.filter(included_in_daily_close__isnull=True).exists()
+    )
+    if not has_movements:
+        blockers.append({
+            'code': 'no_movements',
+            'message': (
+                'No hay ventas, productos ni egresos pendientes: el cierre quedaría en ceros.'
+                if relaxed else
+                'No hay ventas, productos ni egresos pendientes por cerrar.'
+            ),
+            'count': 0,
+            'severity': _sev(),
+        })
+
+    return blockers
+
+
+def parse_close_date(raw, today=None):
+    """Valida la fecha elegida para un cierre. Devuelve (fecha, error).
+
+    Solo los superadministradores pueden elegirla; aquí se valida el formato y
+    que no sea futura — sellar una jornada que aún no ocurrió quemaría el cupo
+    de esa fecha (`DailyClose.date` es único).
+    """
+    from datetime import datetime as _dt
+
+    try:
+        parsed = _dt.strptime(str(raw).strip(), '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return None, 'Fecha de cierre inválida. Usa el formato AAAA-MM-DD.'
+
+    limite = today or timezone.localtime().date()
+    if parsed > limite:
+        return None, (
+            f'No se puede cerrar una fecha futura ({parsed.strftime("%d/%m/%Y")}). '
+            f'Elige hoy o un día anterior.'
+        )
+    return parsed, None
+
+
 def _to_decimal(value):
     """Convierte cualquier entrada (None, int, float, Decimal, str) a Decimal."""
     if value is None:

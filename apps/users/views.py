@@ -312,6 +312,9 @@ def admin_cashflow_view(request):
         'today': today,
         'pending_sales_count': approved_sales.count() + pending_inventory_sales.count(),
         'pending_approvals_count': pending_approvals_count,
+        # Jornada que sellaría el cierre. Entre medianoche y las 5 a.m. sigue
+        # siendo la del día anterior, y se avisa en el encabezado.
+        'business_date': cashflow_services.business_date(),
         'total_sales': total_sales,
         'total_inventory_sales': total_inventory_sales,
         'total_tips': total_tips,

@@ -107,13 +107,12 @@ def barber_availability_view(request, barber_id):
     # Cuántos bloques de 60 min ocupa este servicio (mínimo 1)
     slots_needed = max(1, -(-service_duration // SLOT_SIZE))  # ceil division
 
-    # Map weekday number to schedule key
-    day_names = ['monday', 'tuesday', 'wednesday', 'thursday',
-                 'friday', 'saturday', 'sunday']
-    day_key = day_names[target_date.weekday()]
-    day_schedule = barber.schedule.get(day_key)
-
-    # Check global BlockedDate for overrides
+    # ── Ventana de atención del día ─────────────────────────────────────────
+    # Prioridad: BlockedDate (override manual de los socios) > horario del
+    # barbero, que a su vez ya resuelve festivo → horario dominical.
+    # `last_start` (si viene) es la hora de la ÚLTIMA cita agendable: el
+    # servicio puede terminar después del cierre.
+    last_start = None
     try:
         blocked = BlockedDate.objects.get(date=target_date)
         if blocked.start_time and blocked.end_time:
@@ -128,7 +127,8 @@ def barber_availability_view(request, barber_id):
                 'slots': [],
             })
     except BlockedDate.DoesNotExist:
-        if not day_schedule:
+        window = barber.day_window(target_date)
+        if not window:
             return Response({
                 'barber_id': barber.id,
                 'barber_name': barber.display_name,
@@ -136,9 +136,9 @@ def barber_availability_view(request, barber_id):
                 'day_off': True,
                 'slots': [],
             })
-        # Parse start and end times
-        start_time = datetime.strptime(day_schedule['start'], '%H:%M').time()
-        end_time = datetime.strptime(day_schedule['end'], '%H:%M').time()
+        start_time = window['start']
+        end_time = window['end']
+        last_start = window['last_start']
 
     # Get existing bookings for this barber on this date
     # Solo las reservas 'pending'/'confirmed' ocupan el slot, igual que en la
@@ -174,15 +174,23 @@ def barber_availability_view(request, barber_id):
     end = datetime.combine(target_date, end_time)
     now_local = timezone.localtime()
 
-    while current < end:
+    # Hasta dónde se ofrecen slots. Con `last_start` el último turno es esa
+    # hora exacta (domingos y festivos: 7 p.m.); sin él, se ofrecen bloques
+    # hasta el cierre y el servicio debe caber antes de esa hora.
+    if last_start:
+        slot_limit = datetime.combine(target_date, last_start) + timedelta(minutes=SLOT_SIZE)
+    else:
+        slot_limit = end
+
+    while current < slot_limit:
         slot_end = current + timedelta(minutes=SLOT_SIZE)
         # El servicio ocuparía desde current hasta current + service_duration
         service_end = current + timedelta(minutes=service_duration)
 
         is_available = True
 
-        # 1. El servicio debe caber dentro del horario del barbero
-        if service_end > end:
+        # 1. Sin `last_start`, el servicio debe caber dentro del horario
+        if not last_start and service_end > end:
             is_available = False
 
         # 2. Verificar conflicto con reservas existentes para TODA la ventana del servicio
