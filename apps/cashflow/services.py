@@ -132,6 +132,77 @@ def close_blockers(target_date=None, relaxed=False):
     return blockers
 
 
+def recalculate_unpaid_commissions(barber, new_percentage, apply=False):
+    """Recalcula al `new_percentage` las comisiones NO PAGADAS de un barbero.
+
+    Nace de un caso real: la migración `barbers.0010` (01-may-2026) creó
+    `Barber.commission_percentage` con default 40 y se lo puso a todos,
+    incluido Frank, cuyo acuerdo es 50. La corrección del perfil llegó el
+    10-jul, así que entre esas fechas se emitieron comisiones al 40%. Cambiar
+    el perfil NO las arregla: `Commission.percentage` se congela en el momento
+    del checkout.
+
+    Reglas:
+      - Solo toca `is_paid=False`. Lo ya liquidado no se reescribe: cambiar
+        historia pagada descuadraría cierres y pagos ya entregados.
+      - Solo sube porcentajes por debajo del objetivo; nunca baja uno que ya
+        esté igual o por encima.
+      - Usa `.update()` en vez de `save()` a propósito: `Commission.save()`
+        recalcularía `basis_amount` desde la venta y borraría el ajuste manual
+        de los servicios de Frank con materiales (ver `process_checkout`).
+
+    Con `apply=False` (default) no escribe nada: devuelve la simulación para
+    poder revisarla antes de mover plata.
+    """
+    from apps.cashflow.models import Commission
+
+    target = _to_decimal(new_percentage)
+    pending = (
+        Commission.objects
+        .filter(barber=barber, is_paid=False, percentage__lt=target)
+        .select_related('sale', 'sale__service')
+        .order_by('created_at')
+    )
+
+    rows, before_total, after_total = [], Decimal('0'), Decimal('0')
+    for comm in pending:
+        new_amount = (comm.basis_amount * target) / Decimal('100.00')
+        new_total = new_amount + comm.tip_amount
+        before_total += comm.total_earnings
+        after_total += new_total
+        rows.append({
+            'id': comm.id,
+            'date': timezone.localtime(comm.created_at).strftime('%Y-%m-%d %I:%M %p'),
+            'service': comm.sale.service.name if comm.sale and comm.sale.service else 'General',
+            'basis_amount': float(comm.basis_amount),
+            'old_percentage': float(comm.percentage),
+            'old_commission': float(comm.commission_amount),
+            'new_commission': float(new_amount),
+            'difference': float(new_amount - comm.commission_amount),
+        })
+
+    if apply and rows:
+        with transaction.atomic():
+            for comm in pending:
+                new_amount = (comm.basis_amount * target) / Decimal('100.00')
+                Commission.objects.filter(id=comm.id).update(
+                    percentage=target,
+                    commission_amount=new_amount,
+                    total_earnings=new_amount + comm.tip_amount,
+                )
+
+    return {
+        'applied': bool(apply and rows),
+        'barber': barber.display_name,
+        'new_percentage': float(target),
+        'count': len(rows),
+        'earnings_before': float(before_total),
+        'earnings_after': float(after_total),
+        'difference': float(after_total - before_total),
+        'rows': rows,
+    }
+
+
 def parse_close_date(raw, today=None):
     """Valida la fecha elegida para un cierre. Devuelve (fecha, error).
 

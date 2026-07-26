@@ -18,6 +18,7 @@ urlpatterns = [
     path('cashflow/barber-payments/', views.unpaid_commissions_view, name='cashflow_barber_payments_api'),
     path('cashflow/barber-payments/<int:barber_id>/pay/', views.pay_barber_view, name='cashflow_pay_barber_api'),
     path('cashflow/barber-payments/<int:barber_id>/detail/', views.barber_payment_detail_view, name='cashflow_barber_payment_detail_api'),
+    path('cashflow/barber-payments/<int:barber_id>/recalcular-pendientes/', views.recalculate_commissions_view, name='cashflow_recalculate_commissions_api'),
     path('cashflow/barber-payments/<int:barber_id>/advance/', views.register_barber_advance_view, name='cashflow_barber_advance_api'),
     path('cashflow/barber-payments/advance/<int:advance_id>/', views.delete_barber_advance_view, name='cashflow_delete_barber_advance_api'),
     path('cashflow/barber-payments/payment/<int:payment_id>/delete/', views.delete_barber_payment_view, name='cashflow_delete_barber_payment_api'),
