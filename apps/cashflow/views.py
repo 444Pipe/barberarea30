@@ -2024,7 +2024,66 @@ def barber_payment_detail_view(request, barber_id):
             'balance': float(ledger['balance']),
         }
 
+    # ¿Hay comisiones pendientes emitidas por DEBAJO del % del perfil? Pasa
+    # cuando el porcentaje se corrigió después de facturar: `Commission
+    # .percentage` se congela en el checkout y no se recalcula solo.
+    mismatch = cashflow_services.recalculate_unpaid_commissions(
+        barber=barber, new_percentage=barber.commission_percentage, apply=False
+    )
+    data['commission_mismatch'] = {
+        'count': mismatch['count'],
+        'profile_percentage': float(barber.commission_percentage),
+        'difference': mismatch['difference'],
+        'can_fix': is_superadmin,
+    }
+
     return Response(data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsSuperAdmin])
+def recalculate_commissions_view(request, barber_id):
+    """GET/POST /api/admin/cashflow/barber-payments/<id>/recalcular-pendientes/
+
+    Lleva las comisiones NO PAGADAS del barbero al porcentaje de su perfil.
+    GET simula (no escribe nada), POST aplica. Solo superadministradores: es
+    plata y reescribe montos ya emitidos.
+
+    Nunca toca lo ya liquidado — cambiar historia pagada descuadraría cierres
+    y pagos entregados.
+    """
+    from apps.barbers.models import Barber
+
+    try:
+        barber = Barber.objects.get(pk=barber_id)
+    except Barber.DoesNotExist:
+        return Response({'error': 'Barbero no encontrado'}, status=404)
+
+    apply = request.method == 'POST'
+    result = cashflow_services.recalculate_unpaid_commissions(
+        barber=barber, new_percentage=barber.commission_percentage, apply=apply,
+    )
+
+    if result['applied']:
+        log_audit(
+            user=request.user,
+            action='update',
+            obj=barber,
+            changes={
+                'commissions_updated': result['count'],
+                'new_percentage': result['new_percentage'],
+                'earnings_before': result['earnings_before'],
+                'earnings_after': result['earnings_after'],
+            },
+            request=request,
+            extra_data={'msg': (
+                f"Recalculó {result['count']} comisión/es no pagada/s de "
+                f"{barber.display_name} al {result['new_percentage']:.0f}%. "
+                f"Diferencia a favor del barbero: ${result['difference']:,.0f}"
+            )},
+        )
+
+    return Response(result)
 
 
 @api_view(['POST'])

@@ -1610,6 +1610,28 @@ function cfLoadPaymentDetail() {
     });
 }
 
+// Aplica la corrección de porcentaje sobre las comisiones NO pagadas.
+window.cfRecalcCommissions = function(barberId) {
+  const btn = document.getElementById('btn-recalc-comm');
+  if (!confirm('Se recalcularán las comisiones PENDIENTES a su porcentaje correcto.\n\nLo que ya se pagó no se modifica. Queda registrado en auditoría.\n\n¿Continuar?')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Corrigiendo...'; }
+  fetch(`/api/admin/cashflow/barber-payments/${barberId}/recalcular-pendientes/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+  })
+    .then(r => r.json().then(body => ({ status: r.status, body })))
+    .then(res => {
+      if (res.status !== 200) throw new Error(res.body.error || 'No se pudo aplicar la corrección.');
+      alert(`Listo: ${res.body.count} comisión(es) corregida(s) al ${res.body.new_percentage.toFixed(0)}%.\nDiferencia a favor del barbero: ${fmt(res.body.difference)}`);
+      cfLoadPaymentDetail();
+      cfRefreshAll();
+    })
+    .catch(err => {
+      alert(err.message);
+      if (btn) { btn.disabled = false; btn.textContent = 'Reintentar'; }
+    });
+};
+
 function cfRenderPaymentDetail(d) {
   const t = d.totals;
   const row = (label, value, cls = 'text-white') =>
@@ -1641,6 +1663,28 @@ function cfRenderPaymentDetail(d) {
           <span class="${neg ? 'text-red-400' : 'text-gold'} uppercase tracking-widest text-[0.6rem]">Saldo</span>
           <span class="${neg ? 'text-red-400' : 'text-gold'}">${fmt(d.ledger.balance)}</span>
         </div>
+      </div>`;
+  }
+
+  // Aviso de desfase: comisiones pendientes emitidas por debajo del % del
+  // perfil. Pasa cuando el porcentaje se corrigió DESPUÉS de facturar, porque
+  // el % se congela en cada comisión al hacer el checkout.
+  const mm = d.commission_mismatch;
+  if (mm && mm.count > 0) {
+    resumen += `
+      <div class="bg-amber-500/10 border border-amber-500/40 rounded p-3 mb-4 space-y-2">
+        <p class="text-amber-300 text-xs font-bold">Comisiones emitidas por debajo del ${mm.profile_percentage.toFixed(0)}%</p>
+        <p class="text-[0.7rem] text-smoke/70">
+          ${mm.count} servicio(s) pendiente(s) se facturaron con un porcentaje menor al que hoy tiene el perfil.
+          Corregirlos suma <strong class="text-emerald-400">${fmt(mm.difference)}</strong> a favor de ${escH(d.barber_name)}.
+          Lo ya pagado no se toca.
+        </p>
+        ${mm.can_fix
+          ? `<button onclick="cfRecalcCommissions(${d.barber_id})" id="btn-recalc-comm"
+               class="w-full px-3 py-2 bg-amber-500 hover:bg-amber-400 text-jet text-[0.65rem] font-bold tracking-widest uppercase rounded">
+               Corregir al ${mm.profile_percentage.toFixed(0)}%
+             </button>`
+          : `<p class="text-[0.65rem] text-smoke/40">Solo un superadministrador puede aplicar la corrección.</p>`}
       </div>`;
   }
 
