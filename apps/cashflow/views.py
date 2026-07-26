@@ -1927,6 +1927,7 @@ def barber_payment_detail_view(request, barber_id):
     """
     from apps.cashflow.models import Commission, BarberAdvance, BarberPayment, Sale
     from apps.barbers.models import Barber
+    from django.db.models import Count, Sum
     from django.utils import timezone
 
     try:
@@ -1941,9 +1942,24 @@ def barber_payment_detail_view(request, barber_id):
     # Servicios que componen el acumulado pendiente. Para Frank, `is_paid`
     # significa "ya procesada por un cierre", así que este listado es igualmente
     # lo que aún no ha entrado a ningún cierre.
-    commissions = Commission.objects.filter(
+    #
+    # Va acotado al MISMO período que la tarjeta (`unpaid_commissions_view`).
+    # Antes no filtraba nada y mostraba comisiones de meses viejos —ya cubiertas
+    # en la práctica— mezcladas con las del período que se está liquidando.
+    period_start, period_end, period_label = _parse_barber_pay_period(request)
+
+    all_pending = Commission.objects.filter(
         barber=barber, is_paid=False, sale__approval_status=Sale.STATUS_APPROVED
+    )
+    commissions = all_pending.filter(
+        created_at__gte=period_start, created_at__lt=period_end
     ).select_related('sale', 'sale__booking', 'sale__service', 'sale__payment_method').order_by('-created_at')
+
+    # Lo que queda FUERA del período no se oculta en silencio: se informa,
+    # para que nadie crea que ese saldo desapareció.
+    outside = all_pending.exclude(
+        created_at__gte=period_start, created_at__lt=period_end
+    ).aggregate(n=Count('id'), total=Sum('total_earnings'))
 
     services = []
     for c in commissions:
@@ -2011,6 +2027,11 @@ def barber_payment_detail_view(request, barber_id):
         'advances': advances,
         'payments': payments,
         'totals': totals,
+        'period_label': period_label,
+        'outside_period': {
+            'count': outside['n'] or 0,
+            'total': float(outside['total'] or 0),
+        },
     }
 
     # El saldo de Frank es el del ledger (arrastra días anteriores), no la suma
@@ -2027,8 +2048,11 @@ def barber_payment_detail_view(request, barber_id):
     # ¿Hay comisiones pendientes emitidas por DEBAJO del % del perfil? Pasa
     # cuando el porcentaje se corrigió después de facturar: `Commission
     # .percentage` se congela en el checkout y no se recalcula solo.
+    # Acotado al período visible: corregir meses ya cubiertos generaría una
+    # deuda por servicios que en la práctica ya se pagaron.
     mismatch = cashflow_services.recalculate_unpaid_commissions(
-        barber=barber, new_percentage=barber.commission_percentage, apply=False
+        barber=barber, new_percentage=barber.commission_percentage, apply=False,
+        since=period_start, until=period_end,
     )
     data['commission_mismatch'] = {
         'count': mismatch['count'],
@@ -2049,6 +2073,10 @@ def recalculate_commissions_view(request, barber_id):
     GET simula (no escribe nada), POST aplica. Solo superadministradores: es
     plata y reescribe montos ya emitidos.
 
+    Acotado al MISMO período que el detalle (`?month=AAAA-MM`, o los últimos
+    30 días por defecto). Corregir meses ya cubiertos crearía una deuda por
+    servicios que en la práctica ya se pagaron.
+
     Nunca toca lo ya liquidado — cambiar historia pagada descuadraría cierres
     y pagos entregados.
     """
@@ -2059,10 +2087,13 @@ def recalculate_commissions_view(request, barber_id):
     except Barber.DoesNotExist:
         return Response({'error': 'Barbero no encontrado'}, status=404)
 
+    period_start, period_end, period_label = _parse_barber_pay_period(request)
     apply = request.method == 'POST'
     result = cashflow_services.recalculate_unpaid_commissions(
         barber=barber, new_percentage=barber.commission_percentage, apply=apply,
+        since=period_start, until=period_end,
     )
+    result['period_label'] = period_label
 
     if result['applied']:
         log_audit(

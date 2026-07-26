@@ -132,7 +132,8 @@ def close_blockers(target_date=None, relaxed=False):
     return blockers
 
 
-def recalculate_unpaid_commissions(barber, new_percentage, apply=False):
+def recalculate_unpaid_commissions(barber, new_percentage, apply=False,
+                                   since=None, until=None):
     """Recalcula al `new_percentage` las comisiones NO PAGADAS de un barbero.
 
     Nace de un caso real: la migración `barbers.0010` (01-may-2026) creó
@@ -150,6 +151,9 @@ def recalculate_unpaid_commissions(barber, new_percentage, apply=False):
       - Usa `.update()` en vez de `save()` a propósito: `Commission.save()`
         recalcularía `basis_amount` desde la venta y borraría el ajuste manual
         de los servicios de Frank con materiales (ver `process_checkout`).
+      - `since`/`until` acotan el período. Sin ellos toma todo el histórico,
+        que casi nunca es lo que se quiere: los meses viejos suelen estar
+        cubiertos aunque su bandera `is_paid` diga otra cosa.
 
     Con `apply=False` (default) no escribe nada: devuelve la simulación para
     poder revisarla antes de mover plata.
@@ -163,6 +167,10 @@ def recalculate_unpaid_commissions(barber, new_percentage, apply=False):
         .select_related('sale', 'sale__service')
         .order_by('created_at')
     )
+    if since is not None:
+        pending = pending.filter(created_at__gte=since)
+    if until is not None:
+        pending = pending.filter(created_at__lt=until)
 
     rows, before_total, after_total = [], Decimal('0'), Decimal('0')
     for comm in pending:
