@@ -1594,7 +1594,9 @@ window.closePaymentDetail = function() {
 
 function cfLoadPaymentDetail() {
   if (!cfDetailBarberId) return;
-  fetch(`/api/admin/cashflow/barber-payments/${cfDetailBarberId}/detail/`)
+  // Mismo período que la tarjeta: el modal no debe mostrar meses que la
+  // pantalla de atrás ya excluyó.
+  fetch(`/api/admin/cashflow/barber-payments/${cfDetailBarberId}/detail/${bpPeriodQuery()}`)
     .then(r => r.json())
     .then(d => {
       if (d.error) {
@@ -1615,7 +1617,7 @@ window.cfRecalcCommissions = function(barberId) {
   const btn = document.getElementById('btn-recalc-comm');
   if (!confirm('Se recalcularán las comisiones PENDIENTES a su porcentaje correcto.\n\nLo que ya se pagó no se modifica. Queda registrado en auditoría.\n\n¿Continuar?')) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Corrigiendo...'; }
-  fetch(`/api/admin/cashflow/barber-payments/${barberId}/recalcular-pendientes/`, {
+  fetch(`/api/admin/cashflow/barber-payments/${barberId}/recalcular-pendientes/${bpPeriodQuery()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
   })
@@ -1663,6 +1665,20 @@ function cfRenderPaymentDetail(d) {
           <span class="${neg ? 'text-red-400' : 'text-gold'} uppercase tracking-widest text-[0.6rem]">Saldo</span>
           <span class="${neg ? 'text-red-400' : 'text-gold'}">${fmt(d.ledger.balance)}</span>
         </div>
+      </div>`;
+  }
+
+  // Lo que queda fuera del período elegido. No se oculta en silencio: si hay
+  // comisiones viejas sin marcar, hay que saber que existen.
+  const out = d.outside_period;
+  if (out && out.count > 0) {
+    resumen += `
+      <div class="bg-jet border border-white/10 rounded p-3 mb-4">
+        <p class="text-[0.7rem] text-smoke/60">
+          Fuera de este período hay <strong class="text-smoke/90">${out.count} servicio(s)</strong>
+          sin marcar, por <strong class="text-smoke/90">${fmt(out.total)}</strong>.
+          No entran en esta liquidación. El saldo real de ${escH(d.barber_name)} es el histórico de abajo.
+        </p>
       </div>`;
   }
 
