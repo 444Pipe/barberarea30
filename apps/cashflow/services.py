@@ -345,34 +345,69 @@ def compute_frank_ledger():
     }
 
 
+def current_cash_cut():
+    """Último corte de caja, o None si nunca se ha cerrado.
+
+    Marca el inicio del período en curso. Reemplaza al "día 1 del mes": el
+    saldo de caja ya no se reinicia solo, lo cierran los socios cuando quieren.
+    """
+    from apps.cashflow.models import CashCut
+    return CashCut.objects.order_by('-closed_at').first()
+
+
+def cash_period_bounds():
+    """(inicio, apertura_efectivo, apertura_transferencia) del período en curso.
+
+    `inicio` es None cuando todavía no hay ningún corte: en ese caso el período
+    abarca todo el histórico y arranca en $0. Los socios fijan el saldo real
+    con un movimiento de ajuste.
+    """
+    cut = current_cash_cut()
+    if not cut:
+        return None, Decimal('0'), Decimal('0')
+    return cut.closed_at, _to_decimal(cut.opening_cash), _to_decimal(cut.opening_transfer)
+
+
 def compute_cash_box(reference_date=None):
-    """Control de caja del MES en curso, separado por efectivo y transferencia.
+    """Control de caja del PERÍODO EN CURSO, separado por efectivo y transferencia.
+
+    El período va desde el último corte (`CashCut`) hasta ahora; si nunca se ha
+    cerrado, abarca todo. Antes se recalculaba desde el día 1 del mes y el
+    saldo se perdía cada 1° — ver `CashCut`.
 
     Para cada método (efectivo / transferencia):
+      apertura = saldo con el que quedó el período anterior (0 si se retiró)
       ingresos = ventas de servicios (precio final + propina) + ventas de
-                 inventario, sobre ventas APROBADAS del mes.
-      salidas  = egresos reales del mes (excluye el costo de materiales de
-                 servicios, que es insumo de una venta, no un retiro de caja)
-                 + pagos a barberos NO-Frank del mes (los de Frank ya están
-                 representados como egreso "Pago Diario", para no contar doble).
-      saldo    = ingresos − salidas  → cuánto DEBE haber físicamente.
+                 inventario, sobre ventas APROBADAS del período
+                 + inyecciones de capital y traslados entrantes
+      salidas  = egresos reales (excluye el costo de materiales de servicios,
+                 que es insumo de una venta, no un retiro de caja)
+                 + pagos a barberos NO-Frank (los de Frank ya están
+                 representados como egreso "Pago Diario", para no contar doble)
+                 + retiros y traslados salientes
+      saldo    = apertura + ingresos − salidas  → cuánto DEBE haber físicamente.
 
     Efectivo agrupa ventas sin método o con método 'efectivo' (paridad con el
     resto del módulo). Transferencia agrupa 'transferencia'.
     """
     from django.db.models import Q, Sum, F
-    from apps.cashflow.models import Sale, InventorySale, Expense, BarberPayment
+    from apps.cashflow.models import (
+        Sale, InventorySale, Expense, BarberPayment, CashMovement,
+    )
 
-    today = reference_date or timezone.localdate()
-    month_start = today.replace(day=1)
+    period_start, opening_cash, opening_transfer = cash_period_bounds()
     zero = Decimal('0')
 
-    approved = Sale.objects.filter(
-        approval_status=Sale.STATUS_APPROVED, created_at__date__gte=month_start
-    )
-    inv = InventorySale.objects.filter(created_at__date__gte=month_start)
-    exp = Expense.objects.filter(date__gte=month_start)
-    pays = BarberPayment.objects.filter(created_at__date__gte=month_start)
+    approved = Sale.objects.filter(approval_status=Sale.STATUS_APPROVED)
+    inv = InventorySale.objects.all()
+    exp = Expense.objects.all()
+    pays = BarberPayment.objects.all()
+    movements = CashMovement.objects.filter(cash_cut__isnull=True)
+    if period_start is not None:
+        approved = approved.filter(created_at__gt=period_start)
+        inv = inv.filter(created_at__gt=period_start)
+        exp = exp.filter(created_at__gt=period_start)
+        pays = pays.filter(created_at__gt=period_start)
 
     cash_q = Q(payment_method__isnull=True) | Q(payment_method__slug='efectivo')
     transfer_q = Q(payment_method__slug='transferencia')
@@ -391,19 +426,35 @@ def compute_cash_box(reference_date=None):
             t=Sum('amount'))['t'] or zero
         return _to_decimal(e) + _to_decimal(p)
 
-    cash_income = income(cash_q)
-    transfer_income = income(transfer_q)
-    cash_out = outflow('cash')
-    transfer_out = outflow('transfer')
+    # Movimientos manuales: se reparten entre entradas y salidas según su
+    # efecto real sobre cada caja (un traslado sale de una y entra en la otra).
+    manual = list(movements)
+
+    def manual_in(box):
+        return _to_decimal(sum(
+            (m.effect_on(box) for m in manual if m.effect_on(box) > 0), zero
+        ))
+
+    def manual_out(box):
+        return _to_decimal(sum(
+            (-m.effect_on(box) for m in manual if m.effect_on(box) < 0), zero
+        ))
+
+    cash_income = income(cash_q) + manual_in('cash')
+    transfer_income = income(transfer_q) + manual_in('transfer')
+    cash_out = outflow('cash') + manual_out('cash')
+    transfer_out = outflow('transfer') + manual_out('transfer')
 
     return {
-        'month_start': month_start,
+        'period_start': period_start,
+        'opening_cash': opening_cash,
+        'opening_transfer': opening_transfer,
         'cash_income': cash_income,
         'transfer_income': transfer_income,
         'cash_out': cash_out,
         'transfer_out': transfer_out,
-        'cash_balance': cash_income - cash_out,
-        'transfer_balance': transfer_income - transfer_out,
+        'cash_balance': opening_cash + cash_income - cash_out,
+        'transfer_balance': opening_transfer + transfer_income - transfer_out,
     }
 
 
@@ -413,22 +464,30 @@ def compute_cash_box_detail(reference_date=None):
     entra la plata en efectivo y en transferencia.
     """
     from django.db.models import Q
-    from apps.cashflow.models import Sale, InventorySale, Expense, BarberPayment
+    from apps.cashflow.models import (
+        Sale, InventorySale, Expense, BarberPayment, CashMovement,
+    )
 
-    today = reference_date or timezone.localdate()
-    month_start = today.replace(day=1)
+    period_start, opening_cash, opening_transfer = cash_period_bounds()
     zero = Decimal('0')
 
     cash_q = Q(payment_method__isnull=True) | Q(payment_method__slug='efectivo')
     transfer_q = Q(payment_method__slug='transferencia')
 
-    def build(method_q, source):
+    def since(qs, field='created_at'):
+        """Acota al período en curso. Sin corte previo, no acota nada."""
+        return qs if period_start is None else qs.filter(**{f'{field}__gt': period_start})
+
+    manual = list(since(CashMovement.objects.filter(cash_cut__isnull=True))
+                  .select_related('created_by'))
+
+    def build(method_q, source, opening):
         income, outflow = [], []
 
         # ── ENTRADAS ──────────────────────────────────────────────
-        for s in Sale.objects.filter(
-            approval_status=Sale.STATUS_APPROVED, created_at__date__gte=month_start
-        ).filter(method_q).select_related('booking', 'service'):
+        for s in since(Sale.objects.filter(
+            approval_status=Sale.STATUS_APPROVED
+        )).filter(method_q).select_related('booking', 'service'):
             amt = _to_decimal(s.final_price) + _to_decimal(s.tip_amount)
             if amt == 0:
                 continue
@@ -440,9 +499,7 @@ def compute_cash_box_detail(reference_date=None):
                 'sub': (s.service.name if s.service else 'Servicio') + (f' · propina ${s.tip_amount:,.0f}' if s.tip_amount else ''),
                 'amount': float(amt),
             })
-        for i in InventorySale.objects.filter(
-            created_at__date__gte=month_start
-        ).filter(method_q).select_related('item'):
+        for i in since(InventorySale.objects.all()).filter(method_q).select_related('item'):
             dt = timezone.localtime(i.created_at)
             income.append({
                 '_k': dt.isoformat(),
@@ -453,9 +510,9 @@ def compute_cash_box_detail(reference_date=None):
             })
 
         # ── SALIDAS ───────────────────────────────────────────────
-        for e in Expense.objects.filter(
-            date__gte=month_start, payment_source=source
-        ).exclude(description__startswith=MATERIALS_EXPENSE_PREFIX):
+        for e in since(Expense.objects.filter(
+            payment_source=source
+        )).exclude(description__startswith=MATERIALS_EXPENSE_PREFIX):
             outflow.append({
                 '_k': e.date.isoformat(),
                 'date': e.date.strftime('%d/%m'),
@@ -463,9 +520,9 @@ def compute_cash_box_detail(reference_date=None):
                 'sub': e.get_expense_type_display(),
                 'amount': float(e.amount),
             })
-        for p in BarberPayment.objects.filter(
-            created_at__date__gte=month_start, payment_source=source, expense__isnull=True
-        ).select_related('barber'):
+        for p in since(BarberPayment.objects.filter(
+            payment_source=source, expense__isnull=True
+        )).select_related('barber'):
             dt = timezone.localtime(p.created_at)
             outflow.append({
                 '_k': dt.isoformat(),
@@ -474,6 +531,28 @@ def compute_cash_box_detail(reference_date=None):
                 'sub': 'Pago a barbero',
                 'amount': float(p.amount),
             })
+
+        # ── MOVIMIENTOS MANUALES (inyecciones, retiros, traslados) ────────
+        # Van en el mismo historial que las ventas y los egresos: la idea es
+        # poder responder "¿de dónde salió y a dónde se fue toda la plata?"
+        # en una sola lista, sin tener que cruzar dos pantallas.
+        for m in manual:
+            effect = m.effect_on(source)
+            if effect == 0:
+                continue
+            dt = timezone.localtime(m.created_at)
+            quien = ''
+            if m.created_by:
+                quien = f' · {m.created_by.get_full_name() or m.created_by.username}'
+            row = {
+                '_k': dt.isoformat(),
+                'date': dt.strftime('%d/%m'),
+                'label': m.description or m.get_kind_display(),
+                'sub': m.get_kind_display() + quien,
+                'amount': float(abs(effect)),
+                'is_manual': True,
+            }
+            (income if effect > 0 else outflow).append(row)
 
         income.sort(key=lambda x: x['_k'], reverse=True)
         outflow.sort(key=lambda x: x['_k'], reverse=True)
@@ -488,14 +567,126 @@ def compute_cash_box_detail(reference_date=None):
             'outflow': outflow,
             'income_total': income_total,
             'out_total': out_total,
-            'balance': income_total - out_total,
+            'opening': opening,
+            'balance': opening + income_total - out_total,
         }
 
+    cut = current_cash_cut()
     return {
-        'month_start': month_start,
-        'cash': build(cash_q, 'cash'),
-        'transfer': build(transfer_q, 'transfer'),
+        'period_start': period_start,
+        'period_start_label': timezone.localtime(period_start).strftime('%d/%m/%Y %I:%M %p') if period_start else None,
+        'last_cut': {
+            'id': cut.id,
+            'closed_at': timezone.localtime(cut.closed_at).strftime('%d/%m/%Y %I:%M %p'),
+            'closed_by': (cut.closed_by.get_full_name() or cut.closed_by.username) if cut.closed_by else '—',
+        } if cut else None,
+        'cash': build(cash_q, 'cash', opening_cash),
+        'transfer': build(transfer_q, 'transfer', opening_transfer),
     }
+
+
+def register_cash_movement(*, kind, source, amount, description, user,
+                           to_source=None):
+    """Registra un movimiento manual de caja. Devuelve (movimiento, error).
+
+    Valida aquí y no en la vista para que el comando, el endpoint y cualquier
+    flujo futuro compartan las mismas reglas.
+    """
+    from apps.cashflow.models import CashMovement
+
+    valid_kinds = dict(CashMovement.KINDS)
+    if kind not in valid_kinds:
+        return None, 'Tipo de movimiento inválido.'
+    if source not in ('cash', 'transfer'):
+        return None, 'Debes indicar si el movimiento es en efectivo o en transferencia.'
+
+    amount = _to_decimal(amount)
+    if kind == CashMovement.KIND_ADJUSTMENT:
+        # El ajuste es la única operación con signo: refleja si el conteo real
+        # quedó por encima o por debajo de lo que decía el sistema.
+        if amount == 0:
+            return None, 'El ajuste no puede ser cero: el saldo ya coincide.'
+    else:
+        if amount <= 0:
+            return None, 'El monto debe ser mayor que cero.'
+
+    if kind == CashMovement.KIND_TRANSFER:
+        if to_source not in ('cash', 'transfer'):
+            return None, 'Debes indicar a qué caja se traslada el dinero.'
+        if to_source == source:
+            return None, 'El origen y el destino del traslado no pueden ser la misma caja.'
+    else:
+        to_source = ''
+
+    description = (description or '').strip() or valid_kinds[kind]
+
+    movement = CashMovement.objects.create(
+        kind=kind, source=source, to_source=to_source or '',
+        amount=amount, description=description, created_by=user,
+    )
+    return movement, None
+
+
+def close_cash_cut(*, user, withdraw_cash=False, withdraw_transfer=False, notes=''):
+    """Cierra el período de caja y abre uno nuevo.
+
+    Congela el saldo actual en un `CashCut`, archiva los movimientos manuales
+    del período y decide con cuánto arranca el siguiente: $0 en las cajas de
+    las que se retiró la plata, el saldo que traían en las demás.
+    """
+    from apps.cashflow.models import CashCut, CashMovement
+
+    box = compute_cash_box()
+    cash_balance = box['cash_balance']
+    transfer_balance = box['transfer_balance']
+
+    with transaction.atomic():
+        cut = CashCut.objects.create(
+            closed_by=user,
+            cash_balance=cash_balance,
+            transfer_balance=transfer_balance,
+            withdrew_cash=withdraw_cash,
+            withdrew_transfer=withdraw_transfer,
+            opening_cash=Decimal('0') if withdraw_cash else cash_balance,
+            opening_transfer=Decimal('0') if withdraw_transfer else transfer_balance,
+            notes=(notes or '').strip(),
+        )
+        # Los movimientos manuales del período quedan atados al corte, igual
+        # que las ventas al cierre diario: así el histórico es reconstruible.
+        CashMovement.objects.filter(cash_cut__isnull=True).update(cash_cut=cut)
+
+    return cut
+
+
+def set_cash_starting_point(*, user, cash, transfer, notes=''):
+    """Fija el punto de partida de la caja con lo que los socios contaron.
+
+    Necesario la primera vez: sin ningún corte previo el saldo se calcula
+    sobre TODO el histórico, que arrastra el problema viejo (las inyecciones
+    de capital nunca se registraron, así que el efectivo daba negativo).
+
+    Cierra el histórico en un corte que arranca en $0 y registra el conteo
+    real como ajustes, para que quede el rastro de quién declaró qué.
+    """
+    from apps.cashflow.models import CashMovement
+
+    cash = _to_decimal(cash)
+    transfer = _to_decimal(transfer)
+    if cash < 0 or transfer < 0:
+        return None, 'Los saldos contados no pueden ser negativos.'
+
+    with transaction.atomic():
+        cut = close_cash_cut(
+            user=user, withdraw_cash=True, withdraw_transfer=True,
+            notes=(notes or '').strip() or 'Punto de partida: se cierra el histórico previo.',
+        )
+        for box, amount in (('cash', cash), ('transfer', transfer)):
+            if amount:
+                CashMovement.objects.create(
+                    kind=CashMovement.KIND_ADJUSTMENT, source=box, amount=amount,
+                    description='Saldo inicial contado', created_by=user,
+                )
+    return cut, None
 
 
 def process_checkout(*, booking, confirmed_by, payment_method_id=None,

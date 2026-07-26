@@ -349,12 +349,40 @@
     </div>
   </div>
 
-  <!-- ═══ CAJA DEL MES (Efectivo / Transferencia) ═══ -->
+  <!-- ═══ CONTROL DE CAJA (Efectivo / Transferencia) ═══
+       El saldo ya NO se reinicia cada mes: corre desde el último corte, que
+       deciden los socios. Ver cashflow.models.CashCut. -->
   <div class="cf-section">
-    <div class="flex items-baseline justify-between mb-2">
-      <div class="cf-section-title" style="margin-bottom:0">Caja del mes</div>
-      <span class="text-[0.6rem] text-smoke/30 uppercase tracking-widest">Cuánto debe haber</span>
+    <div class="flex items-baseline justify-between mb-2 flex-wrap gap-2">
+      <div class="cf-section-title" style="margin-bottom:0">Control de caja</div>
+      <span class="text-[0.6rem] text-smoke/30 uppercase tracking-widest">
+        {% if cash_box.last_cut %}Desde el corte del {{ cash_box.last_cut.closed_at }}{% else %}Sin cortes — incluye todo el histórico{% endif %}
+      </span>
     </div>
+
+    {% if user_role == 'superadmin' %}
+    <div class="cf-headbar" style="margin-bottom:0.75rem">
+      <div class="row">
+        <button onclick="cashOpenMovement('deposit')" class="cf-cta-secondary">+ Inyectar dinero</button>
+        <button onclick="cashOpenMovement('withdrawal')" class="cf-cta-secondary">− Retirar</button>
+        <button onclick="cashOpenMovement('transfer')" class="cf-cta-secondary">⇄ Trasladar</button>
+        <button onclick="cashOpenMovement('adjustment')" class="cf-cta-secondary">Ajustar saldo</button>
+        <button onclick="cashOpenCut()" class="cf-cta-primary">Cerrar corte</button>
+      </div>
+    </div>
+    {% if not cash_box.last_cut %}
+    <div class="mb-3 p-3 bg-amber-500/10 border border-amber-500/40 rounded">
+      <p class="text-amber-300 text-xs font-bold mb-1">Falta fijar el punto de partida</p>
+      <p class="text-[0.7rem] text-smoke/70 mb-2">
+        Como nunca se ha hecho un corte, este saldo se calcula sobre todo el histórico y arrastra el error viejo:
+        las inyecciones de capital nunca se registraron, por eso el efectivo puede dar negativo.
+        Cuenten cuánto hay hoy y déjenlo fijado — de ahí en adelante el número es confiable.
+      </p>
+      <button onclick="cashOpenStartingPoint()" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-jet text-[0.65rem] font-bold tracking-widest uppercase rounded">Fijar punto de partida</button>
+    </div>
+    {% endif %}
+    {% endif %}
+
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <!-- Efectivo -->
       <div class="bg-jet-card border border-emerald-500/20 rounded-md p-4 flex flex-col">
@@ -363,7 +391,8 @@
           <span class="text-emerald-400 font-bold text-lg">${{ cash_box.cash.balance|floatformat:0 }}</span>
         </div>
         <div class="space-y-1 text-[0.7rem]">
-          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.cash.income_total|floatformat:0 }}</span></div>
+          {% if cash_box.cash.opening %}<div class="flex justify-between"><span class="text-smoke/50">Viene del corte anterior</span><span class="text-white">${{ cash_box.cash.opening|floatformat:0 }}</span></div>{% endif %}
+          <div class="flex justify-between"><span class="text-smoke/50">Entradas del período</span><span class="text-white">${{ cash_box.cash.income_total|floatformat:0 }}</span></div>
           <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.cash.out_total|floatformat:0 }}</span></div>
           <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-emerald-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-emerald-400">${{ cash_box.cash.balance|floatformat:0 }}</span></div>
         </div>
@@ -375,7 +404,7 @@
               <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
               <span class="text-emerald-400 text-[0.68rem] shrink-0">+${{ m.amount|floatformat:0 }}</span>
             </div>
-            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin entradas este mes.</div>{% endfor %}
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin entradas en este período.</div>{% endfor %}
           </div>
         </details>
         <details class="mt-2">
@@ -386,7 +415,7 @@
               <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
               <span class="text-red-400 text-[0.68rem] shrink-0">-${{ m.amount|floatformat:0 }}</span>
             </div>
-            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin salidas este mes.</div>{% endfor %}
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin salidas en este período.</div>{% endfor %}
           </div>
         </details>
       </div>
@@ -397,7 +426,8 @@
           <span class="text-blue-400 font-bold text-lg">${{ cash_box.transfer.balance|floatformat:0 }}</span>
         </div>
         <div class="space-y-1 text-[0.7rem]">
-          <div class="flex justify-between"><span class="text-smoke/50">Ingresos del mes</span><span class="text-white">${{ cash_box.transfer.income_total|floatformat:0 }}</span></div>
+          {% if cash_box.transfer.opening %}<div class="flex justify-between"><span class="text-smoke/50">Viene del corte anterior</span><span class="text-white">${{ cash_box.transfer.opening|floatformat:0 }}</span></div>{% endif %}
+          <div class="flex justify-between"><span class="text-smoke/50">Entradas del período</span><span class="text-white">${{ cash_box.transfer.income_total|floatformat:0 }}</span></div>
           <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.transfer.out_total|floatformat:0 }}</span></div>
           <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-blue-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-blue-400">${{ cash_box.transfer.balance|floatformat:0 }}</span></div>
         </div>
@@ -409,7 +439,7 @@
               <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
               <span class="text-blue-400 text-[0.68rem] shrink-0">+${{ m.amount|floatformat:0 }}</span>
             </div>
-            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin entradas este mes.</div>{% endfor %}
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin entradas en este período.</div>{% endfor %}
           </div>
         </details>
         <details class="mt-2">
@@ -420,7 +450,7 @@
               <div class="min-w-0"><div class="text-smoke/80 text-[0.68rem] truncate">{{ m.label }}</div><div class="text-smoke/35 text-[0.58rem]">{{ m.date }} · {{ m.sub }}</div></div>
               <span class="text-red-400 text-[0.68rem] shrink-0">-${{ m.amount|floatformat:0 }}</span>
             </div>
-            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin salidas este mes.</div>{% endfor %}
+            {% empty %}<div class="text-smoke/30 text-[0.6rem] py-2 text-center">Sin salidas en este período.</div>{% endfor %}
           </div>
         </details>
       </div>
@@ -669,6 +699,115 @@
       <div class="px-5 pb-4 flex gap-2 justify-end">
         <button onclick="closeAdvanceModal()" class="px-4 py-2 text-xs uppercase tracking-widest text-smoke border border-white/10 rounded">Cancelar</button>
         <button id="cf-btn-confirm-advance" onclick="submitAdvance()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-widest rounded">Registrar vale</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Movimiento manual de caja (inyectar / retirar / trasladar / ajustar) -->
+<div id="modal-cash-movement" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="cashCloseMovement()"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl p-5 max-h-[85vh] overflow-y-auto">
+      <h3 id="cash-mov-title" class="text-lg font-serif text-white mb-1">Movimiento de caja</h3>
+      <p id="cash-mov-help" class="text-smoke/50 text-[0.7rem] mb-4"></p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1" id="cash-mov-source-label">Caja</label>
+          <select id="cash-mov-source" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-gold outline-none">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+          </select>
+        </div>
+        <div id="cash-mov-to-wrap" class="hidden">
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Hacia</label>
+          <select id="cash-mov-to" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-gold outline-none">
+            <option value="transfer">Transferencia</option>
+            <option value="cash">Efectivo</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1" id="cash-mov-amount-label">Monto</label>
+          <input type="number" id="cash-mov-amount" step="500" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-gold outline-none" placeholder="0">
+          <p id="cash-mov-amount-help" class="hidden text-[0.6rem] text-smoke/40 mt-1"></p>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Concepto</label>
+          <input type="text" id="cash-mov-desc" maxlength="200" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-gold outline-none" placeholder="Ej: aporte de Camilo para insumos">
+        </div>
+      </div>
+
+      <div id="cash-mov-error" class="hidden mt-3 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded"></div>
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="cashCloseMovement()">Cancelar</button>
+        <button id="cash-mov-submit" class="px-5 py-2 bg-gold text-jet font-bold rounded text-xs tracking-widest uppercase">Registrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cerrar corte de caja -->
+<div id="modal-cash-cut" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('modal-cash-cut').classList.add('hidden')"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl p-5 max-h-[85vh] overflow-y-auto">
+      <h3 class="text-lg font-serif text-white mb-1">Cerrar corte de caja</h3>
+      <p class="text-smoke/50 text-[0.7rem] mb-4">Congela el saldo actual y arranca un período nuevo. Elige por caja si se llevan la plata o si se queda.</p>
+
+      <div class="space-y-3 text-[0.75rem]">
+        <label class="flex items-start gap-2 p-3 bg-jet border border-emerald-500/20 rounded cursor-pointer">
+          <input type="checkbox" id="cut-withdraw-cash" class="mt-0.5 w-4 h-4 accent-emerald-500">
+          <span>
+            <span class="text-white font-bold">Retiramos el efectivo</span>
+            <span class="block text-smoke/50 text-[0.65rem]">Saldo actual: <strong class="text-emerald-400">${{ cash_box.cash.balance|floatformat:0 }}</strong>. Si lo marcas, el período nuevo arranca en $0.</span>
+          </span>
+        </label>
+        <label class="flex items-start gap-2 p-3 bg-jet border border-blue-500/20 rounded cursor-pointer">
+          <input type="checkbox" id="cut-withdraw-transfer" class="mt-0.5 w-4 h-4 accent-blue-500">
+          <span>
+            <span class="text-white font-bold">Retiramos el saldo de la cuenta</span>
+            <span class="block text-smoke/50 text-[0.65rem]">Saldo actual: <strong class="text-blue-400">${{ cash_box.transfer.balance|floatformat:0 }}</strong>. Si lo marcas, el período nuevo arranca en $0.</span>
+          </span>
+        </label>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Notas (opcional)</label>
+          <textarea id="cut-notes" rows="2" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-gold outline-none" placeholder="Ej: corte de quincena"></textarea>
+        </div>
+      </div>
+
+      <div id="cash-cut-error" class="hidden mt-3 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded"></div>
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="document.getElementById('modal-cash-cut').classList.add('hidden')">Cancelar</button>
+        <button id="cash-cut-submit" class="px-5 py-2 bg-gold text-jet font-bold rounded text-xs tracking-widest uppercase">Cerrar corte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Punto de partida de la caja -->
+<div id="modal-cash-start" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('modal-cash-start').classList.add('hidden')"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-amber-500/30 rounded-md shadow-2xl p-5 max-h-[85vh] overflow-y-auto">
+      <h3 class="text-lg font-serif text-white mb-1">Fijar punto de partida</h3>
+      <p class="text-smoke/50 text-[0.7rem] mb-4">Cuenten cuánto hay ahora mismo. Se cierra el histórico anterior y el saldo queda en estos números.</p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Efectivo contado en caja</label>
+          <input type="number" id="cash-start-cash" step="500" min="0" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-amber-400 outline-none" placeholder="0">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-1">Saldo en la cuenta</label>
+          <input type="number" id="cash-start-transfer" step="500" min="0" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-2 focus:border-amber-400 outline-none" placeholder="0">
+        </div>
+      </div>
+
+      <div id="cash-start-error" class="hidden mt-3 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded"></div>
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="document.getElementById('modal-cash-start').classList.add('hidden')">Cancelar</button>
+        <button id="cash-start-submit" class="px-5 py-2 bg-amber-500 text-jet font-bold rounded text-xs tracking-widest uppercase">Fijar saldo</button>
       </div>
     </div>
   </div>
@@ -1572,6 +1711,159 @@ window.payBarber = function(barberId, barberName, netAmount) {
     }
   })
   .catch(() => alert('Error de conexión.'));
+};
+
+// ═══ CONTROL DE CAJA: movimientos manuales y cortes ═════
+// El saldo ya no se reinicia cada mes. Estos son los movimientos que antes no
+// existían y por los que el efectivo llegaba a dar negativo: inyecciones de
+// capital, retiros y traslados entre efectivo y cuenta.
+const CASH_MOV_CONFIG = {
+  deposit: {
+    title: 'Inyectar dinero',
+    help: 'Plata que entra a la caja sin ser una venta: un aporte de los socios, por ejemplo.',
+    sourceLabel: '¿A qué caja entra?',
+    submit: 'Inyectar',
+    placeholder: 'Ej: aporte de Camilo para insumos',
+  },
+  withdrawal: {
+    title: 'Retirar dinero',
+    help: 'Plata que sale de la caja sin ser un egreso del negocio: un retiro de utilidades, por ejemplo.',
+    sourceLabel: '¿De qué caja sale?',
+    submit: 'Retirar',
+    placeholder: 'Ej: retiro de utilidades',
+  },
+  transfer: {
+    title: 'Trasladar entre cajas',
+    help: 'Mueve plata de efectivo a la cuenta o al revés. El total no cambia, solo dónde está.',
+    sourceLabel: '¿De dónde sale?',
+    submit: 'Trasladar',
+    placeholder: 'Ej: consignación a Bancolombia',
+  },
+  adjustment: {
+    title: 'Ajustar saldo',
+    help: 'Cuadra el sistema con lo que contaste. Usa un monto negativo si hay menos de lo que dice.',
+    sourceLabel: '¿Qué caja ajustas?',
+    submit: 'Ajustar',
+    placeholder: 'Ej: sobrante del arqueo',
+  },
+};
+let cashMovKind = null;
+
+window.cashOpenMovement = function(kind) {
+  cashMovKind = kind;
+  const cfg = CASH_MOV_CONFIG[kind];
+  document.getElementById('cash-mov-title').textContent = cfg.title;
+  document.getElementById('cash-mov-help').textContent = cfg.help;
+  document.getElementById('cash-mov-source-label').textContent = cfg.sourceLabel;
+  document.getElementById('cash-mov-submit').textContent = cfg.submit;
+  document.getElementById('cash-mov-desc').placeholder = cfg.placeholder;
+  document.getElementById('cash-mov-to-wrap').classList.toggle('hidden', kind !== 'transfer');
+  // Solo el ajuste admite negativos: es el único que puede restar para cuadrar.
+  const amount = document.getElementById('cash-mov-amount');
+  amount.min = kind === 'adjustment' ? '' : '0';
+  const help = document.getElementById('cash-mov-amount-help');
+  help.textContent = kind === 'adjustment' ? 'Negativo si en la caja hay menos de lo que dice el sistema.' : '';
+  help.classList.toggle('hidden', kind !== 'adjustment');
+  amount.value = '';
+  document.getElementById('cash-mov-desc').value = '';
+  document.getElementById('cash-mov-error').classList.add('hidden');
+  document.getElementById('modal-cash-movement').classList.remove('hidden');
+};
+
+window.cashCloseMovement = function() {
+  document.getElementById('modal-cash-movement').classList.add('hidden');
+};
+
+function cashShowError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function cashPost(url, body, btn, originalText, errorId) {
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
+  document.getElementById(errorId).classList.add('hidden');
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify(body),
+  })
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(res => {
+      if (res.status !== 200) throw new Error(res.data.error || 'No se pudo completar la operación.');
+      window.location.reload();
+    })
+    .catch(err => {
+      cashShowError(errorId, err.message);
+      btn.disabled = false;
+      btn.textContent = originalText;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const movBtn = document.getElementById('cash-mov-submit');
+  if (movBtn) {
+    movBtn.addEventListener('click', () => {
+      const amount = parseInt(document.getElementById('cash-mov-amount').value, 10);
+      if (isNaN(amount) || amount === 0) {
+        cashShowError('cash-mov-error', 'Escribe un monto distinto de cero.');
+        return;
+      }
+      const body = {
+        kind: cashMovKind,
+        source: document.getElementById('cash-mov-source').value,
+        amount: amount,
+        description: document.getElementById('cash-mov-desc').value,
+      };
+      if (cashMovKind === 'transfer') body.to_source = document.getElementById('cash-mov-to').value;
+      cashPost('/api/admin/cashflow/cash/movements/', body, movBtn,
+               CASH_MOV_CONFIG[cashMovKind].submit, 'cash-mov-error');
+    });
+  }
+
+  const cutBtn = document.getElementById('cash-cut-submit');
+  if (cutBtn) {
+    cutBtn.addEventListener('click', () => {
+      const wCash = document.getElementById('cut-withdraw-cash').checked;
+      const wTransfer = document.getElementById('cut-withdraw-transfer').checked;
+      const aviso = (wCash || wTransfer)
+        ? 'Las cajas marcadas quedarán en $0 y el período nuevo arranca desde ahí.'
+        : 'El saldo se mantiene y pasa completo al período siguiente.';
+      if (!confirm('Se cerrará el corte de caja.\n\n' + aviso + '\n\n¿Continuar?')) return;
+      cashPost('/api/admin/cashflow/cash/cut/', {
+        withdraw_cash: wCash,
+        withdraw_transfer: wTransfer,
+        notes: document.getElementById('cut-notes').value,
+      }, cutBtn, 'Cerrar corte', 'cash-cut-error');
+    });
+  }
+
+  const startBtn = document.getElementById('cash-start-submit');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      if (!confirm('Se cerrará todo el histórico anterior y el saldo quedará en los números que escribiste.\n\n¿Continuar?')) return;
+      cashPost('/api/admin/cashflow/cash/starting-point/', {
+        cash: parseInt(document.getElementById('cash-start-cash').value, 10) || 0,
+        transfer: parseInt(document.getElementById('cash-start-transfer').value, 10) || 0,
+      }, startBtn, 'Fijar saldo', 'cash-start-error');
+    });
+  }
+});
+
+window.cashOpenCut = function() {
+  document.getElementById('cut-withdraw-cash').checked = false;
+  document.getElementById('cut-withdraw-transfer').checked = false;
+  document.getElementById('cut-notes').value = '';
+  document.getElementById('cash-cut-error').classList.add('hidden');
+  document.getElementById('modal-cash-cut').classList.remove('hidden');
+};
+
+window.cashOpenStartingPoint = function() {
+  document.getElementById('cash-start-cash').value = '';
+  document.getElementById('cash-start-transfer').value = '';
+  document.getElementById('cash-start-error').classList.add('hidden');
+  document.getElementById('modal-cash-start').classList.remove('hidden');
 };
 
 // ═══ DETALLE DEL PAGO ═══════════════════════════════════

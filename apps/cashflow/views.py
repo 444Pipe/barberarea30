@@ -2117,6 +2117,197 @@ def recalculate_commissions_view(request, barber_id):
     return Response(result)
 
 
+# ─── CONTROL DE CAJA: movimientos manuales y cortes ──────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsSuperAdmin])
+def cash_movement_view(request):
+    """POST /api/admin/cashflow/cash/movements/
+
+    Registra un movimiento manual de caja. Solo los socios: es capital de
+    ellos, no operación diaria.
+
+    Body: kind (deposit|withdrawal|transfer|adjustment), source (cash|transfer),
+          amount, description, to_source (solo en traslados).
+    """
+    data = request.data or {}
+    movement, error = cashflow_services.register_cash_movement(
+        kind=data.get('kind'),
+        source=data.get('source'),
+        amount=_safe_decimal(data.get('amount'), 0),
+        description=data.get('description', ''),
+        to_source=data.get('to_source'),
+        user=request.user,
+    )
+    if error:
+        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
+    destino = f' → {movement.get_to_source_display()}' if movement.to_source else ''
+    log_audit(
+        user=request.user,
+        action='create',
+        obj=movement,
+        changes={
+            'kind': movement.kind,
+            'source': movement.source,
+            'to_source': movement.to_source,
+            'amount': str(movement.amount),
+        },
+        request=request,
+        extra_data={'msg': (
+            f"{movement.get_kind_display()} de ${movement.amount:,.0f} en "
+            f"{movement.get_source_display()}{destino} — {movement.description}"
+        )},
+    )
+
+    box = cashflow_services.compute_cash_box()
+    return Response({
+        'ok': True,
+        'message': f'{movement.get_kind_display()} registrada por ${movement.amount:,.0f}.',
+        'movement_id': movement.id,
+        'cash_balance': float(box['cash_balance']),
+        'transfer_balance': float(box['transfer_balance']),
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsSuperAdmin])
+def delete_cash_movement_view(request, movement_id):
+    """DELETE /api/admin/cashflow/cash/movements/<id>/ — anula un movimiento.
+
+    Solo del período en curso: los que ya entraron a un corte quedan
+    congelados, igual que las ventas dentro de un cierre diario.
+    """
+    from apps.cashflow.models import CashMovement
+
+    try:
+        movement = CashMovement.objects.get(pk=movement_id)
+    except CashMovement.DoesNotExist:
+        return Response({'error': 'Movimiento no encontrado'}, status=404)
+
+    if movement.cash_cut_id is not None:
+        return Response({
+            'error': 'Este movimiento ya quedó dentro de un corte de caja y no se puede borrar.',
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    resumen = f"{movement.get_kind_display()} de ${movement.amount:,.0f} ({movement.description})"
+    movement.delete()
+    log_audit(
+        user=request.user, action='delete', obj=None,
+        changes={'movement_id': movement_id}, request=request,
+        extra_data={'msg': f'Anuló un movimiento de caja: {resumen}'},
+    )
+    return Response({'ok': True, 'message': 'Movimiento anulado.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsSuperAdmin])
+def close_cash_cut_view(request):
+    """POST /api/admin/cashflow/cash/cut/ — cierra el período de caja.
+
+    Body: withdraw_cash (bool), withdraw_transfer (bool), notes.
+
+    Los socios eligen por caja si se llevan el saldo (el período siguiente
+    arranca en $0) o si la plata se queda (arranca con ese saldo).
+    """
+    data = request.data or {}
+    withdraw_cash = bool(data.get('withdraw_cash', False))
+    withdraw_transfer = bool(data.get('withdraw_transfer', False))
+
+    cut = cashflow_services.close_cash_cut(
+        user=request.user,
+        withdraw_cash=withdraw_cash,
+        withdraw_transfer=withdraw_transfer,
+        notes=data.get('notes', ''),
+    )
+
+    detalle = []
+    detalle.append(f"efectivo ${cut.cash_balance:,.0f}" + (' (retirado)' if withdraw_cash else ' (queda en caja)'))
+    detalle.append(f"transferencia ${cut.transfer_balance:,.0f}" + (' (retirado)' if withdraw_transfer else ' (queda en cuenta)'))
+    log_audit(
+        user=request.user, action='update', obj=cut,
+        changes={
+            'cash_balance': str(cut.cash_balance),
+            'transfer_balance': str(cut.transfer_balance),
+            'withdrew_cash': withdraw_cash,
+            'withdrew_transfer': withdraw_transfer,
+        },
+        request=request,
+        extra_data={'msg': f"Cerró el corte de caja: {', '.join(detalle)}"},
+    )
+
+    return Response({
+        'ok': True,
+        'message': 'Corte de caja registrado.',
+        'cut_id': cut.id,
+        'cash_balance': float(cut.cash_balance),
+        'transfer_balance': float(cut.transfer_balance),
+        'opening_cash': float(cut.opening_cash),
+        'opening_transfer': float(cut.opening_transfer),
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsSuperAdmin])
+def cash_starting_point_view(request):
+    """POST /api/admin/cashflow/cash/starting-point/
+
+    Fija el punto de partida con lo que los socios contaron físicamente.
+    Cierra el histórico previo y deja el saldo en ese número.
+    """
+    data = request.data or {}
+    cut, error = cashflow_services.set_cash_starting_point(
+        user=request.user,
+        cash=_safe_decimal(data.get('cash'), 0),
+        transfer=_safe_decimal(data.get('transfer'), 0),
+        notes=data.get('notes', ''),
+    )
+    if error:
+        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
+    box = cashflow_services.compute_cash_box()
+    log_audit(
+        user=request.user, action='update', obj=cut,
+        changes={
+            'cash': str(box['cash_balance']),
+            'transfer': str(box['transfer_balance']),
+        },
+        request=request,
+        extra_data={'msg': (
+            f"Fijó el punto de partida de la caja: efectivo "
+            f"${box['cash_balance']:,.0f}, transferencia ${box['transfer_balance']:,.0f}"
+        )},
+    )
+    return Response({
+        'ok': True,
+        'message': 'Punto de partida registrado.',
+        'cash_balance': float(box['cash_balance']),
+        'transfer_balance': float(box['transfer_balance']),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsOperationalAdminOrAbove])
+def cash_cuts_list_view(request):
+    """GET /api/admin/cashflow/cash/cuts/ — historial de cortes de caja."""
+    from apps.cashflow.models import CashCut
+
+    cuts = CashCut.objects.select_related('closed_by').order_by('-closed_at')[:60]
+    return Response({'cuts': [{
+        'id': c.id,
+        'closed_at': tz.localtime(c.closed_at).strftime('%d/%m/%Y %I:%M %p'),
+        'closed_by': (c.closed_by.get_full_name() or c.closed_by.username) if c.closed_by else '—',
+        'cash_balance': float(c.cash_balance),
+        'transfer_balance': float(c.transfer_balance),
+        'withdrew_cash': c.withdrew_cash,
+        'withdrew_transfer': c.withdrew_transfer,
+        'opening_cash': float(c.opening_cash),
+        'opening_transfer': float(c.opening_transfer),
+        'movements_count': c.movements.count(),
+        'notes': c.notes,
+    } for c in cuts]})
+
+
 @api_view(['POST'])
 @permission_classes([IsOperationalAdminOrAbove])
 def edit_sale_payment_method_view(request, sale_id):
