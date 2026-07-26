@@ -399,6 +399,22 @@ for _Model, _col in ((_Expense, 'payment_source'), (_BarberPayment, 'payment_sou
         except Exception as _e:
             print(f"  ⚠ No se pudo crear '{_col}':", _e)
 
+# --- Autocuración: tablas del control de caja (CashCut / CashMovement) ---
+# Sin ellas la pantalla de Caja revienta entera. Mismo patrón que el resto de
+# los schema-repairs: si la migración no corrió, se crean con el schema editor.
+from apps.cashflow.models import CashCut as _CashCut, CashMovement as _CashMovement
+for _Model in (_CashCut, _CashMovement):
+    try:
+        _Model.objects.exists()
+    except Exception:
+        print(f"⚠ Tabla {_Model._meta.db_table} no encontrada. Intentando crearla...")
+        try:
+            with connection.schema_editor() as schema_editor:
+                schema_editor.create_model(_Model)
+            print(f"  ✓ Tabla {_Model._meta.db_table} creada vía Schema Editor")
+        except Exception as _e:
+            print(f"  ⚠ No se pudo crear {_Model._meta.db_table}:", _e)
+
 # --- Horario dominical: 2 a 7 p.m. para todos los barberos ---
 # Autocuración: si la migración 0011 no corrió (el historial de migraciones en
 # Railway ha fallado antes), esto reimpone la ventana en cada boot. Los

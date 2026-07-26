@@ -354,6 +354,118 @@ class Expense(models.Model):
         ordering = ['-date', '-created_at']
 
 
+class CashCut(models.Model):
+    """Corte de caja — lo deciden los socios, NO el calendario.
+
+    Antes el control de caja se recalculaba desde el día 1 de cada mes, así que
+    el saldo se "reiniciaba" solo y lo que quedaba en la caja se perdía de
+    vista. Ahora el saldo es corriente: arranca en el último corte y corre
+    hasta hoy.
+
+    Al cerrar, los socios eligen por caja si se llevan el saldo (`withdrew_*`
+    → el período siguiente arranca en $0) o si la plata se queda ahí (arranca
+    con el saldo que traía). Esa decisión queda congelada en `opening_*`, que
+    es lo que lee el cálculo del período siguiente.
+    """
+    closed_at = models.DateTimeField(auto_now_add=True)
+    closed_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name='cash_cuts'
+    )
+    cash_balance = models.DecimalField(max_digits=12, decimal_places=0, default=0,
+        help_text='Saldo de efectivo en el momento del corte')
+    transfer_balance = models.DecimalField(max_digits=12, decimal_places=0, default=0,
+        help_text='Saldo de transferencia en el momento del corte')
+    withdrew_cash = models.BooleanField(default=False,
+        help_text='¿Se retiró el efectivo al cerrar? Si sí, el período siguiente arranca en $0')
+    withdrew_transfer = models.BooleanField(default=False,
+        help_text='¿Se retiró el saldo de la cuenta al cerrar?')
+    opening_cash = models.DecimalField(max_digits=12, decimal_places=0, default=0,
+        help_text='Con cuánto efectivo arranca el período siguiente')
+    opening_transfer = models.DecimalField(max_digits=12, decimal_places=0, default=0,
+        help_text='Con cuánto saldo de cuenta arranca el período siguiente')
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = 'Corte de Caja'
+        verbose_name_plural = 'Cortes de Caja'
+        ordering = ['-closed_at']
+
+    def __str__(self):
+        return f'Corte {self.closed_at:%Y-%m-%d %H:%M} — efectivo ${self.cash_balance:,.0f}'
+
+
+class CashMovement(models.Model):
+    """Movimiento manual de caja: plata que entra o sale sin ser una venta.
+
+    Los socios inyectan capital cuando la operación no alcanza y retiran
+    utilidades; también consignan efectivo a la cuenta. Nada de eso es una
+    venta ni un egreso del negocio, y hasta ahora no había dónde registrarlo:
+    por eso el control de caja llegó a mostrar un saldo NEGATIVO en efectivo,
+    que es físicamente imposible.
+    """
+    KIND_DEPOSIT = 'deposit'
+    KIND_WITHDRAWAL = 'withdrawal'
+    KIND_TRANSFER = 'transfer'
+    KIND_ADJUSTMENT = 'adjustment'
+    KINDS = [
+        (KIND_DEPOSIT, 'Inyección de dinero'),
+        (KIND_WITHDRAWAL, 'Retiro de dinero'),
+        (KIND_TRANSFER, 'Traslado entre cajas'),
+        (KIND_ADJUSTMENT, 'Ajuste de saldo'),
+    ]
+
+    kind = models.CharField(max_length=12, choices=KINDS)
+    source = models.CharField(
+        max_length=10, choices=PAYMENT_SOURCE_CHOICES,
+        help_text='Caja afectada. En un traslado, la caja de ORIGEN.'
+    )
+    to_source = models.CharField(
+        max_length=10, choices=PAYMENT_SOURCE_CHOICES, blank=True,
+        help_text='Solo en traslados: la caja de DESTINO.'
+    )
+    # Positivo siempre, salvo en 'adjustment', donde el signo indica si el
+    # conteo real estaba por encima o por debajo de lo que decía el sistema.
+    amount = models.DecimalField(max_digits=12, decimal_places=0)
+    description = models.CharField(max_length=200)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cash_movements'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    cash_cut = models.ForeignKey(
+        CashCut, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='movements',
+        help_text='Corte que archivó este movimiento. Vacío = período en curso.'
+    )
+
+    class Meta:
+        verbose_name = 'Movimiento de Caja'
+        verbose_name_plural = 'Movimientos de Caja'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_kind_display()} ${self.amount:,.0f} ({self.get_source_display()})'
+
+    def effect_on(self, box):
+        """Cuánto suma (o resta) este movimiento al saldo de `box`.
+
+        `box` es 'cash' o 'transfer'. Un traslado resta en el origen y suma en
+        el destino, así que el mismo movimiento afecta a las dos cajas.
+        """
+        if self.kind == self.KIND_TRANSFER:
+            if self.source == box:
+                return -self.amount
+            if self.to_source == box:
+                return self.amount
+            return Decimal('0')
+        if self.source != box:
+            return Decimal('0')
+        if self.kind == self.KIND_WITHDRAWAL:
+            return -self.amount
+        # Inyección y ajuste suman; el ajuste puede venir negativo.
+        return self.amount
+
+
 class CashflowAlertLog(models.Model):
     """Dedup de alertas programadas: una fila por (tipo, día).
 
