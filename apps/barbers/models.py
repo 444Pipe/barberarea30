@@ -14,6 +14,21 @@ except Exception:
     _video_storage = default_storage
 
 
+# Horario dominical — también se aplica a los festivos colombianos.
+# `end` es la hora de cierre y `last_start` la hora de la ÚLTIMA cita: los
+# socios pidieron "domingos de 2 a 7", entendiendo las 7 p.m. como el último
+# turno agendable, no como el momento en que el servicio debe estar terminado.
+SUNDAY_SCHEDULE = {'start': '14:00', 'end': '19:00', 'last_start': '19:00'}
+
+
+def _parse_hhmm(value):
+    """'HH:MM' → datetime.time. Devuelve None si viene vacío."""
+    if not value:
+        return None
+    from datetime import datetime as _dt
+    return _dt.strptime(value, '%H:%M').time()
+
+
 class Barber(models.Model):
     """Perfil de barbero con horario y especialidades."""
     user = models.OneToOneField(
@@ -52,7 +67,7 @@ class Barber(models.Model):
         return self.display_name
 
     def get_default_schedule(self):
-        """Devuelve horario por defecto (L-V 10–20, Sáb 09–21, Dom 10–15)."""
+        """Devuelve horario por defecto (L-V 10–20, Sáb 09–21, Dom 14–19)."""
         return {
             'monday': {'start': '10:00', 'end': '20:00'},
             'tuesday': {'start': '10:00', 'end': '20:00'},
@@ -60,13 +75,86 @@ class Barber(models.Model):
             'thursday': {'start': '10:00', 'end': '20:00'},
             'friday': {'start': '10:00', 'end': '20:00'},
             'saturday': {'start': '09:00', 'end': '21:00'},
-            'sunday': {'start': '10:00', 'end': '15:00'},
+            'sunday': SUNDAY_SCHEDULE.copy(),
         }
 
     def save(self, *args, **kwargs):
         if not self.schedule:
             self.schedule = self.get_default_schedule()
         super().save(*args, **kwargs)
+
+    def day_window(self, target_date):
+        """Ventana de atención de ESTE barbero en `target_date`.
+
+        Devuelve un dict con `start`, `end`, `last_start` (`datetime.time`, el
+        último puede ser None) y `source`, o None si ese día no se atiende.
+
+        Los festivos colombianos usan la ventana del domingo — decisión de los
+        socios: festivo = horario dominical. `BlockedDate` NO se resuelve aquí:
+        es un override global que manda sobre todo y vive en la capa de
+        disponibilidad.
+        """
+        from apps.bookings.holidays import is_holiday
+
+        day_names = ['monday', 'tuesday', 'wednesday', 'thursday',
+                     'friday', 'saturday', 'sunday']
+        source = 'schedule'
+        day_key = day_names[target_date.weekday()]
+        if day_key != 'sunday' and is_holiday(target_date):
+            day_key = 'sunday'
+            source = 'holiday'
+
+        day_schedule = (self.schedule or {}).get(day_key)
+        if not day_schedule:
+            return None
+        try:
+            window = {
+                'start': _parse_hhmm(day_schedule['start']),
+                'end': _parse_hhmm(day_schedule['end']),
+                'last_start': _parse_hhmm(day_schedule.get('last_start')),
+                'source': source,
+            }
+        except (KeyError, TypeError, ValueError):
+            return None
+        if window['start'] is None or window['end'] is None:
+            return None
+        return window
+
+    def window_violation(self, target_date, start_time, end_time):
+        """Mensaje de error si una cita cae fuera del horario, o None si cabe.
+
+        La disponibilidad del front ya oculta estas horas, pero un POST directo
+        (o una página cacheada con el horario viejo) las colaba: esta es la
+        validación del lado del servidor.
+
+        `end_time` es la hora a la que terminaría el servicio.
+        """
+        window = self.day_window(target_date)
+        if not window:
+            return (
+                f'{self.display_name} no atiende el {target_date.strftime("%d/%m/%Y")}. '
+                f'Por favor elige otra fecha.'
+            )
+
+        etiqueta = 'En los festivos' if window['source'] == 'holiday' else 'Ese día'
+        limite = window['last_start'] or window['end']
+        franja = (
+            f'{window["start"].strftime("%I:%M %p")} a '
+            f'{limite.strftime("%I:%M %p")}'
+        )
+
+        if start_time < window['start']:
+            return f'{etiqueta} se atiende de {franja}. La hora que elegiste es muy temprano.'
+
+        if window['last_start']:
+            if start_time > window['last_start']:
+                return f'{etiqueta} la última cita es a las {window["last_start"].strftime("%I:%M %p")}.'
+        elif end_time > window['end'] or end_time <= start_time:
+            return (
+                f'{etiqueta} se atiende de {franja}. '
+                f'El servicio no alcanza a terminar dentro de ese horario.'
+            )
+        return None
 
     @property
     def is_frank(self):

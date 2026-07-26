@@ -399,6 +399,25 @@ for _Model, _col in ((_Expense, 'payment_source'), (_BarberPayment, 'payment_sou
         except Exception as _e:
             print(f"  ⚠ No se pudo crear '{_col}':", _e)
 
+# --- Horario dominical: 2 a 7 p.m. para todos los barberos ---
+# Autocuración: si la migración 0011 no corrió (el historial de migraciones en
+# Railway ha fallado antes), esto reimpone la ventana en cada boot. Los
+# festivos la reutilizan en tiempo de ejecución vía Barber.day_window().
+try:
+    from apps.barbers.models import Barber as _SchedBarber, SUNDAY_SCHEDULE as _SUNDAY
+    _sched_fixed = 0
+    for _b in _SchedBarber.objects.all():
+        _sch = _b.schedule or {}
+        if _sch.get('sunday') != _SUNDAY:
+            _sch['sunday'] = _SUNDAY.copy()
+            _b.schedule = _sch
+            _b.save(update_fields=['schedule'])
+            _sched_fixed += 1
+    if _sched_fixed:
+        print(f"✓ Horario dominical (14:00–19:00) aplicado a {_sched_fixed} barbero/s")
+except Exception as _e:
+    print("⚠ No se pudo aplicar el horario dominical:", _e)
+
 # --- Normalizar duración de las citas ACTIVAS de Frank a 2h (regla de negocio) ---
 # Frank ocupa siempre 2h; citas antiguas pudieron quedar con 30/60 min y eso
 # permitía agendar otra cita pegada. Se corrige de forma idempotente.

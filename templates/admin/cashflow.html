@@ -301,7 +301,10 @@
     </div>
 
     <div class="cf-headbar">
-      <button id="btn-daily-close" class="cf-cta-primary" {% if pending_sales_count == 0 %}disabled{% endif %}>
+      <!-- Nunca se deshabilita: si algo bloquea el cierre, el modal explica qué
+           es. Antes quedaba gris y sin explicación cuando todas las ventas del
+           día estaban esperando aprobación. -->
+      <button id="btn-daily-close" class="cf-cta-primary">
         Cerrar caja del día
       </button>
       <div class="row">
@@ -565,7 +568,15 @@
   <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
     <div class="bg-jet-card border border-gold/20 rounded-md shadow-2xl p-5 max-h-[85vh] overflow-y-auto">
       <h3 class="text-lg font-serif text-white mb-2">Confirmar cierre</h3>
-      <p class="text-smoke/60 text-sm mb-4">Se liquidan comisiones y se bloquean las ventas del día. Neto reportado: <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>.</p>
+      <p class="text-smoke/60 text-sm mb-1">Se liquidan comisiones y se bloquean las ventas del día. Neto reportado: <strong class="text-gold">${{ net_income|floatformat:0 }}</strong>.</p>
+      <p class="text-[0.7rem] text-smoke/50 mb-4">Jornada a cerrar: <strong class="text-white" id="close-business-date">—</strong> <span id="close-prevday-note" class="hidden text-amber-300">(la jornada de ayer: aún no son las 5 a.m.)</span></p>
+
+      <!-- Motivos por los que no se puede cerrar -->
+      <div id="close-blockers" class="hidden mb-4 p-3 bg-amber-500/10 border border-amber-500/40 rounded space-y-2">
+        <p class="text-amber-300 text-xs font-bold">No se puede cerrar todavía</p>
+        <ul id="close-blockers-list" class="text-[0.7rem] text-smoke/70 space-y-1 list-disc list-inside"></ul>
+        <button id="btn-goto-approvals" class="hidden w-full px-3 py-2 bg-amber-500 hover:bg-amber-400 text-jet text-[0.65rem] font-bold tracking-widest uppercase rounded">Ir a aprobar ventas</button>
+      </div>
 
       <!-- Pago diario de Franko -->
       <div id="frank-pay-section" class="hidden mb-4 p-3 bg-jet border border-amber-500/20 rounded space-y-3">
@@ -862,11 +873,8 @@ function cfUpdateKPIs() {
   // Sales pending count
   const pendingSales = (cfLiveData.sales_detail || []).filter(s => s.type === 'service').length;
   document.getElementById('kpi-sales-sub').textContent = pendingSales + ' venta(s) pendientes de cerrar';
-  // Habilita/deshabilita el cierre según las ventas en vivo pendientes de cerrar.
-  const btnClose = document.getElementById('btn-daily-close');
-  if (btnClose) {
-    btnClose.disabled = (cfLiveData.sales_detail || []).length === 0;
-  }
+  // El botón de cierre NO se deshabilita: el modal es el que explica si hay
+  // algo bloqueando (ventas sin aprobar, jornada ya cerrada, sin movimientos).
 }
 
 function cfUpdatePendingBanner() {
@@ -1219,11 +1227,43 @@ document.addEventListener('DOMContentLoaded', () => {
   if (frankCheck) frankCheck.addEventListener('change', cfToggleFrankAmount);
   if (frankAmount) frankAmount.addEventListener('input', cfUpdateFrankCashWarning);
 
+  // Pinta los motivos por los que el cierre está bloqueado y apaga el botón
+  // de confirmar mientras existan. Fuente única: `blockers` del backend.
+  function cfRenderBlockers(data) {
+    const wrap = document.getElementById('close-blockers');
+    const list = document.getElementById('close-blockers-list');
+    const gotoBtn = document.getElementById('btn-goto-approvals');
+    const dateEl = document.getElementById('close-business-date');
+    const prevNote = document.getElementById('close-prevday-note');
+    if (dateEl) dateEl.textContent = data.business_date_label || '—';
+    if (prevNote) prevNote.classList.toggle('hidden', !data.is_previous_day);
+
+    const blockers = data.blockers || [];
+    list.innerHTML = blockers.map(b => `<li>${escH(b.message)}</li>`).join('');
+    wrap.classList.toggle('hidden', blockers.length === 0);
+    gotoBtn.classList.toggle('hidden', !blockers.some(b => b.code === 'pending_approvals'));
+    btnConfirm.disabled = blockers.length > 0;
+    btnConfirm.style.opacity = blockers.length > 0 ? '0.4' : '1';
+  }
+
+  const gotoApprovals = document.getElementById('btn-goto-approvals');
+  if (gotoApprovals) {
+    gotoApprovals.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      const tab = document.querySelector('.cf-tab[data-tab="pending"]');
+      if (tab) {
+        tab.click();
+        tab.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
+
   function cfLoadClosePreview() {
     fetch('/api/admin/cashflow/daily-close/preview/')
       .then(r => r.json())
       .then(data => {
         cfClosePreview = data;
+        cfRenderBlockers(data);
         document.getElementById('frank-cash-available').textContent = fmt(data.cash.cash_income);
         if (!data.frank.exists) { frankSection.classList.add('hidden'); return; }
         frankSection.classList.remove('hidden');
@@ -1239,7 +1279,15 @@ document.addEventListener('DOMContentLoaded', () => {
         frankAmount.value = Math.round(f.suggested);
         cfToggleFrankAmount();
       })
-      .catch(() => { cfClosePreview = null; frankSection.classList.add('hidden'); });
+      .catch(() => {
+        // Si el preview falla no dejamos al operador encerrado: se habilita el
+        // cierre y que el backend responda con el motivo real.
+        cfClosePreview = null;
+        frankSection.classList.add('hidden');
+        document.getElementById('close-blockers').classList.add('hidden');
+        btnConfirm.disabled = false;
+        btnConfirm.style.opacity = '1';
+      });
   }
 
   function cfSubmitClose(forceCash) {
@@ -1288,6 +1336,10 @@ document.addEventListener('DOMContentLoaded', () => {
       modal.classList.remove('hidden');
       errorDiv.classList.add('hidden');
       forceWrap.classList.add('hidden');
+      // Se bloquea mientras carga el preview; cfRenderBlockers decide si se
+      // habilita según los motivos que devuelva el backend.
+      btnConfirm.disabled = true;
+      btnConfirm.style.opacity = '0.4';
       cfLoadClosePreview();
     });
   }

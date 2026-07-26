@@ -275,6 +275,18 @@ def create_booking_view(request):
                             f'El horario que elegiste no cabe en esa franja.'
                         )
                     }, status=409)
+            # ── Nivel 2b: Validar el horario del barbero ────────────────────────────
+            # Sin BlockedDate manda el horario semanal, que ya resuelve
+            # festivo → ventana dominical (Barber.day_window). El front oculta
+            # estas horas, pero un POST directo o una página cacheada con el
+            # horario viejo las colaba. Los walk-in (presenciales) quedan
+            # exentos: registran algo que ya ocurrió en el local.
+            elif not is_walk_in:
+                violation = barber.window_violation(
+                    req_start.date(), req_time, req_end.time()
+                )
+                if violation:
+                    return Response({'ok': False, 'error': violation}, status=409)
             # ────────────────────────────────────────────────────────────────────────
 
             existing_bookings = Booking.objects.filter(
@@ -752,6 +764,12 @@ def admin_reschedule_booking_view(request, booking_id):
                     f'El nuevo horario no cabe en esa franja.'
                 )
             }, status=409)
+    elif booking.barber:
+        # Sin BlockedDate manda el horario del barbero, que ya resuelve
+        # festivo → ventana dominical.
+        violation = booking.barber.window_violation(req_date, req_time, req_end.time())
+        if violation:
+            return Response({'ok': False, 'error': violation}, status=409)
 
     # Validar inactividad temporal del barbero (BarberUnavailability)
     if booking.barber:

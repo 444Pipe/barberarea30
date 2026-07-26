@@ -132,7 +132,11 @@ def send_daily_close_reminder():
         from apps.analytics.models import log_audit
         from django.conf import settings
 
-        today = timezone.localtime().date()
+        from apps.cashflow import services as cashflow_services
+
+        # Jornada, no fecha del servidor: a las 00:30 el cierre pendiente sigue
+        # siendo el del día anterior.
+        today = cashflow_services.business_date()
         if DailyClose.objects.filter(date=today).exists():
             return
 
@@ -145,10 +149,9 @@ def send_daily_close_reminder():
             approval_status=Sale.STATUS_PENDING, included_in_daily_close__isnull=True
         ).count()
 
-        # El cierre requiere ventas o inventario (daily_close_view corta si no
-        # hay ninguno). Un egreso suelto NO habilita el cierre —se absorbe en un
-        # cierre futuro con ventas—, así que no debe disparar el recordatorio.
-        if not (pending_sales.exists() or pending_inventory.exists()):
+        # Cualquier movimiento pendiente habilita el cierre (ventas, productos
+        # o egresos): un día con solo egresos también hay que cerrarlo.
+        if not (pending_sales.exists() or pending_inventory.exists() or pending_expenses.exists()):
             return  # nada cerrable hoy
 
         # Candado multi-worker: solo el primer proceso inserta y envía.
