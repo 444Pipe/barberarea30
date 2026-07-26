@@ -383,6 +383,9 @@ class CashCut(models.Model):
         help_text='Con cuánto efectivo arranca el período siguiente')
     opening_transfer = models.DecimalField(max_digits=12, decimal_places=0, default=0,
         help_text='Con cuánto saldo de cuenta arranca el período siguiente')
+    is_starting_point = models.BooleanField(default=False,
+        help_text='Corte generado al fijar el punto de partida. No se puede deshacer: '
+                  'hacerlo devolvería el saldo al histórico roto que ese corte vino a cerrar.')
     notes = models.TextField(blank=True)
 
     class Meta:

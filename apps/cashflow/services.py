@@ -345,30 +345,40 @@ def compute_frank_ledger():
     }
 
 
-def current_cash_cut():
+def current_cash_cut(exclude_id=None):
     """Último corte de caja, o None si nunca se ha cerrado.
 
     Marca el inicio del período en curso. Reemplaza al "día 1 del mes": el
     saldo de caja ya no se reinicia solo, lo cierran los socios cuando quieren.
+
+    `exclude_id` permite preguntar "¿cuál sería el último corte SI borrara
+    este?", que es como se simula una reversión sin escribir nada.
+
+    El desempate por `-id` importa: `closed_at` es auto_now_add y dos cortes
+    creados en el mismo instante dejarían el orden indefinido, y todo el
+    invariante "solo se deshace el último" cuelga de este orden.
     """
     from apps.cashflow.models import CashCut
-    return CashCut.objects.order_by('-closed_at').first()
+    qs = CashCut.objects.all()
+    if exclude_id is not None:
+        qs = qs.exclude(pk=exclude_id)
+    return qs.order_by('-closed_at', '-id').first()
 
 
-def cash_period_bounds():
+def cash_period_bounds(exclude_cut_id=None):
     """(inicio, apertura_efectivo, apertura_transferencia) del período en curso.
 
     `inicio` es None cuando todavía no hay ningún corte: en ese caso el período
     abarca todo el histórico y arranca en $0. Los socios fijan el saldo real
     con un movimiento de ajuste.
     """
-    cut = current_cash_cut()
+    cut = current_cash_cut(exclude_id=exclude_cut_id)
     if not cut:
         return None, Decimal('0'), Decimal('0')
     return cut.closed_at, _to_decimal(cut.opening_cash), _to_decimal(cut.opening_transfer)
 
 
-def compute_cash_box(reference_date=None):
+def compute_cash_box(reference_date=None, exclude_cut_id=None):
     """Control de caja del PERÍODO EN CURSO, separado por efectivo y transferencia.
 
     El período va desde el último corte (`CashCut`) hasta ahora; si nunca se ha
@@ -395,14 +405,21 @@ def compute_cash_box(reference_date=None):
         Sale, InventorySale, Expense, BarberPayment, CashMovement,
     )
 
-    period_start, opening_cash, opening_transfer = cash_period_bounds()
+    period_start, opening_cash, opening_transfer = cash_period_bounds(exclude_cut_id)
     zero = Decimal('0')
 
     approved = Sale.objects.filter(approval_status=Sale.STATUS_APPROVED)
     inv = InventorySale.objects.all()
     exp = Expense.objects.all()
     pays = BarberPayment.objects.all()
-    movements = CashMovement.objects.filter(cash_cut__isnull=True)
+    # Al simular el borrado de un corte, sus movimientos archivados vuelven al
+    # período: hay que contarlos igual que los sueltos.
+    if exclude_cut_id is not None:
+        movements = CashMovement.objects.filter(
+            Q(cash_cut__isnull=True) | Q(cash_cut_id=exclude_cut_id)
+        )
+    else:
+        movements = CashMovement.objects.filter(cash_cut__isnull=True)
     if period_start is not None:
         approved = approved.filter(created_at__gt=period_start)
         inv = inv.filter(created_at__gt=period_start)
@@ -636,11 +653,14 @@ def close_cash_cut(*, user, withdraw_cash=False, withdraw_transfer=False, notes=
     """
     from apps.cashflow.models import CashCut, CashMovement
 
-    box = compute_cash_box()
-    cash_balance = box['cash_balance']
-    transfer_balance = box['transfer_balance']
-
     with transaction.atomic():
+        # El saldo se calcula DENTRO de la transacción: si se calculara antes,
+        # un movimiento registrado en el intervalo quedaría archivado en este
+        # corte sin haber entrado en el saldo que el corte congela.
+        box = compute_cash_box()
+        cash_balance = box['cash_balance']
+        transfer_balance = box['transfer_balance']
+
         cut = CashCut.objects.create(
             closed_by=user,
             cash_balance=cash_balance,
@@ -656,6 +676,166 @@ def close_cash_cut(*, user, withdraw_cash=False, withdraw_transfer=False, notes=
         CashMovement.objects.filter(cash_cut__isnull=True).update(cash_cut=cut)
 
     return cut
+
+
+def preview_cash_cut_revert(cut):
+    """Qué pasaría si se deshace `cut`. No escribe nada.
+
+    El saldo resultante NO se estima con una fórmula: se re-deriva con el mismo
+    `compute_cash_box()` excluyendo el corte, que es exactamente lo que va a
+    leer la pantalla después del borrado. Una identidad basada en el saldo
+    congelado del corte mentiría en cuanto alguien editara una venta o un
+    egreso de ese período — solo los `CashMovement` quedan atados al corte por
+    FK; las ventas, egresos y pagos se filtran por fecha y siguen vivos.
+
+    Devuelve los DOS escenarios, porque el resultado depende de una decisión
+    del usuario:
+      - `_if_money_left`  → el retiro que registró el corte fue real y se
+                            materializa: el saldo no recupera esa plata.
+      - `_if_money_stayed`→ el retiro se marcó por error: la plata vuelve.
+    Sin ambos, el modal prometería el número de un escenario y ejecutaría el
+    otro (el default es `money_left_the_box=True`).
+    """
+    latest = current_cash_cut()
+    box = compute_cash_box()
+    # Estado real tras borrar el corte, calculado por el mismo camino que usará
+    # la pantalla. Este es el escenario "la plata se queda".
+    box_after = compute_cash_box(exclude_cut_id=cut.id)
+
+    blockers = []
+    if cut.is_starting_point:
+        blockers.append(
+            'Este es el punto de partida de la caja y no se puede deshacer: el saldo '
+            'volvería al histórico incompleto que ese corte vino a cerrar. Si el número '
+            'quedó mal, corrígelo con "Ajustar saldo".'
+        )
+    if not latest or latest.pk != cut.pk:
+        blockers.append(
+            'Solo se puede deshacer el último corte. Si hay cortes posteriores, sus '
+            'movimientos volverían al período en curso y aparecerían como plata de hoy.'
+        )
+
+    # Lo retirado se descuenta en el escenario "sí salió", porque ahí se
+    # materializa como un CashMovement de retiro.
+    retirado_cash = _to_decimal(cut.cash_balance) if cut.withdrew_cash else Decimal('0')
+    retirado_transfer = _to_decimal(cut.transfer_balance) if cut.withdrew_transfer else Decimal('0')
+
+    # ¿El período archivado sigue cuadrando con la foto que el corte congeló?
+    # Solo los CashMovement quedan atados al corte por FK; las ventas, egresos
+    # y pagos se filtran por fecha y siguen siendo editables. Si alguien corrigió
+    # un egreso de ese período después del cierre, deshacer no devuelve el saldo
+    # que el corte dice. No se oculta: se avisa.
+    warnings = []
+    for etiqueta, esperado, real, ahora, apertura in (
+        ('efectivo', cut.cash_balance, box_after['cash_balance'], box['cash_balance'], cut.opening_cash),
+        ('transferencia', cut.transfer_balance, box_after['transfer_balance'], box['transfer_balance'], cut.opening_transfer),
+    ):
+        desvio = _to_decimal(real) - (_to_decimal(esperado) + _to_decimal(ahora) - _to_decimal(apertura))
+        if desvio != 0:
+            warnings.append(
+                f'El {etiqueta} de ese período ya no cuadra con lo que el corte congeló '
+                f'(diferencia de ${abs(desvio):,.0f}): alguien editó o borró ventas o egresos '
+                f'después de cerrarlo. El saldo que queda es el que se muestra abajo.'
+            )
+
+    return {
+        'cut_id': cut.id,
+        'is_latest': bool(latest and latest.pk == cut.pk),
+        'is_starting_point': cut.is_starting_point,
+        'blockers': blockers,
+        'warnings': warnings,
+        'can_revert': not blockers,
+        'movements_to_release': cut.movements.count(),
+        'withdrew_cash': cut.withdrew_cash,
+        'withdrew_transfer': cut.withdrew_transfer,
+        'withdrawn_total': retirado_cash + retirado_transfer,
+        'cash_now': _to_decimal(box['cash_balance']),
+        'transfer_now': _to_decimal(box['transfer_balance']),
+        # Escenario "el retiro fue un error": la plata vuelve al saldo.
+        'cash_after_if_money_stayed': _to_decimal(box_after['cash_balance']),
+        'transfer_after_if_money_stayed': _to_decimal(box_after['transfer_balance']),
+        # Escenario "la plata sí salió" (el default): se materializa el retiro.
+        'cash_after_if_money_left': _to_decimal(box_after['cash_balance']) - retirado_cash,
+        'transfer_after_if_money_left': _to_decimal(box_after['transfer_balance']) - retirado_transfer,
+    }
+
+
+def revert_cash_cut(*, cut_id, user, money_left_the_box=True):
+    """Deshace un corte de caja. Devuelve (resumen, error).
+
+    `money_left_the_box` decide qué pasa con un corte que registró retiro:
+      - True  → la plata sí salió físicamente. Se materializa como un retiro
+                real (`CashMovement`) para que el saldo no la resucite.
+      - False → el retiro se marcó por error. La plata vuelve al saldo.
+
+    Sin esa distinción, deshacer un corte con retiro haría aparecer plata que
+    ya no está en la caja.
+    """
+    from apps.cashflow.models import CashCut, CashMovement
+
+    with transaction.atomic():
+        # El lock y la revalidación van DENTRO de la transacción: entre que el
+        # usuario abrió la pantalla y confirmó, otro socio pudo cerrar un corte
+        # nuevo, y entonces este ya no sería el último.
+        cut = CashCut.objects.select_for_update().filter(pk=cut_id).first()
+        if not cut:
+            return None, 'Ese corte ya no existe. Recarga la pantalla.'
+
+        preview = preview_cash_cut_revert(cut)
+        if preview['blockers']:
+            return None, ' '.join(preview['blockers'])
+
+        resumen = {
+            'cut_id': cut.id,
+            'closed_at': timezone.localtime(cut.closed_at).strftime('%d/%m/%Y %I:%M %p'),
+            'cash_balance': _to_decimal(cut.cash_balance),
+            'transfer_balance': _to_decimal(cut.transfer_balance),
+            'withdrew_cash': cut.withdrew_cash,
+            'withdrew_transfer': cut.withdrew_transfer,
+            'movements_released': cut.movements.count(),
+            'materialized': [],
+        }
+
+        # El retiro que registró el corte no tiene movimiento propio: solo se
+        # representa poniendo opening_* en 0. Si la plata sí salió, hay que
+        # materializarlo ahora o el saldo la da por presente.
+        if money_left_the_box:
+            for box, retirado, monto in (
+                ('cash', cut.withdrew_cash, cut.cash_balance),
+                ('transfer', cut.withdrew_transfer, cut.transfer_balance),
+            ):
+                if retirado and _to_decimal(monto) > 0:
+                    CashMovement.objects.create(
+                        kind=CashMovement.KIND_WITHDRAWAL,
+                        source=box,
+                        amount=_to_decimal(monto),
+                        description=f'Retiro del corte del {resumen["closed_at"]} (corte deshecho)',
+                        created_by=user,
+                    )
+                    resumen['materialized'].append({'source': box, 'amount': float(_to_decimal(monto))})
+
+        # Se desarchivan explícitamente y no por el SET_NULL implícito: así se
+        # pueden contar para la auditoría y el código no depende del on_delete.
+        cut.movements.update(cash_cut=None)
+        cerrado_en = cut.closed_at
+        cut.delete()
+
+        # El select_for_update bloquea la fila de ESTE corte, pero no impide que
+        # otro socio INSERTE un corte nuevo en paralelo (un INSERT es un
+        # fantasma, no hay fila que bloquear). Bajo READ COMMITTED esta relectura
+        # posterior sí ve un corte ya commiteado, así que se revalida acá y se
+        # revierte todo si dejó de ser el último.
+        if CashCut.objects.filter(closed_at__gt=cerrado_en).exists():
+            transaction.set_rollback(True)
+            return None, (
+                'Otro usuario cerró un corte nuevo mientras confirmabas. '
+                'No se deshizo nada: recarga la pantalla e inténtalo otra vez.'
+            )
+
+    box = compute_cash_box()
+    resumen['cash_balance_now'] = _to_decimal(box['cash_balance'])
+    resumen['transfer_balance_now'] = _to_decimal(box['transfer_balance'])
+    return resumen, None
 
 
 def set_cash_starting_point(*, user, cash, transfer, notes=''):
@@ -680,6 +860,10 @@ def set_cash_starting_point(*, user, cash, transfer, notes=''):
             user=user, withdraw_cash=True, withdraw_transfer=True,
             notes=(notes or '').strip() or 'Punto de partida: se cierra el histórico previo.',
         )
+        # Se marca para que no se pueda deshacer: revertirlo devolvería el
+        # saldo al histórico incompleto que este corte vino justamente a cerrar.
+        cut.is_starting_point = True
+        cut.save(update_fields=['is_starting_point'])
         for box, amount in (('cash', cash), ('transfer', transfer)):
             if amount:
                 CashMovement.objects.create(

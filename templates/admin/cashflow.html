@@ -586,6 +586,17 @@
     </div>
   </div>
 
+  <!-- ═══ HISTORIAL DE CORTES DE CAJA ═══ -->
+  <div class="cf-section">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div class="cf-section-title" style="margin-bottom:0">Historial de cortes de caja</div>
+      <span class="text-[0.6rem] text-smoke/30 uppercase tracking-widest">Solo se puede deshacer el último</span>
+    </div>
+    <div id="cf-cuts-list" class="cf-close-list">
+      <div class="cf-empty">Cargando cortes...</div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════ -->
@@ -780,6 +791,46 @@
       <div class="flex gap-2 justify-end mt-4">
         <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="document.getElementById('modal-cash-cut').classList.add('hidden')">Cancelar</button>
         <button id="cash-cut-submit" class="px-5 py-2 bg-gold text-jet font-bold rounded text-xs tracking-widest uppercase">Cerrar corte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Deshacer un corte de caja -->
+<div id="modal-cash-revert" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('modal-cash-revert').classList.add('hidden')"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-red-500/30 rounded-md shadow-2xl p-5 max-h-[85vh] overflow-y-auto">
+      <h3 class="text-lg font-serif text-white mb-1">Deshacer corte de caja</h3>
+      <p id="revert-subtitle" class="text-smoke/50 text-[0.7rem] mb-4"></p>
+
+      <!-- Consecuencias reales, calculadas por el servidor -->
+      <div id="revert-preview" class="bg-jet border border-white/10 rounded p-3 mb-4 space-y-1 text-[0.72rem]"></div>
+
+      <!-- Solo aparece si el corte registró un retiro: define si la plata
+           salió de verdad o si el retiro se marcó por error. -->
+      <div id="revert-withdraw-wrap" class="hidden mb-4 p-3 bg-amber-500/10 border border-amber-500/40 rounded space-y-2">
+        <p class="text-amber-300 text-xs font-bold">Ese corte registró un retiro</p>
+        <p class="text-[0.7rem] text-smoke/70">¿Qué pasó con esa plata?</p>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="radio" name="revert-money" value="left" class="mt-0.5 accent-emerald-500" checked>
+          <span class="text-[0.7rem]"><strong class="text-white">Sí salió de la caja.</strong> <span class="text-smoke/50">Queda registrada como retiro y el saldo no cambia.</span></span>
+        </label>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="radio" name="revert-money" value="stayed" class="mt-0.5 accent-amber-500">
+          <span class="text-[0.7rem]"><strong class="text-white">No, fue un error.</strong> <span class="text-smoke/50">La plata sigue en la caja y vuelve al saldo.</span></span>
+        </label>
+      </div>
+
+      <div id="revert-blockers" class="hidden mb-4 p-3 bg-red-500/10 border border-red-500/40 rounded">
+        <p class="text-red-300 text-xs font-bold mb-1">No se puede deshacer</p>
+        <ul id="revert-blockers-list" class="text-[0.7rem] text-smoke/70 space-y-1 list-disc list-inside"></ul>
+      </div>
+
+      <div id="revert-error" class="hidden mt-3 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded"></div>
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-4 py-2 text-smoke text-xs tracking-widest uppercase" onclick="document.getElementById('modal-cash-revert').classList.add('hidden')">Cancelar</button>
+        <button id="revert-submit" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded text-xs tracking-widest uppercase">Deshacer corte</button>
       </div>
     </div>
   </div>
@@ -1859,6 +1910,175 @@ window.cashOpenCut = function() {
   document.getElementById('modal-cash-cut').classList.remove('hidden');
 };
 
+// ── Historial de cortes de caja ─────────────────────────
+window.cfLoadCashCuts = function() {
+  const container = document.getElementById('cf-cuts-list');
+  if (!container) return;
+  fetch('/api/admin/cashflow/cash/cuts/')
+    // Sin validar el status, un 403 o un 500 (que este proyecto devuelve en
+    // JSON) se pintaría como "no hay cortes", que es mentira.
+    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+    .then(data => {
+      const cuts = data.cuts || [];
+      if (!cuts.length) {
+        container.innerHTML = '<div class="cf-empty">Todavía no se ha cerrado ningún corte de caja.</div>';
+        return;
+      }
+      // La etiqueta se busca en este mapa y no se interpola dentro del
+      // atributo onclick: el navegador decodifica las entidades HTML antes de
+      // evaluar el JS, así que escapar ahí no protege de una comilla.
+      cfCutsById = {};
+      cuts.forEach(c => { cfCutsById[c.id] = c; });
+      container.innerHTML = cuts.map(c => {
+        const etiqueta = c.is_starting_point
+          ? '<span class="text-[0.55rem] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 tracking-widest uppercase">Punto de partida</span>'
+          : '';
+        const retiro = (label, valor, retirado, color) => `
+          <div class="flex justify-between">
+            <span class="text-smoke/50">${label}${retirado ? ' <span class="text-red-400/70">(retirado)</span>' : ''}</span>
+            <span class="${color}">${fmt(valor)}</span>
+          </div>`;
+        return `
+        <div class="bg-jet-card border border-white/5 rounded-md p-4 hover:border-gold/30 transition-colors flex flex-col">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="text-white font-bold text-sm">${esc(c.closed_at)}</div>
+            ${etiqueta}
+          </div>
+          <div class="text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-2">Cerró: ${esc(c.closed_by)}</div>
+          <div class="space-y-1 text-[0.7rem] border-t border-white/5 pt-2">
+            ${retiro('Efectivo', c.cash_balance, c.withdrew_cash, 'text-emerald-400')}
+            ${retiro('Transferencia', c.transfer_balance, c.withdrew_transfer, 'text-blue-400')}
+            <div class="flex justify-between text-smoke/40"><span>Movimientos</span><span>${c.movements_count}</span></div>
+          </div>
+          ${c.notes ? `<div class="text-[0.6rem] text-smoke/40 mt-2 italic">${esc(c.notes)}</div>` : ''}
+          ${c.can_revert ? `
+          <div class="mt-auto pt-3">
+            <button onclick="cashOpenRevert(${c.id})"
+              class="w-full px-3 py-2 text-smoke/40 hover:text-red-400 border border-white/5 hover:border-red-400/30 rounded transition-all text-[0.6rem] tracking-widest uppercase">
+              Deshacer este corte
+            </button>
+          </div>` : ''}
+        </div>`;
+      }).join('');
+    })
+    .catch(() => {
+      container.innerHTML = '<div class="cf-empty text-red-400">Error al cargar los cortes.</div>';
+    });
+};
+
+let cfRevertCutId = null;
+let cfCutsById = {};
+
+window.cashOpenRevert = function(cutId) {
+  cfRevertCutId = cutId;
+  const cut = cfCutsById[cutId] || {};
+  const modal = document.getElementById('modal-cash-revert');
+  document.getElementById('revert-subtitle').textContent = 'Corte del ' + (cut.closed_at || '');
+  // Se reinicia la elección para que reabrir el modal no herede la anterior.
+  const porDefecto = document.querySelector('input[name="revert-money"][value="left"]');
+  if (porDefecto) porDefecto.checked = true;
+  document.getElementById('revert-preview').innerHTML = '<div class="text-smoke/40">Calculando…</div>';
+  document.getElementById('revert-blockers').classList.add('hidden');
+  document.getElementById('revert-withdraw-wrap').classList.add('hidden');
+  document.getElementById('revert-error').classList.add('hidden');
+  const submit = document.getElementById('revert-submit');
+  submit.disabled = true;
+  submit.textContent = 'Deshacer corte';
+  modal.classList.remove('hidden');
+
+  // El servidor calcula las consecuencias: nadie confirma a ciegas un cambio
+  // de saldo. GET no escribe nada.
+  fetch(`/api/admin/cashflow/cash/cuts/${cutId}/`)
+    // Un 403 trae JSON válido: sin validar el status se pintaría como preview
+    // bueno y —peor— se habilitaría el botón destructivo.
+    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+    .then(p => {
+      cfRevertPreview = p;
+      cfRenderRevertPreview();
+
+      const hayRetiro = p.withdrew_cash || p.withdrew_transfer;
+      document.getElementById('revert-withdraw-wrap').classList.toggle('hidden', !hayRetiro);
+
+      const blockers = p.blockers || [];
+      if (blockers.length) {
+        document.getElementById('revert-blockers-list').innerHTML =
+          blockers.map(b => `<li>${esc(b)}</li>`).join('');
+        document.getElementById('revert-blockers').classList.remove('hidden');
+      }
+      submit.disabled = blockers.length > 0;
+      submit.style.opacity = blockers.length > 0 ? '0.4' : '1';
+    })
+    .catch(() => {
+      cfRevertPreview = null;
+      document.getElementById('revert-preview').innerHTML =
+        '<div class="text-red-400">No se pudo calcular el efecto de deshacer este corte. Recarga la pantalla.</div>';
+      submit.disabled = true;
+      submit.style.opacity = '0.4';
+    });
+};
+
+let cfRevertPreview = null;
+
+// El saldo resultante depende de la opción elegida, así que se repinta con
+// cada cambio de radio. Antes se calculaba una sola vez y el número mostrado
+// contradecía a la opción marcada por defecto.
+function cfRenderRevertPreview() {
+  const p = cfRevertPreview;
+  if (!p) return;
+  const salio = (document.querySelector('input[name="revert-money"]:checked') || {}).value !== 'stayed';
+  const cashAfter = salio ? p.cash_after_if_money_left : p.cash_after_if_money_stayed;
+  const transferAfter = salio ? p.transfer_after_if_money_left : p.transfer_after_if_money_stayed;
+
+  const row = (label, value, cls = 'text-white') =>
+    `<div class="flex justify-between gap-3"><span class="text-smoke/50">${label}</span><span class="${cls} text-right">${value}</span></div>`;
+  const flecha = (ahora, despues, color) => ahora === despues
+    ? `<span class="${color}">${fmt(ahora)}</span> <span class="text-smoke/30">(sin cambio)</span>`
+    : `<span class="text-smoke/40">${fmt(ahora)}</span> <span class="text-smoke/30">→</span> <span class="${color} font-bold">${fmt(despues)}</span>`;
+
+  const avisos = (p.warnings || []).map(w =>
+    `<div class="mt-2 pt-2 border-t border-amber-500/30 text-amber-300 text-[0.65rem]">${esc(w)}</div>`).join('');
+
+  document.getElementById('revert-preview').innerHTML =
+    row('Movimientos que vuelven al período', p.movements_to_release)
+    + row('Efectivo', flecha(p.cash_now, cashAfter, 'text-emerald-400'))
+    + row('Transferencia', flecha(p.transfer_now, transferAfter, 'text-blue-400'))
+    + avisos;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[name="revert-money"]').forEach(radio => {
+    radio.addEventListener('change', cfRenderRevertPreview);
+  });
+
+  const btn = document.getElementById('revert-submit');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!cfRevertCutId) return;
+    const elegido = document.querySelector('input[name="revert-money"]:checked');
+    btn.disabled = true;
+    btn.textContent = 'Deshaciendo...';
+    document.getElementById('revert-error').classList.add('hidden');
+    fetch(`/api/admin/cashflow/cash/cuts/${cfRevertCutId}/`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ money_left_the_box: !elegido || elegido.value === 'left' }),
+    })
+      .then(r => r.json().then(data => ({ status: r.status, data })))
+      .then(res => {
+        if (res.status !== 200) throw new Error(res.data.error || 'No se pudo deshacer el corte.');
+        window.location.reload();
+      })
+      .catch(err => {
+        cashShowError('revert-error', err.message);
+        btn.disabled = false;
+        btn.textContent = 'Deshacer corte';
+        // Un fallo casi siempre significa que el estado cambió: la lista que
+        // se ve quedó vieja.
+        cfLoadCashCuts();
+      });
+  });
+});
+
 window.cashOpenStartingPoint = function() {
   document.getElementById('cash-start-cash').value = '';
   document.getElementById('cash-start-transfer').value = '';
@@ -2394,7 +2614,9 @@ function cfRefreshAll() {
   cfLoadLive();
   fetchBarberPayments();
   cfLoadCloses();
+  cfLoadCashCuts();
 }
+cfLoadCashCuts();
 // Auto-refresh cada 60s
 clearInterval(cfRefreshTimer);
 cfRefreshTimer = setInterval(cfLoadLive, 60000);
