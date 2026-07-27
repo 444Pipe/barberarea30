@@ -444,10 +444,11 @@ try:
 except Exception as _e:
     print("⚠ No se pudo marcar los cortes de punto de partida:", _e)
 
-# --- Horario dominical: 2 a 7 p.m. para todos los barberos ---
-# Autocuración: si la migración 0011 no corrió (el historial de migraciones en
-# Railway ha fallado antes), esto reimpone la ventana en cada boot. Los
-# festivos la reutilizan en tiempo de ejecución vía Barber.day_window().
+# --- Horario dominical: 2 a 7 p.m., última cita 6:30 p.m. ---
+# Autocuración: si las migraciones 0011/0012 no corrieron (el historial de
+# migraciones en Railway ha fallado antes), esto reimpone la ventana en cada
+# boot. Los festivos la reutilizan en tiempo de ejecución vía
+# Barber.day_window().
 try:
     from apps.barbers.models import Barber as _SchedBarber, SUNDAY_SCHEDULE as _SUNDAY
     _sched_fixed = 0
@@ -459,7 +460,10 @@ try:
             _b.save(update_fields=['schedule'])
             _sched_fixed += 1
     if _sched_fixed:
-        print(f"✓ Horario dominical (14:00–19:00) aplicado a {_sched_fixed} barbero/s")
+        print(
+            "✓ Horario dominical (14:00–19:00, última cita 18:30) "
+            f"aplicado a {_sched_fixed} barbero/s"
+        )
 except Exception as _e:
     print("⚠ No se pudo aplicar el horario dominical:", _e)
 

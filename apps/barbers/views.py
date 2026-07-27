@@ -175,7 +175,7 @@ def barber_availability_view(request, barber_id):
     now_local = timezone.localtime()
 
     # Hasta dónde se ofrecen slots. Con `last_start` el último turno es esa
-    # hora exacta (domingos y festivos: 7 p.m.); sin él, se ofrecen bloques
+    # hora exacta (domingos y festivos: 6:30 p.m.); sin él, se ofrecen bloques
     # hasta el cierre y el servicio debe caber antes de esa hora.
     if last_start:
         slot_limit = datetime.combine(target_date, last_start) + timedelta(minutes=SLOT_SIZE)

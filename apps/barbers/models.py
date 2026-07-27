@@ -15,10 +15,11 @@ except Exception:
 
 
 # Horario dominical — también se aplica a los festivos colombianos.
-# `end` es la hora de cierre y `last_start` la hora de la ÚLTIMA cita: los
-# socios pidieron "domingos de 2 a 7", entendiendo las 7 p.m. como el último
-# turno agendable, no como el momento en que el servicio debe estar terminado.
-SUNDAY_SCHEDULE = {'start': '14:00', 'end': '19:00', 'last_start': '19:00'}
+# `end` es la hora de cierre y `last_start` la hora de la ÚLTIMA cita agendable.
+# Se atiende de 2 a 7, pero la última cita queda a las 6:30 p.m.: un servicio de
+# una hora que empezara a las 7 terminaría a las 8, muy pasado el cierre
+# (petición del dueño, 26-jul-2026).
+SUNDAY_SCHEDULE = {'start': '14:00', 'end': '19:00', 'last_start': '18:30'}
 
 
 def _parse_hhmm(value):
