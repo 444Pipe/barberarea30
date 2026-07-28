@@ -360,6 +360,13 @@
       </span>
     </div>
 
+    {% if cash_box_error %}
+    <div class="mb-3 p-3 bg-red-500/10 border border-red-500/40 rounded">
+      <p class="text-red-300 text-xs font-bold mb-1">No se pudo cargar el control de caja</p>
+      <p class="text-[0.7rem] text-smoke/70">Hubo un error temporal calculando los saldos. El resto de la página funciona con normalidad; vuelve a cargar en un momento. (El detalle quedó registrado en los logs del servidor.)</p>
+    </div>
+    {% endif %}
+
     {% if user_role == 'superadmin' %}
     <div class="cf-headbar" style="margin-bottom:0.75rem">
       <div class="row">

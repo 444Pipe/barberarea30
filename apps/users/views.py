@@ -300,10 +300,36 @@ def admin_cashflow_view(request):
     inventory_items = InventoryItem.objects.filter(is_active=True).order_by('category', 'name')
     payment_methods = PaymentMethod.objects.filter(is_active=True).order_by('name')
 
-    # Control de caja del mes (efectivo/transferencia) con historial desglosado
-    # y saldo derivado de Frank.
-    cash_box = cashflow_services.compute_cash_box_detail()
-    frank_ledger = cashflow_services.compute_frank_ledger()
+    # Control de caja (efectivo/transferencia) con historial desglosado y saldo
+    # derivado de Frank. Es la parte más nueva, compleja y pesada (recorre las
+    # ventas/egresos/pagos/movimientos del período). Si algo falla —un dato raro,
+    # un timeout de la BD, o el hueco de esquema en la ventana de un deploy— NO se
+    # debe tumbar toda la página de finanzas: se registra el traceback real (visible
+    # en los logs de Railway) y la caja se muestra en un estado de "no disponible".
+    cash_box = None
+    frank_ledger = None
+    cash_box_error = False
+    try:
+        cash_box = cashflow_services.compute_cash_box_detail()
+        frank_ledger = cashflow_services.compute_frank_ledger()
+    except Exception:
+        cash_box_error = True
+        import logging as _logging, traceback as _traceback
+        _logging.getLogger(__name__).error(
+            "Fallo calculando el control de caja en /admin-panel/cashflow/:\n%s",
+            _traceback.format_exc(),
+        )
+        # Estructura vacía con la MISMA forma para que el template no se rompa:
+        # muestra todo en $0 y arriba se avisa que no se pudo cargar (ver logs).
+        _empty_box = {
+            'income': [], 'outflow': [], 'income_total': 0,
+            'out_total': 0, 'opening': 0, 'balance': 0,
+        }
+        cash_box = {
+            'period_start': None, 'period_start_label': None, 'last_cut': None,
+            'cash': dict(_empty_box), 'transfer': dict(_empty_box),
+        }
+        frank_ledger = {'exists': False, 'balance': 0, 'suggested_payment': 0}
 
     context = {
         'user_role': request.user.profile.role,
@@ -325,6 +351,7 @@ def admin_cashflow_view(request):
         'payment_methods': payment_methods,
         'cash_box': cash_box,
         'frank_ledger': frank_ledger,
+        'cash_box_error': cash_box_error,
     }
     return render(request, 'admin/cashflow.html', context)
 
