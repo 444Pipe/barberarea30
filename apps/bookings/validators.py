@@ -39,6 +39,7 @@ def check_booking_conflict(
     duration_minutes,
     exclude_booking_id=None,
     check_overlap=True,
+    check_unavailability=True,
 ):
     """Devuelve un string de error si la franja [date time, +duration) no se
     puede usar para reservar con `barber`. Devuelve None si está libre.
@@ -46,6 +47,8 @@ def check_booking_conflict(
     Considera, en orden:
       1. BlockedDate (cierre total del local o ventana parcial de atención).
       2. BarberUnavailability del barbero (solape real, no solo hora de inicio).
+         Se puede omitir con check_unavailability=False (ej. walk-in / servicio
+         manual que se fuerza sobre el bloqueo del barbero, con confirmación).
       3. Reservas existentes del barbero que se cruzan (si check_overlap).
     """
     try:
@@ -85,7 +88,7 @@ def check_booking_conflict(
             )
 
     # 2. BarberUnavailability del barbero (solape real)
-    if barber is not None:
+    if check_unavailability and barber is not None:
         for u_start, u_end in BarberUnavailability.objects.filter(
             barber=barber, date=d
         ).values_list('start_time', 'end_time'):

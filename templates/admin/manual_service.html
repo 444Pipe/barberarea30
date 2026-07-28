@@ -163,7 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('manual-service-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    doManualSubmit(false);
+  });
+
+  function doManualSubmit(force) {
     const btn = document.getElementById('ms-submit-btn');
+    const resetBtn = () => { btn.disabled = false; btn.innerHTML = 'Bloquear Agenda'; };
     btn.disabled = true;
     btn.innerHTML = 'Procesando...';
 
@@ -177,7 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
       time: document.getElementById('ms-time').value,
       duration_minutes: parseInt(document.getElementById('ms-duration').value) || 60,
       manual_labor_cost: parseFloat(document.getElementById('ms-labor-cost').value) || 0,
-      manual_materials_cost: parseFloat(document.getElementById('ms-materials-cost').value) || 0
+      manual_materials_cost: parseFloat(document.getElementById('ms-materials-cost').value) || 0,
+      force: !!force
     };
 
     fetch('/admin-panel/manual-service/', {
@@ -193,18 +199,25 @@ document.addEventListener('DOMContentLoaded', () => {
       if(data.success) {
         alert('✅ Servicio manual creado. Agenda bloqueada.');
         window.location.href = '/admin-panel/bookings/';
-      } else {
-        alert('❌ Error: ' + (data.error || 'Error desconocido'));
-        btn.disabled = false;
-        btn.innerHTML = 'Bloquear Agenda';
+        return;
       }
+      // El barbero está bloqueado en ese rango → permitir forzar con confirmación.
+      if (data.requires_override) {
+        if (confirm(data.warning || 'El barbero está bloqueado en este rango. ¿Agendar de todos modos?')) {
+          doManualSubmit(true);
+          return;
+        }
+        resetBtn();
+        return;
+      }
+      alert('❌ Error: ' + (data.error || 'Error desconocido'));
+      resetBtn();
     })
     .catch(err => {
       alert('❌ Error de red: ' + err);
-      btn.disabled = false;
-      btn.innerHTML = 'Bloquear Agenda';
+      resetBtn();
     });
-  });
+  }
 });
 
 function getCookie(name) {

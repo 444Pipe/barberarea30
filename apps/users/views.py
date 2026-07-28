@@ -523,16 +523,35 @@ def admin_manual_service_view(request):
                 if barber is not None else duration_minutes
             )
 
-            # Validar bloqueos del local y del barbero antes de crear.
+            # Validar bloqueos antes de crear. Como en el walk-in, el bloqueo de
+            # inactividad del BARBERO se puede forzar (con confirmación previa); el
+            # local cerrado y el cruce con otra cita siguen siendo bloqueos firmes.
             from apps.bookings.validators import check_booking_conflict
+            force = bool(data.get('force'))
+            override_block_note = None
             err = check_booking_conflict(
-                barber=barber,
-                date=date,
-                time=time,
+                barber=barber, date=date, time=time,
                 duration_minutes=effective_duration,
             )
             if err:
-                return JsonResponse({'error': err}, status=409)
+                hard_err = check_booking_conflict(
+                    barber=barber, date=date, time=time,
+                    duration_minutes=effective_duration,
+                    check_unavailability=False,
+                )
+                if hard_err:
+                    # Bloqueo firme (local cerrado o cruce con otra cita): no se fuerza.
+                    return JsonResponse({'error': hard_err}, status=409)
+                # El único bloqueo es la inactividad del barbero → se puede forzar.
+                if not force:
+                    return JsonResponse({
+                        'requires_override': True,
+                        'warning': err + ' ¿Deseas agendarlo de todos modos?',
+                    }, status=409)
+                override_block_note = err
+
+            if override_block_note:
+                notes = notes.rstrip() + '\n\n⚠ Agendado manualmente sobre un bloqueo de inactividad del barbero.'
 
             booking = Booking.objects.create(
                 client_name=client_name,
