@@ -240,7 +240,12 @@ def create_booking_view(request):
         effective_duration = barber.effective_duration_minutes(service)
         try:
             from datetime import datetime as _dt, timedelta
-            req_time = _dt.strptime(requested_time_str, '%H:%M').time()
+            # Acepta 'HH:MM' y 'HH:MM:SS': si la hora llega con segundos, el
+            # parseo estricto fallaba y se saltaban los chequeos de bloqueo.
+            try:
+                req_time = _dt.strptime(requested_time_str, '%H:%M').time()
+            except (ValueError, TypeError):
+                req_time = _dt.strptime(str(requested_time_str)[:5], '%H:%M').time()
             req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
             req_end = req_start + timedelta(minutes=effective_duration)
 
@@ -288,6 +293,29 @@ def create_booking_view(request):
                 if violation:
                     return Response({'ok': False, 'error': violation}, status=409)
             # ────────────────────────────────────────────────────────────────────────
+
+            # ── Nivel 2c: RED DE SEGURIDAD del bloqueo del barbero ──────────────────
+            # El bloqueo de inactividad (BarberUnavailability) ya se revisa antes,
+            # pero ese chequeo puede saltarse (hora con segundos, o una carrera).
+            # Aquí se revalida DENTRO de la transacción, con la ventana efectiva ya
+            # calculada, para garantizar que una reserva del PÚBLICO nunca caiga
+            # sobre un bloqueo. Los walk-in ya se resolvieron antes (con su
+            # confirmación de forzado), por eso quedan exentos.
+            if not is_walk_in:
+                for u_start, u_end in BarberUnavailability.objects.filter(
+                    barber=barber, date=requested_date
+                ).values_list('start_time', 'end_time'):
+                    u_s = _dt.combine(req_start.date(), u_start)
+                    u_e = _dt.combine(req_start.date(), u_end)
+                    if u_s < req_end and u_e > req_start:
+                        return Response({
+                            'ok': False,
+                            'error': (
+                                f'{barber.display_name} está bloqueado de '
+                                f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
+                                f'el {requested_date}. Por favor elige otra hora.'
+                            )
+                        }, status=409)
 
             existing_bookings = Booking.objects.filter(
                 barber=barber,
