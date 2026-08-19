@@ -303,18 +303,27 @@ def compute_frank_ledger():
     frank_commissions = Commission.objects.filter(
         barber=frank, sale__approval_status=Sale.STATUS_APPROVED
     )
+    frank_advances = BarberAdvance.objects.filter(barber=frank)
+    frank_payments = BarberPayment.objects.filter(barber=frank)
+
+    # Punto de partida: si el barbero tiene un reinicio de saldo, solo se cuenta
+    # lo POSTERIOR a esa fecha (todo lo anterior queda en 0, sin borrar historial).
+    reset = frank.ledger_reset_at
+    if reset:
+        frank_commissions = frank_commissions.filter(created_at__gt=reset)
+        frank_advances = frank_advances.filter(created_at__gt=reset)
+        frank_payments = frank_payments.filter(created_at__gt=reset)
+
     earnings_total = frank_commissions.aggregate(t=Sum('total_earnings'))['t'] or zero
-    advances_total = BarberAdvance.objects.filter(barber=frank).aggregate(
-        t=Sum('amount'))['t'] or zero
-    payments_total = BarberPayment.objects.filter(barber=frank).aggregate(
-        t=Sum('amount'))['t'] or zero
+    advances_total = frank_advances.aggregate(t=Sum('amount'))['t'] or zero
+    payments_total = frank_payments.aggregate(t=Sum('amount'))['t'] or zero
 
     balance = _to_decimal(earnings_total) - _to_decimal(advances_total) - _to_decimal(payments_total)
 
     unpaid_earnings = frank_commissions.filter(is_paid=False).aggregate(
         t=Sum('total_earnings'))['t'] or zero
-    unsettled_advances = BarberAdvance.objects.filter(
-        barber=frank, is_settled=False).aggregate(t=Sum('amount'))['t'] or zero
+    unsettled_advances = frank_advances.filter(is_settled=False).aggregate(
+        t=Sum('amount'))['t'] or zero
 
     # Sugerido a pagar: SOLO lo pendiente de los últimos 30 días, para no arrastrar
     # backlog antiguo al cierre (los pagos "tomaban fechas anteriores"). La DEUDA
@@ -324,8 +333,8 @@ def compute_frank_ledger():
     recent_unpaid = frank_commissions.filter(
         is_paid=False, created_at__gte=cutoff
     ).aggregate(t=Sum('total_earnings'))['t'] or zero
-    recent_advances = BarberAdvance.objects.filter(
-        barber=frank, is_settled=False, created_at__gte=cutoff
+    recent_advances = frank_advances.filter(
+        is_settled=False, created_at__gte=cutoff
     ).aggregate(t=Sum('amount'))['t'] or zero
     suggested_30d = _to_decimal(recent_unpaid) - _to_decimal(recent_advances)
     # Nunca sugerir más que la deuda real, ni menos que cero.

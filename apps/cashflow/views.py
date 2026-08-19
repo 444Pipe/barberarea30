@@ -1604,9 +1604,17 @@ def unpaid_commissions_view(request):
     if frank:
         ledger = cashflow_services.compute_frank_ledger()
 
-        frank_daily = Commission.objects.filter(
+        # Punto de partida: solo mostrar lo POSTERIOR al reinicio de saldo (si lo hay).
+        reset = frank.ledger_reset_at
+        _frank_comms = Commission.objects.filter(
             barber=frank, is_paid=False, sale__approval_status='approved'
-        ).annotate(date=TruncDate('created_at')).values('date').annotate(
+        )
+        _frank_adv = BarberAdvance.objects.filter(barber=frank, is_settled=False)
+        if reset:
+            _frank_comms = _frank_comms.filter(created_at__gt=reset)
+            _frank_adv = _frank_adv.filter(created_at__gt=reset)
+
+        frank_daily = _frank_comms.annotate(date=TruncDate('created_at')).values('date').annotate(
             daily_total=Sum('total_earnings'),
             daily_commissions=Sum('commission_amount'),
             daily_tips=Sum('tip_amount')
@@ -1618,9 +1626,7 @@ def unpaid_commissions_view(request):
             'tips': float(day['daily_tips'] or 0),
         } for day in frank_daily if day['date']]
 
-        frank_advances_qs = BarberAdvance.objects.filter(
-            barber=frank, is_settled=False
-        ).select_related('created_by').order_by('-created_at')
+        frank_advances_qs = _frank_adv.select_related('created_by').order_by('-created_at')
         frank_advances = [{
             'id': adv.id,
             'amount': float(adv.amount),
@@ -1629,11 +1635,9 @@ def unpaid_commissions_view(request):
             'by': (adv.created_by.get_full_name() or adv.created_by.username) if adv.created_by else '—',
         } for adv in frank_advances_qs]
 
-        frank_unpaid = Commission.objects.filter(
-            barber=frank, is_paid=False, sale__approval_status='approved'
-        ).aggregate(commissions=Sum('commission_amount'), tips=Sum('tip_amount'))
+        frank_unpaid = _frank_comms.aggregate(commissions=Sum('commission_amount'), tips=Sum('tip_amount'))
 
-        if ledger['balance'] != 0 or frank_history or frank_advances:
+        if ledger['balance'] != 0 or frank_history or frank_advances or frank.ledger_reset_at:
             data.append({
                 'barber_id': frank.id,
                 'barber_name': frank.display_name,

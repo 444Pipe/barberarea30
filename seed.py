@@ -382,6 +382,22 @@ try:
 except Exception as _e:
     print("⚠ No se pudo hacer el backfill de BarberPayment:", _e)
 
+# --- Autocuración para barbers_barber.ledger_reset_at (punto de partida del saldo) ---
+from apps.barbers.models import Barber as _BarberLR
+try:
+    _BarberLR.objects.filter(ledger_reset_at__isnull=False).exists()
+except Exception:
+    print("⚠ Columna 'ledger_reset_at' no encontrada en barbers_barber. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.DateTimeField(null=True, blank=True)
+            _f.set_attributes_from_name('ledger_reset_at')
+            schema_editor.add_field(_BarberLR, _f)
+        print("  ✓ Columna 'ledger_reset_at' creada.")
+    except Exception as _e:
+        print("  ⚠ No se pudo crear 'ledger_reset_at':", _e)
+
 # --- Autocuración para payment_source en egresos y pagos a barberos ---
 from apps.cashflow.models import Expense as _Expense, BarberPayment as _BarberPayment
 for _Model, _col in ((_Expense, 'payment_source'), (_BarberPayment, 'payment_source')):

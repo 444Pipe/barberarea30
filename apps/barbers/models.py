@@ -58,6 +58,10 @@ class Barber(models.Model):
         max_digits=5, decimal_places=2, default=40.0,
         help_text='Porcentaje de comisión estándar (0-100)'
     )
+    # Punto de partida del saldo/ledger: si está fijado, solo se cuentan las
+    # comisiones, vales y pagos POSTERIORES a esta fecha. Sirve para "reiniciar"
+    # el acumulado de un barbero (ej. Frank) dejando su historial intacto en BD.
+    ledger_reset_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
