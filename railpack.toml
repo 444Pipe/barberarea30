@@ -1,6 +1,11 @@
 [variables]
 # Build phase usa settings.build (sin secrets de Railway)
 DJANGO_SETTINGS_MODULE = "config.settings.build"
+# mise (2026.8+) exige "GitHub artifact attestations" para descargar CPython;
+# los builds standalone viejos (ej. 3.12.7 de oct-2024) no las tienen y el
+# build falla. Desactivamos esa verificación (es una descarga de build, no un
+# riesgo de runtime).
+MISE_PYTHON_GITHUB_ATTESTATIONS = "false"
 
 [deploy]
 # En runtime sobreescribimos DJANGO_SETTINGS_MODULE con production
