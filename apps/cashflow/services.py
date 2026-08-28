@@ -403,6 +403,9 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
                  que es insumo de una venta, no un retiro de caja)
                  + pagos a barberos NO-Frank (los de Frank ya están
                  representados como egreso "Pago Diario", para no contar doble)
+                 + vales/adelantos entregados a barberos (plata que ya salió
+                 del cajón; no se cuenta doble porque la liquidación paga el
+                 neto: acumulado − vales)
                  + retiros y traslados salientes
       saldo    = apertura + ingresos − salidas  → cuánto DEBE haber físicamente.
 
@@ -411,7 +414,7 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
     """
     from django.db.models import Q, Sum, F
     from apps.cashflow.models import (
-        Sale, InventorySale, Expense, BarberPayment, CashMovement,
+        Sale, InventorySale, Expense, BarberPayment, BarberAdvance, CashMovement,
     )
 
     period_start, opening_cash, opening_transfer = cash_period_bounds(exclude_cut_id)
@@ -421,6 +424,7 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
     inv = InventorySale.objects.all()
     exp = Expense.objects.all()
     pays = BarberPayment.objects.all()
+    advs = BarberAdvance.objects.all()
     # Al simular el borrado de un corte, sus movimientos archivados vuelven al
     # período: hay que contarlos igual que los sueltos.
     if exclude_cut_id is not None:
@@ -434,6 +438,7 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
         inv = inv.filter(created_at__gt=period_start)
         exp = exp.filter(created_at__gt=period_start)
         pays = pays.filter(created_at__gt=period_start)
+        advs = advs.filter(created_at__gt=period_start)
 
     cash_q = Q(payment_method__isnull=True) | Q(payment_method__slug='efectivo')
     transfer_q = Q(payment_method__slug='transferencia')
@@ -450,7 +455,11 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
         ).aggregate(t=Sum('amount'))['t'] or zero
         p = pays.filter(payment_source=source, expense__isnull=True).aggregate(
             t=Sum('amount'))['t'] or zero
-        return _to_decimal(e) + _to_decimal(p)
+        # Los vales históricos tienen payment_source vacío y quedan fuera a
+        # propósito: no se recalcula caja hacia atrás.
+        a = advs.filter(payment_source=source).aggregate(
+            t=Sum('amount'))['t'] or zero
+        return _to_decimal(e) + _to_decimal(p) + _to_decimal(a)
 
     # Movimientos manuales: se reparten entre entradas y salidas según su
     # efecto real sobre cada caja (un traslado sale de una y entra en la otra).
@@ -491,7 +500,7 @@ def compute_cash_box_detail(reference_date=None):
     """
     from django.db.models import Q
     from apps.cashflow.models import (
-        Sale, InventorySale, Expense, BarberPayment, CashMovement,
+        Sale, InventorySale, Expense, BarberPayment, BarberAdvance, CashMovement,
     )
 
     period_start, opening_cash, opening_transfer = cash_period_bounds()
@@ -556,6 +565,17 @@ def compute_cash_box_detail(reference_date=None):
                 'label': f'Pago a {p.barber.display_name if p.barber else "Barbero"}',
                 'sub': 'Pago a barbero',
                 'amount': float(p.amount),
+            })
+        for a in since(BarberAdvance.objects.filter(
+            payment_source=source
+        )).select_related('barber'):
+            dt = timezone.localtime(a.created_at)
+            outflow.append({
+                '_k': dt.isoformat(),
+                'date': dt.strftime('%d/%m'),
+                'label': f'Vale a {a.barber.display_name if a.barber else "Barbero"}',
+                'sub': 'Vale / adelanto' + (f' · {a.reason}' if a.reason else ''),
+                'amount': float(a.amount),
             })
 
         # ── MOVIMIENTOS MANUALES (inyecciones, retiros, traslados) ────────

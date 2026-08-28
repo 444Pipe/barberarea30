@@ -203,6 +203,16 @@ class BarberAdvance(models.Model):
         related_name='barber_advances_given'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    # De dónde salió FÍSICAMENTE la plata del vale. El vale es dinero que ya
+    # se entregó, así que descuenta del control de caja (ver
+    # services.compute_cash_box). No hay doble conteo: la liquidación
+    # posterior paga el neto (acumulado − vales).
+    # Vacío = vale histórico, anterior a esta regla: no toca la caja.
+    payment_source = models.CharField(
+        max_length=10, choices=PAYMENT_SOURCE_CHOICES, blank=True, default='',
+        help_text='De dónde salió el dinero: efectivo o transferencia '
+                  '(vacío = vale histórico, no descuenta de la caja)'
+    )
     # Liquidación: se marca cuando el vale ya fue descontado en un pago.
     is_settled = models.BooleanField(
         default=False, help_text='¿Ya fue descontado en una liquidación al barbero?'

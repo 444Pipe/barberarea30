@@ -400,7 +400,7 @@
         <div class="space-y-1 text-[0.7rem]">
           {% if cash_box.cash.opening %}<div class="flex justify-between"><span class="text-smoke/50">Viene del corte anterior</span><span class="text-white">${{ cash_box.cash.opening|floatformat:0 }}</span></div>{% endif %}
           <div class="flex justify-between"><span class="text-smoke/50">Entradas del período</span><span class="text-white">${{ cash_box.cash.income_total|floatformat:0 }}</span></div>
-          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.cash.out_total|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos + vales)</span><span class="text-red-400">-${{ cash_box.cash.out_total|floatformat:0 }}</span></div>
           <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-emerald-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-emerald-400">${{ cash_box.cash.balance|floatformat:0 }}</span></div>
         </div>
         <details class="mt-3">
@@ -435,7 +435,7 @@
         <div class="space-y-1 text-[0.7rem]">
           {% if cash_box.transfer.opening %}<div class="flex justify-between"><span class="text-smoke/50">Viene del corte anterior</span><span class="text-white">${{ cash_box.transfer.opening|floatformat:0 }}</span></div>{% endif %}
           <div class="flex justify-between"><span class="text-smoke/50">Entradas del período</span><span class="text-white">${{ cash_box.transfer.income_total|floatformat:0 }}</span></div>
-          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos)</span><span class="text-red-400">-${{ cash_box.transfer.out_total|floatformat:0 }}</span></div>
+          <div class="flex justify-between"><span class="text-smoke/50">Salidas (egresos + pagos + vales)</span><span class="text-red-400">-${{ cash_box.transfer.out_total|floatformat:0 }}</span></div>
           <div class="flex justify-between border-t border-white/10 pt-1 font-bold"><span class="text-blue-400/80 uppercase tracking-widest text-[0.6rem]">Debe haber</span><span class="text-blue-400">${{ cash_box.transfer.balance|floatformat:0 }}</span></div>
         </div>
         <details class="mt-3">
@@ -702,11 +702,19 @@
         <button onclick="closeAdvanceModal()" class="text-smoke/40 hover:text-white">✕</button>
       </div>
       <div class="p-5 space-y-4">
-        <div class="text-xs text-smoke/70">Préstamo a <strong class="text-white" id="cf-advance-barber-name"></strong>. Se descuenta de su acumulado de la quincena.</div>
+        <div class="text-xs text-smoke/70">Préstamo a <strong class="text-white" id="cf-advance-barber-name"></strong>. Se descuenta de su acumulado de la quincena y sale de la caja de una vez.</div>
         <div class="text-[0.7rem] text-smoke/50"><span id="cf-advance-available-label">Saldo disponible: </span><strong class="text-gold" id="cf-advance-available"></strong></div>
         <div>
           <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Monto del vale</label>
           <input type="number" id="cf-advance-amount" min="1" step="1000" placeholder="0" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-amber-400 outline-none">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">¿De dónde sale el vale?</label>
+          <select id="cf-advance-source" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-amber-400 outline-none">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+          </select>
+          <div class="text-[0.65rem] text-smoke/50 mt-1.5">El monto se descuenta del control de caja: la plata ya salió.</div>
         </div>
         <div>
           <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">Motivo (opcional)</label>
@@ -1715,7 +1723,7 @@ function fetchBarberPayments() {
                 ${p.advances.map(a => `
                   <div class="flex justify-between items-center bg-amber-500/[0.06] border border-amber-500/20 p-1.5 rounded gap-2">
                     <div class="min-w-0">
-                      <div class="text-amber-300 font-medium">${fmt(a.amount)}</div>
+                      <div class="text-amber-300 font-medium">${fmt(a.amount)}${a.source ? ` <span class="text-smoke/40 font-normal">· salió de ${escH(a.source).toLowerCase()}</span>` : ''}</div>
                       <div class="text-smoke/40 text-[0.58rem] truncate">${a.date}${a.reason ? ' · ' + escH(a.reason) : ''} · ${escH(a.by)}</div>
                     </div>
                     <button onclick="deleteAdvance(${a.id})" class="text-red-400/60 hover:text-red-400 shrink-0 px-1 text-sm leading-none" title="Anular vale">✕</button>
@@ -2263,7 +2271,7 @@ function cfRenderPaymentDetail(d) {
         ${d.advances.map(a => `
           <div class="flex justify-between bg-amber-500/[0.06] border border-amber-500/20 p-2 rounded">
             <div class="min-w-0">
-              <div class="text-amber-300 font-medium">${fmt(a.amount)}</div>
+              <div class="text-amber-300 font-medium">${fmt(a.amount)}${a.source ? ` <span class="text-smoke/40 font-normal">· salió de ${escH(a.source).toLowerCase()}</span>` : ''}</div>
               <div class="text-smoke/40 text-[0.58rem]">${a.date}${a.reason ? ' · ' + escH(a.reason) : ''} · ${escH(a.by)}</div>
             </div>
           </div>`).join('')}
@@ -2324,6 +2332,7 @@ window.openAdvanceModal = function(barberId, barberName, available, isFrank) {
   document.getElementById('cf-advance-available').textContent = fmt(available) + (isFrank ? ' (puede quedar negativo)' : '');
   document.getElementById('cf-advance-available-label').textContent = isFrank ? 'Saldo actual: ' : 'Saldo disponible: ';
   document.getElementById('cf-advance-amount').value = '';
+  document.getElementById('cf-advance-source').value = 'cash';
   document.getElementById('cf-advance-reason').value = '';
   const err = document.getElementById('cf-advance-error');
   err.classList.add('hidden'); err.textContent = '';
@@ -2338,6 +2347,7 @@ window.submitAdvance = function() {
   if (!cfAdvanceBarberId) return;
   const amount = parseInt(document.getElementById('cf-advance-amount').value, 10);
   const reason = document.getElementById('cf-advance-reason').value.trim();
+  const payment_source = document.getElementById('cf-advance-source').value;
   const errEl = document.getElementById('cf-advance-error');
   const btn = document.getElementById('cf-btn-confirm-advance');
   errEl.classList.add('hidden');
@@ -2350,13 +2360,16 @@ window.submitAdvance = function() {
   fetch(`/api/admin/cashflow/barber-payments/${cfAdvanceBarberId}/advance/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-    body: JSON.stringify({ amount, reason })
+    body: JSON.stringify({ amount, reason, payment_source })
   })
   .then(r => r.json().then(d => ({ ok: r.ok, d })))
   .then(({ ok, d }) => {
     if (ok && d.ok) {
       closeAdvanceModal();
-      fetchBarberPayments();
+      // El vale descuenta del control de caja, que se renderiza en el
+      // servidor: recargar para que el saldo mostrado siga cuadrando con la
+      // plata física del cajón.
+      window.location.reload();
     } else {
       errEl.textContent = d.error || 'No se pudo registrar el vale.';
       errEl.classList.remove('hidden');
@@ -2366,14 +2379,15 @@ window.submitAdvance = function() {
   .finally(() => { btn.disabled = false; btn.textContent = 'Registrar vale'; });
 };
 window.deleteAdvance = function(advanceId) {
-  if (!confirm('¿Anular este vale/adelanto? El monto se devuelve al acumulado del barbero.')) return;
+  if (!confirm('¿Anular este vale/adelanto? El monto se devuelve al acumulado del barbero y a la caja.')) return;
   fetch(`/api/admin/cashflow/barber-payments/advance/${advanceId}/`, {
     method: 'DELETE',
     headers: { 'X-CSRFToken': CSRF }
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) { fetchBarberPayments(); }
+    // Anular el vale devuelve la plata a la caja: mismo motivo que arriba.
+    if (data.ok) { window.location.reload(); }
     else { alert(data.error || 'No se pudo anular el vale.'); }
   })
   .catch(() => alert('Error de conexión.'));

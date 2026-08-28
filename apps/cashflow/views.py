@@ -1582,6 +1582,7 @@ def unpaid_commissions_view(request):
             'amount': float(adv.amount),
             'reason': adv.reason,
             'date': adv.created_at.strftime('%Y-%m-%d'),
+            'source': adv.get_payment_source_display() if adv.payment_source else '',
             'by': (adv.created_by.get_full_name() or adv.created_by.username) if adv.created_by else '—',
         } for adv in advances_qs]
 
@@ -1632,6 +1633,7 @@ def unpaid_commissions_view(request):
             'amount': float(adv.amount),
             'reason': adv.reason,
             'date': adv.created_at.strftime('%Y-%m-%d'),
+            'source': adv.get_payment_source_display() if adv.payment_source else '',
             'by': (adv.created_by.get_full_name() or adv.created_by.username) if adv.created_by else '—',
         } for adv in frank_advances_qs]
 
@@ -1670,6 +1672,9 @@ def register_barber_advance_view(request, barber_id):
 
     El barbero pide prestado parte de lo que ha hecho. El monto no puede superar el
     saldo disponible (acumulado pendiente menos vales ya pendientes).
+
+    `payment_source` (efectivo/transferencia) dice de dónde salió la plata: el
+    vale descuenta del control de caja, porque el dinero ya se entregó.
     """
     from apps.cashflow.models import Commission, BarberAdvance
     from apps.barbers.models import Barber
@@ -1683,6 +1688,12 @@ def register_barber_advance_view(request, barber_id):
 
     raw_amount = request.data.get('amount')
     reason = (request.data.get('reason') or '').strip()
+    payment_source = (request.data.get('payment_source') or 'cash').strip()
+    if payment_source not in ('cash', 'transfer'):
+        return Response(
+            {'error': 'Indica si el vale se entregó en efectivo o por transferencia.'},
+            status=400,
+        )
     try:
         amount = Decimal(str(raw_amount)).quantize(Decimal('1'))
     except (InvalidOperation, TypeError, ValueError):
@@ -1709,21 +1720,24 @@ def register_barber_advance_view(request, barber_id):
             }, status=400)
 
     advance = BarberAdvance.objects.create(
-        barber=barber, amount=amount, reason=reason, created_by=request.user
+        barber=barber, amount=amount, reason=reason,
+        payment_source=payment_source, created_by=request.user
     )
+
+    source_label = 'Efectivo' if payment_source == 'cash' else 'Transferencia'
 
     log_audit(
         user=request.user,
         action='create',
         obj=advance,
-        changes={'amount': float(amount)},
+        changes={'amount': float(amount), 'payment_source': payment_source},
         request=request,
-        extra_data={'msg': f"Registró un vale/adelanto de ${amount:,.0f} a {barber.display_name}" + (f" — {reason}" if reason else "")}
+        extra_data={'msg': f"Registró un vale/adelanto de ${amount:,.0f} ({source_label.lower()}) a {barber.display_name}" + (f" — {reason}" if reason else "")}
     )
 
     return Response({
         'ok': True,
-        'message': f'Vale de ${amount:,.0f} registrado para {barber.display_name}.'
+        'message': f'Vale de ${amount:,.0f} registrado para {barber.display_name}. Descontado de la caja en {source_label.lower()}.'
     }, status=201)
 
 
@@ -1993,6 +2007,7 @@ def barber_payment_detail_view(request, barber_id):
         'amount': float(a.amount),
         'reason': a.reason,
         'date': timezone.localtime(a.created_at).strftime('%Y-%m-%d'),
+        'source': a.get_payment_source_display() if a.payment_source else '',
         'by': (a.created_by.get_full_name() or a.created_by.username) if a.created_by else '—',
     } for a in advances_qs]
 

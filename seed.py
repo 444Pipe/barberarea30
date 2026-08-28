@@ -415,6 +415,24 @@ for _Model, _col in ((_Expense, 'payment_source'), (_BarberPayment, 'payment_sou
         except Exception as _e:
             print(f"  ⚠ No se pudo crear '{_col}':", _e)
 
+# --- Autocuración para payment_source en vales/adelantos ---
+# El vale descuenta del control de caja (services.compute_cash_box). Los vales
+# históricos quedan con '' a propósito: no se recalcula la caja hacia atrás.
+from apps.cashflow.models import BarberAdvance as _BarberAdvance2
+try:
+    _BarberAdvance2.objects.filter(payment_source='cash').exists()
+except Exception:
+    print("⚠ Columna 'payment_source' no encontrada en cashflow_barberadvance. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.CharField(max_length=10, default='', blank=True)
+            _f.set_attributes_from_name('payment_source')
+            schema_editor.add_field(_BarberAdvance2, _f)
+        print("  ✓ Columna 'payment_source' creada en cashflow_barberadvance.")
+    except Exception as _e:
+        print("  ⚠ No se pudo crear 'payment_source' en cashflow_barberadvance:", _e)
+
 # --- Autocuración: tablas del control de caja (CashCut / CashMovement) ---
 # Sin ellas la pantalla de Caja revienta entera. Mismo patrón que el resto de
 # los schema-repairs: si la migración no corrió, se crean con el schema editor.
