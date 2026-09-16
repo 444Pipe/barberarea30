@@ -18,6 +18,7 @@ from decimal import Decimal
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Exists
 from django.utils import timezone
 
 from apps.cashflow.models import Sale, Commission, PaymentMethod
@@ -105,6 +106,21 @@ EXPENSE_TYPES_BY_ROLE = {
 def allowed_expense_types(role):
     """Tipos de egreso que este rol puede registrar o editar."""
     return EXPENSE_TYPES_BY_ROLE.get(role, {'variable'})
+
+
+def _frank_expense_of_close():
+    """Subconsulta: ¿el cierre de este pago todavía tiene su egreso "Pago Diario"?
+
+    Se usa con `~Exists(...)` en vez de un `exclude()` sobre la relación, porque
+    el exclude arma un JOIN y un cierre con dos egresos que coincidan devolvería
+    el pago dos veces, sumándolo doble. Un subquery nunca duplica filas.
+    """
+    from django.db.models import OuterRef
+    from apps.cashflow.models import Expense
+    return Expense.objects.filter(
+        included_in_daily_close=OuterRef('daily_close'),
+        description__startswith=FRANK_DAILY_EXPENSE_PREFIX,
+    )
 
 
 def looks_like_advance(description):
@@ -538,9 +554,10 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
         # enlace ni con excluir todo pago de cierre: se excluye solo si el
         # cierre todavía tiene su egreso "Pago Diario", que es lo que de verdad
         # representa el mismo dinero.
-        p = pays.filter(payment_source=source, expense__isnull=True).exclude(
-            daily_close__expenses__description__startswith=FRANK_DAILY_EXPENSE_PREFIX
-        ).aggregate(t=Sum('amount'))['t'] or zero
+        p = pays.filter(
+            payment_source=source, expense__isnull=True,
+        ).filter(~Exists(_frank_expense_of_close())).aggregate(
+            t=Sum('amount'))['t'] or zero
         # Los vales históricos tienen payment_source vacío y quedan fuera a
         # propósito: no se recalcula caja hacia atrás.
         a = advs.filter(payment_source=source).aggregate(
@@ -725,9 +742,8 @@ def compute_outflows(*, source=None, category=None, period_start=None,
     payments = acotar(
         BarberPayment.objects.filter(
             payment_source__in=sources, expense__isnull=True,
-        ).exclude(
-            daily_close__expenses__description__startswith=FRANK_DAILY_EXPENSE_PREFIX
-        ).select_related('barber', 'created_by')
+        ).filter(~Exists(_frank_expense_of_close()))
+        .select_related('barber', 'created_by')
     )
     for pmt in payments:
         nombre = pmt.barber.display_name if pmt.barber else 'Barbero'
