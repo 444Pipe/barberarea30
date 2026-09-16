@@ -62,7 +62,7 @@ class Command(BaseCommand):
                         Expense.objects.create(
                             description='Pago Diario: Franko',
                             amount=frank_pay,
-                            expense_type='variable',
+                            expense_type='barber_payment',
                             registered_by=close.closed_by,
                             included_in_daily_close=close
                         )

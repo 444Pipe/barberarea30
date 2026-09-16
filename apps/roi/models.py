@@ -134,8 +134,10 @@ class MonthlyROISnapshot(models.Model):
     )
     total_operational_expenses = models.DecimalField(
         max_digits=15, decimal_places=0, default=0,
-        verbose_name='Egresos Operativos (Variables + Inventario)',
-        help_text='Expense.amount donde expense_type IN (variable, inventory), excluyendo "Pago Diario: Franko" (ya está en comisiones).',
+        verbose_name='Egresos Operativos (Día a día + Inventario + Materiales)',
+        help_text='Expense.amount de todo lo que no es un gasto fijo, excluyendo '
+                  'el "Pago Diario: Franko" automático (ya está en comisiones). '
+                  'Un bono suelto a un barbero sí cuenta: es gasto real.',
     )
     net_income = models.DecimalField(
         max_digits=15, decimal_places=0, default=0,

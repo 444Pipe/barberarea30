@@ -177,10 +177,21 @@
     window.fetchBarberPayments = fetchBarberPayments;
 
     window.payBarber = function(barberId, barberName, netAmount) {
-      if (!confirm(`Liquidar ${fmt(netAmount)} (neto, ya descontados los vales) a ${barberName}?`)) return;
+      // La fuente es obligatoria: sin ella el pago se guardaba siempre como
+      // efectivo y el control de caja quedaba descuadrado en ese monto.
+      const fuente = prompt(
+        `Liquidar ${fmt(netAmount)} (neto, ya descontados los vales) a ${barberName}.\n\n` +
+        'Escribe 1 si se paga en EFECTIVO o 2 si es por TRANSFERENCIA:', '1');
+      if (fuente === null) return;
+      const payment_source = fuente.trim() === '2' ? 'transfer' : 'cash';
+      if (!['1', '2'].includes(fuente.trim())) {
+        alert('Escribe 1 para efectivo o 2 para transferencia.');
+        return;
+      }
       fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/`, {
         method: 'POST',
-        headers: { 'X-CSRFToken': CSRF }
+        headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_source })
       })
       .then(r => r.json())
       .then(data => {

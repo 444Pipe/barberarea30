@@ -6,7 +6,8 @@ Reglas de negocio (Área 30 Barber Club):
   • Comisiones           = Suma de Commission.commission_amount del mes
                            (40% staff general / 50% Frank — el % vive en Barber.commission_percentage
                            y en Commission.percentage, recalculado por Commission.save()).
-  • Egresos Operativos   = Expense (variable + inventory) EXCLUYENDO "Pago Diario: Franko"
+  • Egresos Operativos   = Expense de tipo variable + inventory + materials,
+                           EXCLUYENDO los de tipo barber_payment ("Pago Diario: Franko")
                            (ese pago ya está representado en la Commission de Frank al 50% —
                            contarlo en egresos lo duplicaría).
   • Egresos Fijos        = Expense con expense_type='fixed' (arriendo, servicios, nómina).
@@ -35,7 +36,9 @@ from .models import (
 
 
 # Descripción canónica del egreso auto-generado por DailyClose cuando se paga a Frank.
-# Si cambia en apps/cashflow/views.py, actualizar aquí también.
+# Desde la migración cashflow.0017 el criterio principal es el TIPO
+# (Expense.TYPE_BARBER_PAYMENT); esta descripción queda como respaldo para
+# cualquier fila que se haya quedado sin reclasificar.
 FRANK_DAILY_EXPENSE_DESC = 'Pago Diario: Franko'
 
 
@@ -113,11 +116,20 @@ def get_month_financials(year: int, month: int, *, include_pending: bool = False
         expense_qs.filter(expense_type='fixed').aggregate(t=Sum('amount'))['t']
     )
 
-    # Operativos = variables + compras de inventario, EXCLUYENDO "Pago Diario: Franko"
-    # (ese pago ya está representado en Commission al 50% → contarlo aquí lo duplicaría).
+    # Operativos = todo lo que no es un gasto fijo, MENOS el pago automático
+    # diario a Frank: ese costo ya viaja en su Commission al 50%, y contarlo
+    # otra vez aquí lo duplicaría.
+    #
+    # Se excluye ese egreso concreto, no la categoría entera: un bono o un pago
+    # suelto a un barbero sí es gasto real y debe pesar en el neto. Excluir todo
+    # 'barber_payment' dejaría esos montos fuera del ROI sin que nadie lo note,
+    # y los socios se repartirían una utilidad que no existe.
+    #
+    # OJO al agregar un expense_type nuevo: si no entra en esta lista ni en
+    # 'fixed', su monto desaparece del ROI sin avisar. Ver Expense.OPERATIONAL_TYPES.
     operational_qs = (
-        expense_qs.filter(expense_type__in=['variable', 'inventory'])
-        .exclude(description__iexact=FRANK_DAILY_EXPENSE_DESC)
+        expense_qs.filter(expense_type__in=Expense.OPERATIONAL_TYPES)
+        .exclude(description__startswith=FRANK_DAILY_EXPENSE_DESC)
     )
     total_operational_expenses = _D(operational_qs.aggregate(t=Sum('amount'))['t'])
 

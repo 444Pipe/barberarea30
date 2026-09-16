@@ -13,6 +13,7 @@ Centraliza la transacción completa de una venta:
 Toda la operación corre dentro de un bloque transaction.atomic(),
 garantizando que o todo sucede o nada sucede (rollback automático).
 """
+import re
 from decimal import Decimal
 from datetime import timedelta
 
@@ -24,21 +25,96 @@ from apps.inventory.models import ServiceInventoryItem, InventoryMovement
 from apps.analytics.models import log_audit
 
 
-# Prefijo del egreso que genera la casilla "Materiales" del checkout. Es un
-# identificador semántico: los detalles de caja lo usan para separar el costo
-# de materiales del resto de egresos (ver is_materials_expense).
+# Prefijo del egreso que genera la casilla "Materiales" del checkout. Desde que
+# existe `Expense.TYPE_MATERIALS` el prefijo ya no es el criterio, solo el
+# respaldo para las filas que quedaron de antes de la reclasificación.
 MATERIALS_EXPENSE_PREFIX = 'Materiales Servicio:'
 
+# Egreso que crea el cierre diario para pagarle a Frank. Mismo caso: el tipo
+# `Expense.TYPE_BARBER_PAYMENT` manda, el texto es el respaldo.
+FRANK_DAILY_EXPENSE_PREFIX = 'Pago Diario: Franko'
 
-def is_materials_expense(description):
+# Un egreso cuya descripción trae alguna de estas palabras es, casi siempre, un
+# adelanto a un barbero escrito a mano en vez de usar el botón "Dar vale". Pasa
+# por caja pero no baja el saldo del barbero, así que el cierre le sugiere
+# pagarle completo y la plata sale dos veces. Ver `looks_like_advance`.
+ADVANCE_LIKE_RE = re.compile(
+    r'(?i)\b(vale|vales|adelanto|adelantos|anticipo|anticipos'
+    r'|pr[eé]stamo|prestamo|prestamos)\b'
+)
+
+
+def _expense_fields(expense_or_description):
+    """Acepta un Expense o una descripción suelta. Devuelve (tipo, descripción).
+
+    Las firmas viejas pasaban solo el texto; se siguen aceptando para no
+    romperlas, pero sin tipo el criterio cae al prefijo.
+    """
+    if isinstance(expense_or_description, str) or expense_or_description is None:
+        return None, expense_or_description or ''
+    return (
+        getattr(expense_or_description, 'expense_type', None),
+        getattr(expense_or_description, 'description', '') or '',
+    )
+
+
+def is_materials_expense(expense_or_description):
     """¿Este egreso es el costo de materiales de un servicio?
 
     Los materiales no son un gasto operativo más (arriendo, servicios): son el
-    insumo de una venta concreta. Se separan en los detalles de caja para poder
-    responder "¿de qué se compone este monto?" sin cambiar cómo se calculan los
-    totales — sigue entrando en total_expenses como siempre.
+    insumo de una venta concreta, y se muestran como su propio rubro en los
+    detalles de caja y del cierre.
     """
-    return (description or '').startswith(MATERIALS_EXPENSE_PREFIX)
+    expense_type, description = _expense_fields(expense_or_description)
+    if expense_type is not None:
+        return expense_type == 'materials' or description.startswith(MATERIALS_EXPENSE_PREFIX)
+    return description.startswith(MATERIALS_EXPENSE_PREFIX)
+
+
+def is_frank_daily_expense(expense_or_description):
+    """¿Es el egreso que el cierre diario crea para pagarle a Frank?
+
+    Importa porque su costo ya está representado en la Commission de Frank:
+    contarlo además como gasto operativo lo duplicaría (ver apps/roi/services).
+
+    El criterio es la DESCRIPCIÓN, no el tipo, y a propósito: un bono suelto a
+    un barbero también es 'barber_payment' pero no está en ninguna Commission,
+    así que sí es gasto real y debe poder editarse y borrarse como cualquier
+    otro. "Pago Diario: Franko" es un patrón reservado que ni add_expense_view
+    ni edit_expense_view dejan escribir a mano, así que solo lo lleva el egreso
+    que genera el cierre.
+    """
+    _expense_type, description = _expense_fields(expense_or_description)
+    return description.startswith(FRANK_DAILY_EXPENSE_PREFIX)
+
+
+# Qué tipos de egreso puede registrar o editar cada rol. Los operativos (Frank)
+# manejan el gasto del día a día y los materiales de un servicio; los fijos, las
+# compras de inventario y los pagos a barberos son de los socios.
+#
+# Un egreso 'barber_payment' registrado a mano NO toca el saldo de ningún
+# barbero: para eso están "Dar vale" y "Liquidar". Sirve para dejar constancia
+# de una salida ya decidida (un bono, un pago fuera de liquidación).
+EXPENSE_TYPES_BY_ROLE = {
+    'operational_admin': {'variable', 'materials'},
+    'admin': {'variable', 'materials'},
+    'superadmin': {'fixed', 'variable', 'inventory', 'materials', 'barber_payment'},
+}
+
+
+def allowed_expense_types(role):
+    """Tipos de egreso que este rol puede registrar o editar."""
+    return EXPENSE_TYPES_BY_ROLE.get(role, {'variable'})
+
+
+def looks_like_advance(description):
+    """¿Esta descripción de egreso parece un vale/adelanto a un barbero?
+
+    Se usa para NO dejar registrarlo como egreso suelto: el camino correcto es
+    "Dar vale", que además de sacar la plata de la caja se la descuenta al
+    barbero de su acumulado.
+    """
+    return bool(ADVANCE_LIKE_RE.search(description or ''))
 
 
 # La jornada no termina a la medianoche. Un cierre hecho a las 00:20 del
@@ -399,8 +475,9 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
       ingresos = ventas de servicios (precio final + propina) + ventas de
                  inventario, sobre ventas APROBADAS del período
                  + inyecciones de capital y traslados entrantes
-      salidas  = egresos reales (excluye el costo de materiales de servicios,
-                 que es insumo de una venta, no un retiro de caja)
+      salidas  = egresos con esa fuente (incluidos los materiales de un
+                 servicio: son plata que salió del cajón. Un insumo que no pasó
+                 por caja se registra con payment_source='none' y no cuenta)
                  + pagos a barberos NO-Frank (los de Frank ya están
                  representados como egreso "Pago Diario", para no contar doble)
                  + vales/adelantos entregados a barberos (plata que ya salió
@@ -450,11 +527,20 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
         return _to_decimal(s) + _to_decimal(i)
 
     def outflow(source):
-        e = exp.filter(payment_source=source).exclude(
-            description__startswith=MATERIALS_EXPENSE_PREFIX
+        # Los materiales de un servicio ya NO se excluyen: si la plata salió del
+        # cajón, la caja tiene que restarla. El egreso que no pasó por caja se
+        # marca con payment_source='none' y queda fuera por el propio filtro.
+        e = exp.filter(payment_source=source).aggregate(t=Sum('amount'))['t'] or zero
+        # El pago de Frank se omite cuando su Expense ya entró arriba, para no
+        # contarlo dos veces. Pero `expense` es SET_NULL: si ese egreso se borra,
+        # el enlace queda en nulo y el pago pasa a ser la ÚNICA constancia de
+        # esa salida (ha pasado en producción). Por eso no basta con mirar el
+        # enlace ni con excluir todo pago de cierre: se excluye solo si el
+        # cierre todavía tiene su egreso "Pago Diario", que es lo que de verdad
+        # representa el mismo dinero.
+        p = pays.filter(payment_source=source, expense__isnull=True).exclude(
+            daily_close__expenses__description__startswith=FRANK_DAILY_EXPENSE_PREFIX
         ).aggregate(t=Sum('amount'))['t'] or zero
-        p = pays.filter(payment_source=source, expense__isnull=True).aggregate(
-            t=Sum('amount'))['t'] or zero
         # Los vales históricos tienen payment_source vacío y quedan fuera a
         # propósito: no se recalcula caja hacia atrás.
         a = advs.filter(payment_source=source).aggregate(
@@ -490,6 +576,258 @@ def compute_cash_box(reference_date=None, exclude_cut_id=None):
         'transfer_out': transfer_out,
         'cash_balance': opening_cash + cash_income - cash_out,
         'transfer_balance': opening_transfer + transfer_income - transfer_out,
+    }
+
+
+# ── Salidas de dinero, en una sola lista ────────────────────────────────────
+#
+# La plata sale del negocio por cuatro puertas distintas, cada una con su
+# modelo: un egreso, un vale a un barbero, una liquidación, o un movimiento
+# manual (retiro / traslado). La pantalla de Egresos solo mostraba la primera,
+# y por eso el dueño no lograba reconstruir el "Debe haber" de la caja.
+#
+# `compute_outflows` es la ÚNICA función que arma esa lista. La tarjeta de caja
+# y la pantalla de Egresos cuelgan las dos de aquí, así que no pueden divergir:
+# si un día no cuadran, el bug está en esta función y en ninguna otra parte.
+
+# Categorías de salida. Las cinco primeras son los tipos de `Expense`; las
+# demás existen porque un vale o un retiro no son egresos y nunca tuvieron tipo.
+OUTFLOW_CATEGORIES = [
+    ('fixed', 'Fijo'),
+    ('variable', 'Día a día'),
+    ('inventory', 'Compra de inventario'),
+    ('materials', 'Materiales de servicio'),
+    ('barber_payment', 'Pago a barberos'),
+    ('advance', 'Vale / adelanto'),
+    ('settlement', 'Liquidación a barbero'),
+    ('withdrawal', 'Retiro de dinero'),
+    ('transfer_out', 'Traslado a la otra caja'),
+    ('adjustment', 'Ajuste de saldo'),
+]
+OUTFLOW_CATEGORY_LABELS = dict(OUTFLOW_CATEGORIES)
+
+
+def _person(user):
+    if not user:
+        return 'Sistema'
+    return user.get_full_name() or user.username
+
+
+def compute_outflows(*, source=None, category=None, period_start=None,
+                     date_from=None, date_to=None, use_cash_period=True,
+                     exclude_cut_id=None):
+    """Todas las salidas de dinero, con la MISMA acotación que compute_cash_box.
+
+    Cada fila trae de dónde salió (`source`), qué clase de salida es
+    (`category`), y qué modelo la respalda (`kind`), para poder editarla o
+    anularla desde la pantalla de Egresos.
+
+    - `use_cash_period=True` acota igual que la caja: por fecha de REGISTRO,
+      desde el último corte. Es lo que hace que los totales coincidan.
+    - `use_cash_period=False` con `date_from`/`date_to` acota por la fecha
+      visible del egreso, que es como la gente busca ("el arriendo de julio").
+      Los vales, pagos y movimientos no tienen fecha editable: para ellos se
+      usa la de registro.
+
+    Nunca incluye `payment_source='none'` ni los vales históricos sin fuente:
+    esa plata no pasó por la caja y contarla desbalancearía el "Debe haber".
+    """
+    from django.db.models import Q
+    from apps.cashflow.models import (
+        BarberAdvance, BarberPayment, CashMovement, Expense,
+    )
+
+    if period_start is None and use_cash_period:
+        period_start, _oc, _ot = cash_period_bounds(exclude_cut_id)
+
+    sources = ('cash', 'transfer') if source is None else (source,)
+
+    def acotar(qs, date_field=None):
+        """Aplica el período de caja y/o el rango de fechas que pidió el usuario."""
+        if use_cash_period and period_start is not None:
+            qs = qs.filter(created_at__gt=period_start)
+        if date_from or date_to:
+            field = date_field or 'created_at__date'
+            if date_from:
+                qs = qs.filter(**{f'{field}__gte': date_from})
+            if date_to:
+                qs = qs.filter(**{f'{field}__lte': date_to})
+        return qs
+
+    rows = []
+
+    # ── Egresos ────────────────────────────────────────────────────────
+    expenses = acotar(
+        Expense.objects.filter(payment_source__in=sources)
+        .select_related('registered_by', 'included_in_daily_close'),
+        date_field='date',
+    )
+    for e in expenses:
+        rows.append({
+            'kind': 'expense',
+            'id': e.id,
+            'at': e.created_at,
+            'date': e.date,
+            'label': e.description,
+            'category': e.expense_type,
+            'category_label': OUTFLOW_CATEGORY_LABELS.get(
+                e.expense_type, e.get_expense_type_display()),
+            'source': e.payment_source,
+            'amount': _to_decimal(e.amount),
+            'registered_by': _person(e.registered_by),
+            'daily_close_id': e.included_in_daily_close_id,
+            # "Del sistema" = lo creó el checkout o el cierre, no una
+            # persona. Se reconoce por la descripción reservada, no por el
+            # tipo: un egreso de materiales registrado a mano es un gasto
+            # normal y su dueño tiene que poder corregirlo.
+            'is_system': (
+                is_frank_daily_expense(e)
+                or e.description.startswith(MATERIALS_EXPENSE_PREFIX)
+            ),
+            'has_image': bool(e.image),
+            'image_url': e.image.url if e.image else None,
+            'notes': e.notes or '',
+        })
+
+    # ── Vales / adelantos ──────────────────────────────────────────────
+    # Los históricos (payment_source='') quedan fuera a propósito: se decidió
+    # no recalcular la caja hacia atrás (ver commit 7527ed7).
+    advances = acotar(
+        BarberAdvance.objects.filter(payment_source__in=sources)
+        .select_related('barber', 'created_by')
+    )
+    for a in advances:
+        nombre = a.barber.display_name if a.barber else 'Barbero'
+        rows.append({
+            'kind': 'advance',
+            'id': a.id,
+            'at': a.created_at,
+            'date': timezone.localtime(a.created_at).date(),
+            'label': f'Vale a {nombre}',
+            'category': 'advance',
+            'category_label': OUTFLOW_CATEGORY_LABELS['advance'],
+            'source': a.payment_source,
+            'amount': _to_decimal(a.amount),
+            'registered_by': _person(a.created_by),
+            'daily_close_id': None,
+            'is_system': False,
+            'has_image': False,
+            'image_url': None,
+            'notes': a.reason or '',
+        })
+
+    # ── Liquidaciones a barberos ───────────────────────────────────────
+    # Las de Frank van enlazadas a su Expense "Pago Diario": se omiten aquí
+    # porque ese egreso ya entró arriba. Contar ambos sería pagarle dos veces.
+    # Mismo criterio que compute_cash_box: se omite el pago cuyo cierre todavía
+    # conserva el egreso "Pago Diario" (ese ya entró arriba). Si el egreso se
+    # borró, el pago es la única constancia de la salida y sí tiene que contar.
+    payments = acotar(
+        BarberPayment.objects.filter(
+            payment_source__in=sources, expense__isnull=True,
+        ).exclude(
+            daily_close__expenses__description__startswith=FRANK_DAILY_EXPENSE_PREFIX
+        ).select_related('barber', 'created_by')
+    )
+    for pmt in payments:
+        nombre = pmt.barber.display_name if pmt.barber else 'Barbero'
+        rows.append({
+            'kind': 'payment',
+            'id': pmt.id,
+            'at': pmt.created_at,
+            'date': timezone.localtime(pmt.created_at).date(),
+            'label': f'Liquidación a {nombre}',
+            'category': 'settlement',
+            'category_label': OUTFLOW_CATEGORY_LABELS['settlement'],
+            'source': pmt.payment_source,
+            'amount': _to_decimal(pmt.amount),
+            'registered_by': _person(pmt.created_by),
+            'daily_close_id': pmt.daily_close_id,
+            'is_system': pmt.daily_close_id is not None,
+            'has_image': False,
+            'image_url': None,
+            'notes': pmt.notes or '',
+        })
+
+    # ── Movimientos manuales con efecto negativo ───────────────────────
+    movements = CashMovement.objects.select_related('created_by')
+    if use_cash_period:
+        # Dentro del período de caja, el criterio NO es la fecha sino el corte:
+        # `cash_cut__isnull=True` significa "todavía no archivado", que es
+        # exactamente lo que cuenta compute_cash_box. Mantenerlo idéntico es lo
+        # que garantiza que los dos totales cuadren.
+        if exclude_cut_id is not None:
+            movements = movements.filter(
+                Q(cash_cut__isnull=True) | Q(cash_cut_id=exclude_cut_id))
+        else:
+            movements = movements.filter(cash_cut__isnull=True)
+    # Fuera del período de caja (un rango de fechas, o "las últimas"), los
+    # movimientos se acotan solo por fecha, igual que los egresos y los vales.
+    # Filtrar también por corte los haría desaparecer apenas se cierra uno: el
+    # retiro de ayer dejaría de existir hoy, que es justo lo que esta pantalla
+    # vino a resolver.
+    if date_from:
+        movements = movements.filter(created_at__date__gte=date_from)
+    if date_to:
+        movements = movements.filter(created_at__date__lte=date_to)
+    for m in movements:
+        for box in sources:
+            efecto = m.effect_on(box)
+            if efecto >= 0:
+                continue
+            if m.kind == CashMovement.KIND_TRANSFER:
+                cat = 'transfer_out'
+            elif m.kind == CashMovement.KIND_WITHDRAWAL:
+                cat = 'withdrawal'
+            else:
+                cat = 'adjustment'
+            rows.append({
+                'kind': 'movement',
+                'id': m.id,
+                'at': m.created_at,
+                'date': timezone.localtime(m.created_at).date(),
+                'label': m.description or m.get_kind_display(),
+                'category': cat,
+                'category_label': OUTFLOW_CATEGORY_LABELS[cat],
+                'source': box,
+                'amount': _to_decimal(abs(efecto)),
+                'registered_by': _person(m.created_by),
+                'daily_close_id': None,
+                'is_system': False,
+                'has_image': False,
+                'image_url': None,
+                'notes': '',
+            })
+
+    if category:
+        rows = [r for r in rows if r['category'] == category]
+
+    rows.sort(key=lambda r: r['at'], reverse=True)
+    return rows
+
+
+def summarize_outflows(rows):
+    """Totales por fuente y por categoría de una lista de `compute_outflows`."""
+    by_source = {'cash': Decimal('0'), 'transfer': Decimal('0')}
+    by_category = {}
+    total = Decimal('0')
+    for r in rows:
+        total += r['amount']
+        if r['source'] in by_source:
+            by_source[r['source']] += r['amount']
+        by_category[r['category']] = by_category.get(r['category'], Decimal('0')) + r['amount']
+    return {
+        'total': total,
+        'by_source': by_source,
+        'by_category': [
+            {
+                'key': key,
+                'label': OUTFLOW_CATEGORY_LABELS.get(key, key),
+                'amount': by_category[key],
+            }
+            for key, _label in OUTFLOW_CATEGORIES
+            if key in by_category
+        ],
     }
 
 
@@ -545,60 +883,44 @@ def compute_cash_box_detail(reference_date=None):
             })
 
         # ── SALIDAS ───────────────────────────────────────────────
-        for e in since(Expense.objects.filter(
-            payment_source=source
-        )).exclude(description__startswith=MATERIALS_EXPENSE_PREFIX):
+        # Una sola fuente de verdad: la misma función que alimenta la pantalla
+        # de Egresos. Los movimientos manuales negativos ya vienen incluidos,
+        # así que más abajo solo se agregan los positivos.
+        for row in compute_outflows(source=source, period_start=period_start):
+            sub = row['category_label']
+            if row['notes'] and row['kind'] == 'advance':
+                sub = f"{sub} · {row['notes']}"
             outflow.append({
-                '_k': e.date.isoformat(),
-                'date': e.date.strftime('%d/%m'),
-                'label': e.description,
-                'sub': e.get_expense_type_display(),
-                'amount': float(e.amount),
-            })
-        for p in since(BarberPayment.objects.filter(
-            payment_source=source, expense__isnull=True
-        )).select_related('barber'):
-            dt = timezone.localtime(p.created_at)
-            outflow.append({
-                '_k': dt.isoformat(),
-                'date': dt.strftime('%d/%m'),
-                'label': f'Pago a {p.barber.display_name if p.barber else "Barbero"}',
-                'sub': 'Pago a barbero',
-                'amount': float(p.amount),
-            })
-        for a in since(BarberAdvance.objects.filter(
-            payment_source=source
-        )).select_related('barber'):
-            dt = timezone.localtime(a.created_at)
-            outflow.append({
-                '_k': dt.isoformat(),
-                'date': dt.strftime('%d/%m'),
-                'label': f'Vale a {a.barber.display_name if a.barber else "Barbero"}',
-                'sub': 'Vale / adelanto' + (f' · {a.reason}' if a.reason else ''),
-                'amount': float(a.amount),
+                '_k': row['at'].isoformat(),
+                'date': row['date'].strftime('%d/%m'),
+                'label': row['label'],
+                'sub': sub,
+                'amount': float(row['amount']),
+                'is_manual': row['kind'] == 'movement',
             })
 
-        # ── MOVIMIENTOS MANUALES (inyecciones, retiros, traslados) ────────
-        # Van en el mismo historial que las ventas y los egresos: la idea es
-        # poder responder "¿de dónde salió y a dónde se fue toda la plata?"
-        # en una sola lista, sin tener que cruzar dos pantallas.
+        # ── MOVIMIENTOS MANUALES ENTRANTES (inyecciones, traslados) ───────
+        # Van en el mismo historial que las ventas: la idea es poder responder
+        # "¿de dónde salió y a dónde se fue toda la plata?" en una sola lista,
+        # sin tener que cruzar dos pantallas. Los salientes ya los trajo
+        # compute_outflows.
         for m in manual:
             effect = m.effect_on(source)
-            if effect == 0:
+            # Los negativos ya entraron arriba vía compute_outflows.
+            if effect <= 0:
                 continue
             dt = timezone.localtime(m.created_at)
             quien = ''
             if m.created_by:
                 quien = f' · {m.created_by.get_full_name() or m.created_by.username}'
-            row = {
+            income.append({
                 '_k': dt.isoformat(),
                 'date': dt.strftime('%d/%m'),
                 'label': m.description or m.get_kind_display(),
                 'sub': m.get_kind_display() + quien,
                 'amount': float(abs(effect)),
                 'is_manual': True,
-            }
-            (income if effect > 0 else outflow).append(row)
+            })
 
         income.sort(key=lambda x: x['_k'], reverse=True)
         outflow.sort(key=lambda x: x['_k'], reverse=True)
@@ -908,9 +1230,16 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                      added_value_amount=0, added_value_description='',
                      commission_percentage=50, notes='', 
                      frank_materials_cost=0, frank_labor_cost=0,
+                     frank_materials_source='cash',
                      request=None):
     """
     Procesa el checkout completo de una reserva de forma atómica.
+
+    `frank_materials_source` dice de dónde salió la plata de los materiales:
+    'cash', 'transfer', o 'none' cuando el insumo no pasó por la caja (lo puso
+    el barbero, o venía de stock ya pagado). El egreso se registra igual —baja
+    la base de comisión— pero solo las dos primeras descuentan del control de
+    caja.
     """
     from decimal import Decimal
     from apps.cashflow.models import Expense
@@ -989,10 +1318,16 @@ def process_checkout(*, booking, confirmed_by, payment_method_id=None,
                 # venta dentro de la descripción para que reject_sale_view
                 # pueda eliminar EXACTAMENTE este egreso (no el de otra venta
                 # del mismo cliente).
+                materials_source = (
+                    frank_materials_source
+                    if frank_materials_source in ('cash', 'transfer', 'none')
+                    else 'cash'
+                )
                 Expense.objects.create(
                     description=f"{MATERIALS_EXPENSE_PREFIX} {booking.client_name} (venta #{sale.id})",
                     amount=Decimal(str(frank_materials_cost)),
-                    expense_type='variable',
+                    expense_type=Expense.TYPE_MATERIALS,
+                    payment_source=materials_source,
                     registered_by=confirmed_by
                 )
 

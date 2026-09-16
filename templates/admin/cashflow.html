@@ -730,6 +730,42 @@
   </div>
 </div>
 
+<!-- Modal: Liquidar a un barbero -->
+<!-- Antes esto era un confirm() y el pago siempre se guardaba como efectivo.
+     Si se pagaba por transferencia, la caja quedaba descuadrada en ese monto. -->
+<div id="cf-modal-pay" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closePayModal()"></div>
+  <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto">
+    <div class="bg-jet-card border border-gold/30 rounded-md shadow-2xl">
+      <div class="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white tracking-widest uppercase">Liquidar barbero</h3>
+        <button onclick="closePayModal()" class="text-smoke/40 hover:text-white">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="text-xs text-smoke/70">Pago a <strong class="text-white" id="cf-pay-barber-name"></strong>.</div>
+        <div class="bg-jet border border-white/10 rounded p-4 text-center">
+          <div class="text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Neto a entregar</div>
+          <div class="text-2xl font-serif font-bold text-gold" id="cf-pay-amount"></div>
+          <div class="text-[0.65rem] text-smoke/40 mt-1">Ya tiene descontados los vales del período.</div>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] uppercase tracking-widest text-smoke/60 mb-2">¿Con qué se le paga?</label>
+          <select id="cf-pay-source" class="w-full bg-jet border border-white/10 text-white rounded px-3 py-3 focus:border-gold outline-none">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+          </select>
+          <div class="text-[0.65rem] text-smoke/50 mt-1.5">El monto se descuenta de esa caja. Si se elige mal, el saldo deja de cuadrar con la plata real.</div>
+        </div>
+        <div id="cf-pay-error" class="hidden p-2 bg-red-500/20 border border-red-500/40 text-red-400 text-xs rounded"></div>
+      </div>
+      <div class="px-5 pb-4 flex gap-2 justify-end">
+        <button onclick="closePayModal()" class="px-4 py-2 text-xs uppercase tracking-widest text-smoke border border-white/10 rounded">Cancelar</button>
+        <button id="cf-btn-confirm-pay" onclick="submitPay()" class="px-4 py-2 bg-gold hover:bg-gold-light text-jet text-xs font-bold uppercase tracking-widest rounded">Liquidar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Movimiento manual de caja (inyectar / retirar / trasladar / ajustar) -->
 <div id="modal-cash-movement" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="cashCloseMovement()"></div>
@@ -1760,23 +1796,61 @@ function fetchBarberPayments() {
     });
 }
 window.fetchBarberPayments = fetchBarberPayments;
+// La liquidación pide de qué caja sale la plata: sin ese dato el pago se
+// guardaba siempre como efectivo y el control de caja quedaba descuadrado.
+let _payBarberId = null;
+
 window.payBarber = function(barberId, barberName, netAmount) {
-  if (!confirm(`Liquidar ${fmt(netAmount)} (neto, ya descontados los vales) a ${barberName}?`)) return;
+  _payBarberId = barberId;
+  document.getElementById('cf-pay-barber-name').textContent = barberName;
+  document.getElementById('cf-pay-amount').textContent = fmt(netAmount);
+  document.getElementById('cf-pay-source').value = 'cash';
+  const err = document.getElementById('cf-pay-error');
+  err.classList.add('hidden'); err.textContent = '';
+  document.getElementById('cf-modal-pay').classList.remove('hidden');
+};
+
+window.closePayModal = function() {
+  _payBarberId = null;
+  document.getElementById('cf-modal-pay').classList.add('hidden');
+};
+
+window.submitPay = function() {
+  if (!_payBarberId) return;
+  const btn = document.getElementById('cf-btn-confirm-pay');
+  const err = document.getElementById('cf-pay-error');
+  const payment_source = document.getElementById('cf-pay-source').value;
+  const barberId = _payBarberId;
+  btn.disabled = true;
+  btn.textContent = 'Liquidando...';
   // El mismo periodo del filtro: se liquida solo lo mostrado.
   fetch(`/api/admin/cashflow/barber-payments/${barberId}/pay/` + bpPeriodQuery(), {
     method: 'POST',
-    headers: { 'X-CSRFToken': CSRF }
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payment_source })
   })
   .then(r => r.json())
   .then(data => {
+    btn.disabled = false;
+    btn.textContent = 'Liquidar';
     if (data.ok) {
+      closePayModal();
       alert(data.message);
-      fetchBarberPayments();
+      // La liquidación descuenta del control de caja, que se renderiza en el
+      // servidor: recargar para que el saldo mostrado siga cuadrando con la
+      // plata física (mismo criterio que el vale).
+      window.location.reload();
     } else {
-      alert(data.error || 'Error.');
+      err.textContent = data.error || 'Error.';
+      err.classList.remove('hidden');
     }
   })
-  .catch(() => alert('Error de conexión.'));
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Liquidar';
+    err.textContent = 'Error de conexión.';
+    err.classList.remove('hidden');
+  });
 };
 
 // ═══ CONTROL DE CAJA: movimientos manuales y cortes ═════

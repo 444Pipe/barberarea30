@@ -56,6 +56,13 @@
     <!-- Charts + Ranking (hidden until load) -->
     <div id="report-content" class="hidden space-y-6">
 
+        <!-- En que se fue la plata: el desglose por categoria del mes -->
+        <div class="bg-jet-card border border-white/5 rounded-sm p-6">
+            <h2 class="text-xs tracking-widest uppercase text-smoke/50 mb-1 font-semibold">En qué se fue la plata</h2>
+            <p class="text-smoke/40 text-[0.7rem] mb-4">Egresos del mes separados por categoría. El pago diario a Frank se muestra aparte porque su costo ya está contado dentro de las comisiones.</p>
+            <div id="expense-breakdown" class="grid grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+
         <!-- Net Income Chart -->
         <div class="bg-jet-card border border-white/5 rounded-sm p-6">
             <h2 class="text-xs tracking-widest uppercase text-smoke/50 mb-4 font-semibold">Flujo de Caja por Cierre Diario</h2>
@@ -163,6 +170,7 @@ function loadReport() {
     .then(data => {
         if (data.error) { showError(data.error); return; }
         renderKPIs(data.kpis, data.period);
+        renderExpenseBreakdown(data.expenses_by_type || []);
         renderRanking(data.barber_ranking);
         renderCloses(data.daily_closes);
         renderClosesChart(data.daily_closes);
@@ -176,6 +184,48 @@ function loadReport() {
     });
 }
 
+// El desglose que pidio el duenno: cuanto se va en materiales, cuanto en el
+// dia a dia y cuanto en pagarle a los barberos. Antes los tres caian en
+// "Gasto Variable" y no habia forma de separarlos.
+const CATEGORIA_COLORES = {
+    variable:       { color: 'text-blue-400',    borde: 'border-blue-500/20',    fondo: 'bg-blue-500/5' },
+    fixed:          { color: 'text-purple-400',  borde: 'border-purple-500/20',  fondo: 'bg-purple-500/5' },
+    inventory:      { color: 'text-emerald-400', borde: 'border-emerald-500/20', fondo: 'bg-emerald-500/5' },
+    materials:      { color: 'text-amber-400',   borde: 'border-amber-500/20',   fondo: 'bg-amber-500/5' },
+    barber_payment: { color: 'text-gold',        borde: 'border-gold/20',        fondo: 'bg-gold/5' },
+};
+
+function renderExpenseBreakdown(categorias) {
+    const caja = document.getElementById('expense-breakdown');
+    const conMonto = categorias.filter(c => c.amount > 0);
+
+    if (!conMonto.length) {
+        caja.innerHTML = '<div class="col-span-2 lg:col-span-3 text-center py-6 text-smoke/30 text-sm">No hubo egresos este mes.</div>';
+        return;
+    }
+
+    const total = conMonto.reduce((suma, c) => suma + c.amount, 0);
+
+    caja.innerHTML = conMonto
+        .sort((a, b) => b.amount - a.amount)
+        .map(c => {
+            const estilo = CATEGORIA_COLORES[c.key] || { color: 'text-smoke', borde: 'border-white/10', fondo: 'bg-white/[0.02]' };
+            const porcentaje = total ? Math.round((c.amount / total) * 100) : 0;
+            return `
+        <div class="border ${estilo.borde} ${estilo.fondo} p-4 rounded-sm">
+            <div class="text-smoke/50 text-[0.65rem] tracking-widest uppercase mb-1">${c.label}</div>
+            <div class="font-serif font-bold ${estilo.color} text-xl">${fmt(c.amount)}</div>
+            <div class="mt-2 h-1 bg-white/5 rounded-full overflow-hidden">
+                <div class="h-full ${estilo.color.replace('text-', 'bg-')}" style="width: ${porcentaje}%"></div>
+            </div>
+            <div class="text-[0.65rem] text-smoke/40 mt-1">${porcentaje}% de los egresos</div>
+        </div>`;
+        }).join('') + `
+        <div class="col-span-2 lg:col-span-3 pt-2 text-right text-[0.7rem] text-smoke/40">
+            Total de egresos del mes: <span class="text-orange-400 font-semibold">${fmt(total)}</span>
+        </div>`;
+}
+
 function renderKPIs(k, period) {
     // total_commissions ahora excluye a Frank — su pago diario va dentro
     // de total_expenses, así que mostrarlo aparte evita la doble cuenta.
@@ -184,7 +234,7 @@ function renderKPIs(k, period) {
         { label: 'Propinas', value: fmt(k.total_tips), sub: 'para los barberos', color: 'text-white', border: 'border-white/5' },
         { label: 'Comisiones Equipo', value: fmt(k.total_commissions), sub: 'sin incluir a Frank', color: 'text-red-400', border: 'border-white/5' },
         { label: 'Pago Diario a Frank', value: fmt(k.frank_payout || 0), sub: 'comisión + propinas (ya en egresos)', color: 'text-amber-400', border: 'border-white/5' },
-        { label: 'Egresos del Mes', value: fmt(k.total_expenses), sub: 'incluye pago a Frank', color: 'text-orange-400', border: 'border-white/5' },
+        { label: 'Egresos del Mes', value: fmt(k.total_expenses), sub: 'todo, incluido el pago a Frank', color: 'text-orange-400', border: 'border-white/5' },
         { label: 'Descuentos Aplicados', value: fmt(k.total_discounts), sub: 'del mes', color: 'text-blue-400', border: 'border-white/5' },
         { label: 'GANANCIA NETA', value: fmt(k.net_income), sub: `${period}`, color: 'text-gold text-3xl', border: 'border-gold/30 shadow-[0_0_15px_rgba(212,175,55,0.15)]' },
     ];

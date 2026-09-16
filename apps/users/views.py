@@ -358,9 +358,26 @@ def admin_cashflow_view(request):
 
 @operational_admin_required
 def admin_expenses_view(request):
-    """Lista de egresos con filtro por rango de fechas (?date_from=&date_to=)."""
+    """Todas las salidas de dinero, no solo los egresos.
+
+    Antes esta pantalla listaba únicamente el modelo `Expense`, así que los
+    vales, las liquidaciones a barberos y los retiros no aparecían por ningún
+    lado. El dueño veía un "Debe haber" en la caja que no lograba reconstruir
+    aquí, y la diferencia parecía plata perdida.
+
+    Ahora cuelga de `compute_outflows`, la misma función que alimenta la
+    tarjeta de caja: con `period=caja` los dos totales son el mismo número por
+    construcción (lo verifica ConciliacionTests).
+
+    Parámetros GET:
+      period      caja (desde el último corte) | rango | recientes
+      date_from   / date_to   solo con period=rango, sobre la fecha del egreso
+      source      cash | transfer
+      category    cualquiera de OUTFLOW_CATEGORIES
+    """
     from datetime import datetime
-    from django.db.models import Sum
+    from apps.cashflow import services as cashflow_services
+    from apps.cashflow.models import Expense
 
     def _parse(value):
         try:
@@ -370,29 +387,108 @@ def admin_expenses_view(request):
 
     date_from = _parse(request.GET.get('date_from'))
     date_to = _parse(request.GET.get('date_to'))
+    source = request.GET.get('source') or ''
+    category = request.GET.get('category') or ''
+    if source not in ('cash', 'transfer'):
+        source = ''
+    if category not in dict(cashflow_services.OUTFLOW_CATEGORIES):
+        category = ''
 
-    qs = Expense.objects.select_related('registered_by', 'included_in_daily_close')
-    if date_from:
-        qs = qs.filter(date__gte=date_from)
-    if date_to:
-        qs = qs.filter(date__lte=date_to)
-    qs = qs.order_by('-date', '-created_at')
+    # El período por defecto es el de la caja: es el que hace que este total y
+    # el "Debe haber" hablen del mismo dinero. Un rango de fechas explícito
+    # gana, porque quien lo escribe está buscando otra cosa.
+    period = request.GET.get('period') or ''
+    if period not in ('caja', 'rango', 'recientes'):
+        period = 'rango' if (date_from or date_to) else 'caja'
+    if period != 'rango':
+        date_from = date_to = None
 
-    is_filtered = bool(date_from or date_to)
-    filtered_total = qs.aggregate(t=Sum('amount'))['t'] or 0
-    filtered_count = qs.count()
-    expenses = qs if is_filtered else qs[:50]
+    period_start = None
+    last_cut = None
+    try:
+        period_start, _oc, _ot = cashflow_services.cash_period_bounds()
+        last_cut = cashflow_services.current_cash_cut()
+        rows = cashflow_services.compute_outflows(
+            source=source or None,
+            category=category or None,
+            date_from=date_from,
+            date_to=date_to,
+            use_cash_period=(period == 'caja'),
+        )
+        # "Últimas 50" recorta ANTES de sumar: el total que se muestra encima
+        # de la tabla tiene que ser el de las filas que se ven, no el del
+        # histórico entero.
+        if period == 'recientes':
+            rows = rows[:50]
+        summary = cashflow_services.summarize_outflows(rows)
+        box = cashflow_services.compute_cash_box()
+        outflows_error = False
+    except Exception:
+        # Misma política que la tarjeta de caja: un dato raro no debe tumbar la
+        # página entera. Se avisa arriba y el traceback queda en los logs.
+        import logging as _logging, traceback as _traceback
+        _logging.getLogger(__name__).error(
+            "Fallo listando las salidas en /admin-panel/expenses/:\n%s",
+            _traceback.format_exc(),
+        )
+        rows, summary, box = [], {'total': 0, 'by_source': {}, 'by_category': []}, {}
+        outflows_error = True
+
+    # Cuadre contra la caja: solo tiene sentido cuando se está mirando
+    # exactamente el período de la caja y sin filtros que recorten la lista.
+    cuadre = None
+    if period == 'caja' and not category and not outflows_error:
+        esperado_cash = box.get('cash_out', 0)
+        esperado_transfer = box.get('transfer_out', 0)
+        if source == 'cash':
+            esperado, obtenido = esperado_cash, summary['by_source'].get('cash', 0)
+        elif source == 'transfer':
+            esperado, obtenido = esperado_transfer, summary['by_source'].get('transfer', 0)
+        else:
+            esperado = esperado_cash + esperado_transfer
+            obtenido = summary['total']
+        cuadre = {
+            'esperado': esperado,
+            'obtenido': obtenido,
+            'ok': esperado == obtenido,
+            'diferencia': obtenido - esperado,
+        }
+
+    rows_visibles = rows
+
+    period_label = {
+        'caja': (
+            f'Desde el corte del {timezone.localtime(period_start).strftime("%d/%m/%Y %I:%M %p")}'
+            if period_start else 'Todo el histórico (nunca se ha hecho un corte)'
+        ),
+        'recientes': 'Últimas 50 salidas registradas',
+        'rango': 'Rango de fechas elegido',
+    }[period]
+
+    role = request.user.profile.role
+    tipos_permitidos = [
+        (key, label) for key, label in Expense.EXPENSE_TYPES
+        if key in cashflow_services.allowed_expense_types(role)
+    ]
 
     context = {
-        'user_role': request.user.profile.role,
+        'user_role': role,
         'user_name': request.user.get_full_name() or request.user.username,
         'active_section': 'expenses',
-        'expenses': expenses,
-        'is_filtered': is_filtered,
+        'rows': rows_visibles,
+        'rows_total': len(rows),
+        'summary': summary,
+        'cuadre': cuadre,
+        'outflows_error': outflows_error,
+        'period': period,
+        'period_label': period_label,
+        'last_cut': last_cut,
+        'source': source,
+        'category': category,
+        'categories': cashflow_services.OUTFLOW_CATEGORIES,
+        'expense_types': tipos_permitidos,
         'date_from_str': date_from.strftime('%Y-%m-%d') if date_from else '',
         'date_to_str': date_to.strftime('%Y-%m-%d') if date_to else '',
-        'filtered_total': filtered_total,
-        'filtered_count': filtered_count,
     }
     return render(request, 'admin/expenses.html', context)
 

@@ -364,8 +364,9 @@ try:
             description__startswith='Pago Diario: Franko',
             included_in_daily_close__isnull=False,
         ).select_related('included_in_daily_close')
+        _bf_linked = 0
         for _exp in _frank_pay_expenses:
-            _, _was_created = _BarberPayment.objects.get_or_create(
+            _pago, _was_created = _BarberPayment.objects.get_or_create(
                 barber=_frank_b,
                 daily_close=_exp.included_in_daily_close,
                 defaults={
@@ -377,8 +378,17 @@ try:
             )
             if _was_created:
                 _bf_created += 1
+            elif _pago.expense_id is None:
+                # `expense` viaja en defaults, así que get_or_create NO lo pone
+                # sobre un pago que ya existía. Un pago de Frank sin ese enlace
+                # se contaba como salida además de su egreso: el pago diario
+                # descontado dos veces de la caja.
+                _BarberPayment.objects.filter(pk=_pago.pk).update(expense=_exp)
+                _bf_linked += 1
         if _bf_created:
             print(f"✓ Backfill BarberPayment: {_bf_created} pago/s histórico/s de Frank registrados")
+        if _bf_linked:
+            print(f"✓ Enlazados {_bf_linked} pago/s de Frank a su egreso (evita doble conteo en caja)")
 except Exception as _e:
     print("⚠ No se pudo hacer el backfill de BarberPayment:", _e)
 
@@ -627,3 +637,25 @@ try:
         print("Email de Cristian actualizado a cristiangome930@gmail.com")
 except Exception as e:
     print("Error actualizando email de Cristian:", e)
+
+# --- Reclasificación defensiva de expense_type (materials / barber_payment) ---
+# La migración cashflow.0017 ya hace este backfill. Se repite aquí porque el
+# historial de migraciones en Railway ha fallado antes: una migración marcada
+# como aplicada sin haber corrido dejaría los egresos automáticos como
+# 'variable', y entonces el ROI contaría dos veces el pago a Frank y el dueño
+# perdería el desglose de materiales. Es idempotente: si ya están bien, no toca
+# nada.
+try:
+    from apps.cashflow.models import Expense as _Expense
+    _mat = (_Expense.objects
+            .filter(description__startswith='Materiales Servicio:')
+            .exclude(expense_type='materials')
+            .update(expense_type='materials'))
+    _pay = (_Expense.objects
+            .filter(description__startswith='Pago Diario: Franko')
+            .exclude(expense_type='barber_payment')
+            .update(expense_type='barber_payment'))
+    if _mat or _pay:
+        print(f"Egresos reclasificados: {_mat} a materials, {_pay} a barber_payment.")
+except Exception as e:
+    print("No se pudo reclasificar expense_type (¿migración 0017 pendiente?):", e)

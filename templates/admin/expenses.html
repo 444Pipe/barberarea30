@@ -1,13 +1,13 @@
 {% extends 'admin/base_admin.html' %}
 
-{% block title %}Egresos - Área 30{% endblock %}
+{% block title %}Salidas de dinero - Área 30{% endblock %}
 
 {% block content %}
 <div class="space-y-6 fade-in">
-    <div class="flex justify-between items-center">
+    <div class="flex justify-between items-start gap-4 flex-wrap">
         <div>
-            <h1 class="text-2xl font-serif text-white">Egresos Operativos</h1>
-            <p class="text-smoke/60 text-sm mt-1">Control de gastos fijos y variables del club.</p>
+            <h1 class="text-2xl font-serif text-white">Salidas de Dinero</h1>
+            <p class="text-smoke/60 text-sm mt-1">Todo lo que sale de la caja: egresos, vales, liquidaciones y retiros.</p>
         </div>
         <button id="btn-new-expense" class="px-5 py-2.5 bg-gold hover:bg-gold-light text-jet font-semibold rounded-sm tracking-widest text-xs uppercase shadow-lg transition-colors flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -15,50 +15,138 @@
         </button>
     </div>
 
-    <!-- Filtro por fechas -->
+    {% if outflows_error %}
+    <div class="bg-red-500/10 border border-red-500/30 rounded-sm p-4">
+        <p class="text-red-400 text-sm font-semibold">No se pudo calcular la lista de salidas.</p>
+        <p class="text-smoke/60 text-xs mt-1">El detalle quedó en los registros del servidor. Avisa al soporte técnico.</p>
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
     <div class="bg-jet-card border border-white/5 rounded-sm p-4">
-        <form method="get" id="expense-filter-form" class="flex flex-wrap items-end gap-3">
-            <div class="flex flex-wrap gap-1.5">
-                <button type="button" onclick="setExpenseRange('today')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Hoy</button>
-                <button type="button" onclick="setExpenseRange('yesterday')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Ayer</button>
-                <button type="button" onclick="setExpenseRange('week')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Esta semana</button>
-                <button type="button" onclick="setExpenseRange('month')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Este mes</button>
+        <form method="get" id="expense-filter-form" class="space-y-3">
+            <input type="hidden" name="period" id="filter-period" value="{{ period }}">
+
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="setPeriod('caja')"
+                        class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold rounded transition-colors border {% if period == 'caja' %}bg-gold text-jet border-gold{% else %}text-smoke/60 hover:text-gold border-white/10 hover:border-gold/40{% endif %}">
+                        Período de caja
+                    </button>
+                    <button type="button" onclick="setPeriod('recientes')"
+                        class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold rounded transition-colors border {% if period == 'recientes' %}bg-gold text-jet border-gold{% else %}text-smoke/60 hover:text-gold border-white/10 hover:border-gold/40{% endif %}">
+                        Últimas 50
+                    </button>
+                </div>
+
+                <div class="h-8 w-px bg-white/10 hidden sm:block"></div>
+
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="setExpenseRange('today')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Hoy</button>
+                    <button type="button" onclick="setExpenseRange('yesterday')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Ayer</button>
+                    <button type="button" onclick="setExpenseRange('week')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Esta semana</button>
+                    <button type="button" onclick="setExpenseRange('month')" class="px-3 py-2 text-[0.65rem] tracking-widest uppercase font-semibold text-smoke/60 hover:text-gold border border-white/10 hover:border-gold/40 rounded transition-colors">Este mes</button>
+                </div>
             </div>
-            <div>
-                <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Desde</label>
-                <input type="date" name="date_from" id="filter-date-from" value="{{ date_from_str }}" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all">
+
+            <div class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Desde</label>
+                    <input type="date" name="date_from" id="filter-date-from" value="{{ date_from_str }}" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all">
+                </div>
+                <div>
+                    <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Hasta</label>
+                    <input type="date" name="date_to" id="filter-date-to" value="{{ date_to_str }}" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all">
+                </div>
+                <div>
+                    <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Salió de</label>
+                    <select name="source" id="filter-source" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all appearance-none">
+                        <option value="">Ambas cajas</option>
+                        <option value="cash" {% if source == 'cash' %}selected{% endif %}>Efectivo</option>
+                        <option value="transfer" {% if source == 'transfer' %}selected{% endif %}>Transferencia</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Categoría</label>
+                    <select name="category" id="filter-category" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all appearance-none">
+                        <option value="">Todas</option>
+                        {% for key, label in categories %}
+                        <option value="{{ key }}" {% if category == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="px-4 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-[0.65rem] tracking-widest uppercase transition-colors">Buscar</button>
+                <a href="{% url 'admin_expenses' %}" class="px-4 py-2 text-smoke/60 hover:text-white border border-white/10 rounded-sm text-[0.65rem] tracking-widest uppercase transition-colors">Limpiar ✕</a>
             </div>
-            <div>
-                <label class="block text-[0.6rem] uppercase tracking-widest text-smoke/50 mb-1">Hasta</label>
-                <input type="date" name="date_to" id="filter-date-to" value="{{ date_to_str }}" class="bg-jet-lighter border border-white/10 text-smoke rounded-sm px-3 py-2 text-sm focus:border-gold transition-all">
-            </div>
-            <button type="submit" class="px-4 py-2 bg-gold hover:bg-gold-light text-jet font-bold rounded-sm text-[0.65rem] tracking-widest uppercase transition-colors">Buscar</button>
-            {% if is_filtered %}
-            <a href="{% url 'admin_expenses' %}" class="px-4 py-2 text-smoke/60 hover:text-white border border-white/10 rounded-sm text-[0.65rem] tracking-widest uppercase transition-colors">Limpiar ✕</a>
-            {% endif %}
         </form>
-        {% if is_filtered %}
-        <div class="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-            <div><span class="text-[0.6rem] uppercase tracking-widest text-smoke/50">Total del período</span> <span class="text-red-400 font-serif font-bold text-lg ml-2">-${{ filtered_total|floatformat:0 }}</span></div>
-            <div class="text-smoke/50 text-xs">{{ filtered_count }} egreso{{ filtered_count|pluralize }}</div>
+
+        <div class="mt-4 pt-3 border-t border-white/5">
+            <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                <div>
+                    <span class="text-[0.6rem] uppercase tracking-widest text-smoke/50">Total que salió</span>
+                    <span class="text-red-400 font-serif font-bold text-xl ml-2">-${{ summary.total|floatformat:0 }}</span>
+                </div>
+                <div class="text-smoke/50 text-xs">{{ rows_total }} salida{{ rows_total|pluralize }}</div>
+                <div class="text-smoke/40 text-xs">{{ period_label }}</div>
+            </div>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+                <span class="px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[0.68rem]">
+                    <span class="text-emerald-400/70 uppercase tracking-widest text-[0.58rem]">Efectivo</span>
+                    <span class="text-emerald-400 font-semibold ml-2">-${{ summary.by_source.cash|floatformat:0 }}</span>
+                </span>
+                <span class="px-3 py-1.5 rounded bg-blue-500/10 border border-blue-500/20 text-[0.68rem]">
+                    <span class="text-blue-400/70 uppercase tracking-widest text-[0.58rem]">Transferencia</span>
+                    <span class="text-blue-400 font-semibold ml-2">-${{ summary.by_source.transfer|floatformat:0 }}</span>
+                </span>
+            </div>
+
+            {% if summary.by_category %}
+            <div class="mt-3">
+                <div class="text-[0.58rem] uppercase tracking-widest text-smoke/40 mb-2">En qué se fue</div>
+                <div class="flex flex-wrap gap-2">
+                    {% for c in summary.by_category %}
+                    <a href="?period={{ period }}&source={{ source }}&category={{ c.key }}&date_from={{ date_from_str }}&date_to={{ date_to_str }}"
+                       class="px-3 py-1.5 rounded border text-[0.68rem] transition-colors {% if category == c.key %}bg-gold/15 border-gold/40 text-gold{% else %}bg-white/[0.03] border-white/10 text-smoke/70 hover:border-gold/30 hover:text-gold{% endif %}">
+                        {{ c.label }}
+                        <span class="font-semibold ml-1.5">${{ c.amount|floatformat:0 }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if cuadre %}
+            <div class="mt-3 pt-3 border-t border-white/5 text-[0.68rem]">
+                {% if cuadre.ok %}
+                <span class="text-emerald-400">✓ Cuadra con las salidas del control de caja (${{ cuadre.esperado|floatformat:0 }}).</span>
+                {% else %}
+                <span class="text-amber-400">⚠ No cuadra con el control de caja: la caja dice ${{ cuadre.esperado|floatformat:0 }} y aquí suma ${{ cuadre.obtenido|floatformat:0 }} (diferencia ${{ cuadre.diferencia|floatformat:0 }}). Avisa al soporte técnico.</span>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
-    <!-- Expenses List -->
+    <!-- Lista -->
     <div class="bg-jet-card border border-white/5 rounded-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-white/5 bg-jet">
-            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">{% if is_filtered %}Egresos del período{% else %}Historial Reciente (últimos 50){% endif %}</h2>
+        <div class="px-5 py-4 border-b border-white/5 bg-jet flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-sm tracking-widest uppercase text-white font-semibold">
+                {% if period == 'caja' %}Salidas del período de caja{% elif period == 'recientes' %}Últimas 50 salidas{% else %}Salidas del período{% endif %}
+            </h2>
+            {% if period == 'caja' and last_cut %}
+            <span class="text-[0.6rem] text-smoke/40">Corte anterior cerrado por {{ last_cut.closed_by.get_full_name|default:last_cut.closed_by.username|default:"—" }}</span>
+            {% endif %}
         </div>
-        
-        {% if expenses %}
+
+        {% if rows %}
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-jet-lighter border-b border-white/5">
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Fecha</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Descripción</th>
-                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Tipo</th>
+                        <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Categoría</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold">Registrado Por</th>
                         <th class="px-5 py-3 text-xs tracking-widest uppercase text-smoke/50 font-semibold text-right">Monto</th>
                         {% if user_role == 'superadmin' or user_role == 'operational_admin' %}
@@ -67,64 +155,81 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
-                    {% for exp in expenses %}
+                    {% for r in rows %}
                     <tr class="hover:bg-white/[0.02] transition-colors">
-                        <td class="px-5 py-4 text-sm text-smoke/80">
-                            {{ exp.date|date:"d M Y" }}
-                            <div class="text-[10px] text-smoke/40">{{ exp.created_at|date:"g:i A" }}</div>
+                        <td class="px-5 py-4 text-sm text-smoke/80 whitespace-nowrap">
+                            {{ r.date|date:"d M Y" }}
+                            <div class="text-[10px] text-smoke/40">{{ r.at|date:"g:i A" }}</div>
                         </td>
                         <td class="px-5 py-4">
-                            <div class="text-sm text-white font-medium">{{ exp.description }}</div>
-                            {% if exp.notes %}<div class="text-[10px] text-smoke/40 mt-1">{{ exp.notes }}</div>{% endif %}
-                            {% if exp.image %}
-                                <a href="{{ exp.image.url }}" target="_blank" class="text-[10px] text-gold/80 hover:text-gold mt-1 inline-flex items-center gap-1">
+                            <div class="text-sm text-white font-medium">{{ r.label }}</div>
+                            {% if r.notes %}<div class="text-[10px] text-smoke/40 mt-1">{{ r.notes }}</div>{% endif %}
+                            {% if r.image_url %}
+                                <a href="{{ r.image_url }}" target="_blank" class="text-[10px] text-gold/80 hover:text-gold mt-1 inline-flex items-center gap-1">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                                     Ver Soporte
                                 </a>
                             {% endif %}
                         </td>
                         <td class="px-5 py-4">
-                            {% if exp.expense_type == 'variable' %}
-                                <span class="px-2 py-1 bg-blue-500/10 text-blue-400 text-[10px] uppercase tracking-widest rounded-sm border border-blue-500/20">Variable</span>
-                            {% elif exp.expense_type == 'fixed' %}
+                            {% if r.category == 'variable' %}
+                                <span class="px-2 py-1 bg-blue-500/10 text-blue-400 text-[10px] uppercase tracking-widest rounded-sm border border-blue-500/20">Día a día</span>
+                            {% elif r.category == 'fixed' %}
                                 <span class="px-2 py-1 bg-purple-500/10 text-purple-400 text-[10px] uppercase tracking-widest rounded-sm border border-purple-500/20">Fijo</span>
-                            {% else %}
+                            {% elif r.category == 'inventory' %}
                                 <span class="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] uppercase tracking-widest rounded-sm border border-emerald-500/20">Inventario</span>
+                            {% elif r.category == 'materials' %}
+                                <span class="px-2 py-1 bg-amber-500/10 text-amber-400 text-[10px] uppercase tracking-widest rounded-sm border border-amber-500/20">Materiales</span>
+                            {% elif r.category == 'barber_payment' %}
+                                <span class="px-2 py-1 bg-gold/10 text-gold text-[10px] uppercase tracking-widest rounded-sm border border-gold/20">Pago barbero</span>
+                            {% elif r.category == 'advance' %}
+                                <span class="px-2 py-1 bg-amber-600/10 text-amber-300 text-[10px] uppercase tracking-widest rounded-sm border border-amber-600/20">Vale</span>
+                            {% elif r.category == 'settlement' %}
+                                <span class="px-2 py-1 bg-gold/10 text-gold text-[10px] uppercase tracking-widest rounded-sm border border-gold/20">Liquidación</span>
+                            {% else %}
+                                <span class="px-2 py-1 bg-white/5 text-smoke/70 text-[10px] uppercase tracking-widest rounded-sm border border-white/10">{{ r.category_label }}</span>
                             {% endif %}
-                            <div class="mt-1 text-[10px] text-smoke/40">{% if exp.payment_source == 'transfer' %}💳 Transferencia{% else %}💵 Efectivo{% endif %}</div>
+                            <div class="mt-1 text-[10px] text-smoke/40">{% if r.source == 'transfer' %}💳 Transferencia{% else %}💵 Efectivo{% endif %}</div>
                         </td>
-                        <td class="px-5 py-4 text-sm text-smoke/60">
-                            {{ exp.registered_by.get_full_name|default:exp.registered_by.username|default:"Sistema" }}
-                        </td>
-                        <td class="px-5 py-4 text-sm font-serif font-bold text-red-400 text-right">
-                            -${{ exp.amount|floatformat:0 }}
+                        <td class="px-5 py-4 text-sm text-smoke/60">{{ r.registered_by }}</td>
+                        <td class="px-5 py-4 text-sm font-serif font-bold text-red-400 text-right whitespace-nowrap">
+                            -${{ r.amount|floatformat:0 }}
                         </td>
                         {% if user_role == 'superadmin' or user_role == 'operational_admin' %}
                         <td class="px-5 py-4 text-right">
                             <div class="flex items-center justify-end gap-1">
-                            {% if 'Pago Diario: Franko' in exp.description or '(venta #' in exp.description %}
+                            {% if r.kind == 'expense' %}
+                                {% if r.is_system %}
                                 <span class="p-1.5 text-smoke/20" title="Egreso automático del sistema — no editable">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                 </span>
-                            {% elif user_role == 'superadmin' or exp.expense_type == 'variable' %}
-                                {% if exp.included_in_daily_close_id and user_role != 'superadmin' %}
+                                {% elif r.daily_close_id and user_role != 'superadmin' %}
                                 <span class="p-1.5 text-smoke/20" title="Incluido en un cierre — solo un superadmin puede corregirlo">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                 </span>
                                 {% else %}
                                 <button onclick="openEditExpense(this)"
-                                    data-id="{{ exp.id }}" data-desc="{{ exp.description }}" data-amount="{{ exp.amount|floatformat:0 }}"
-                                    data-type="{{ exp.expense_type }}" data-notes="{{ exp.notes }}" data-source="{{ exp.payment_source }}" data-closed="{% if exp.included_in_daily_close_id %}1{% endif %}"
-                                    class="p-1.5 rounded text-smoke/30 hover:text-gold hover:bg-gold/10 transition-all duration-200" title="Editar egreso{% if exp.included_in_daily_close_id %} (en cierre: solo descripción/notas){% endif %}">
+                                    data-id="{{ r.id }}" data-desc="{{ r.label }}" data-amount="{{ r.amount|floatformat:0 }}"
+                                    data-type="{{ r.category }}" data-notes="{{ r.notes }}" data-source="{{ r.source }}" data-closed="{% if r.daily_close_id %}1{% endif %}"
+                                    class="p-1.5 rounded text-smoke/30 hover:text-gold hover:bg-gold/10 transition-all duration-200" title="Editar egreso{% if r.daily_close_id %} (en cierre: solo descripción/notas){% endif %}">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </button>
                                 {% endif %}
-                            {% endif %}
-                            {% if user_role == 'superadmin' %}
-                            <button onclick="confirmDeleteExpense({{ exp.id }}, '{{ exp.description|escapejs }}', {{ exp.amount|floatformat:0 }})"
-                                class="p-1.5 rounded text-smoke/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" title="Eliminar egreso">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                            </button>
+                                {% if user_role == 'superadmin' %}
+                                <button onclick="confirmDeleteExpense({{ r.id }}, '{{ r.label|escapejs }}', {{ r.amount|floatformat:0 }})"
+                                    class="p-1.5 rounded text-smoke/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" title="Eliminar egreso">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                                {% endif %}
+                            {% elif r.kind == 'advance' %}
+                                <button onclick="anularVale({{ r.id }}, '{{ r.label|escapejs }}', {{ r.amount|floatformat:0 }})"
+                                    class="p-1.5 rounded text-smoke/30 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200" title="Anular vale">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            {% elif r.kind == 'payment' or r.kind == 'movement' %}
+                                <a href="{% url 'admin_cashflow' %}" class="p-1.5 inline-block rounded text-smoke/30 hover:text-gold hover:bg-gold/10 transition-all duration-200" title="Se gestiona desde Caja">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                                </a>
                             {% endif %}
                             </div>
                         </td>
@@ -136,7 +241,7 @@
         </div>
         {% else %}
         <div class="p-8 text-center text-smoke/50 text-sm">
-            No se han registrado egresos aún.
+            No hay salidas de dinero en este período.
         </div>
         {% endif %}
     </div>
@@ -145,16 +250,17 @@
 <!-- Modal Registrar Egreso -->
 <div id="modal-expense" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl overflow-hidden p-6">
-            <h3 class="text-xl font-serif text-white mb-4">Registrar Nuevo Egreso</h3>
-            
+            <h3 class="text-xl font-serif text-white mb-1">Registrar Nuevo Egreso</h3>
+            <p class="text-smoke/40 text-[0.7rem] mb-4">Para un adelanto a un barbero usa <strong class="text-gold/80">Dar vale</strong> en Caja: así también se le descuenta de su acumulado.</p>
+
             <form id="form-expense" class="space-y-4" enctype="multipart/form-data">
                 <div>
                     <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Descripción</label>
                     <input type="text" name="description" required class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Ej: Compra de café, Pago arriendo...">
                 </div>
-                
+
                 <div>
                     <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Monto ($)</label>
                     <input type="number" name="amount" required min="1" step="1" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all" placeholder="Ej: 15000">
@@ -163,11 +269,9 @@
                 <div>
                     <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Tipo de Egreso</label>
                     <select name="expense_type" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none">
-                        <option value="variable">Gasto Variable (Día a Día)</option>
-                        {% if user_role == 'superadmin' %}
-                        <option value="fixed">Gasto Fijo (Arriendo, Servicios)</option>
-                        <option value="inventory">Compra de Inventario</option>
-                        {% endif %}
+                        {% for key, label in expense_types %}
+                        <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
 
@@ -176,7 +280,13 @@
                     <select name="payment_source" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none">
                         <option value="cash">Efectivo</option>
                         <option value="transfer">Transferencia</option>
+                        {% if user_role == 'superadmin' %}
+                        <option value="none">No salió de caja</option>
+                        {% endif %}
                     </select>
+                    {% if user_role == 'superadmin' %}
+                    <p class="text-smoke/30 text-[10px] mt-1">"No salió de caja" es para un insumo que puso el barbero o que ya estaba pagado: se registra el costo pero no descuenta del saldo.</p>
+                    {% endif %}
                 </div>
 
                 <div>
@@ -198,14 +308,16 @@
                     </button>
                 </div>
                 <div id="expense-error" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-400 text-xs rounded-sm"></div>
+                <a id="expense-error-link" href="{% url 'admin_cashflow' %}" class="hidden mt-2 text-gold text-xs underline">Ir a Caja para dar el vale →</a>
             </form>
         </div>
     </div>
 </div>
+
 <!-- Modal Editar Egreso -->
 <div id="modal-edit-expense" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeEditExpense()"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div class="bg-jet-card border border-gold/20 rounded-sm shadow-2xl overflow-hidden p-6">
             <h3 class="text-xl font-serif text-white mb-1">Editar Egreso</h3>
             <p id="edit-expense-closed-note" class="hidden text-amber-400/80 text-xs mb-3">Este egreso ya está en un cierre: el monto y el tipo no se pueden cambiar.</p>
@@ -223,11 +335,9 @@
                 <div>
                     <label class="block text-xs uppercase tracking-widest font-semibold mb-2 text-smoke/70">Tipo de Egreso</label>
                     <select name="expense_type" id="edit-exp-type" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none disabled:opacity-40">
-                        <option value="variable">Gasto Variable (Día a Día)</option>
-                        {% if user_role == 'superadmin' %}
-                        <option value="fixed">Gasto Fijo (Arriendo, Servicios)</option>
-                        <option value="inventory">Compra de Inventario</option>
-                        {% endif %}
+                        {% for key, label in expense_types %}
+                        <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div>
@@ -235,6 +345,9 @@
                     <select name="payment_source" id="edit-exp-source" class="w-full px-4 py-3 bg-jet-lighter border border-white/10 text-smoke rounded-sm focus:border-gold transition-all appearance-none">
                         <option value="cash">Efectivo</option>
                         <option value="transfer">Transferencia</option>
+                        {% if user_role == 'superadmin' %}
+                        <option value="none">No salió de caja</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div>
@@ -295,21 +408,24 @@
         const modal = document.getElementById('modal-expense');
         const form = document.getElementById('form-expense');
         const errorDiv = document.getElementById('expense-error');
+        const errorLink = document.getElementById('expense-error-link');
         const btnSubmit = document.getElementById('btn-submit-expense');
 
         btnOpen.addEventListener('click', () => {
             modal.classList.remove('hidden');
             errorDiv.classList.add('hidden');
+            errorLink.classList.add('hidden');
             form.reset();
         });
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            
+
             const originalText = btnSubmit.innerHTML;
             btnSubmit.innerHTML = 'Guardando...';
             btnSubmit.disabled = true;
-            
+            errorLink.classList.add('hidden');
+
             const formData = new FormData(form);
 
             fetch('/api/admin/cashflow/expenses/', {
@@ -324,22 +440,35 @@
                 if (res.status === 200 || res.status === 201 || res.body.ok) {
                     window.location.reload();
                 } else {
-                    throw new Error(res.body.error || 'Error al guardar');
+                    const err = new Error(res.body.error || 'Error al guardar');
+                    err.code = res.body.code;
+                    throw err;
                 }
             })
             .catch(err => {
                 errorDiv.textContent = err.message;
                 errorDiv.classList.remove('hidden');
+                // Un adelanto mal registrado es el error más común: se ofrece el
+                // camino correcto en vez de dejar al usuario adivinando.
+                if (err.code === 'advance_like') {
+                    errorLink.classList.remove('hidden');
+                }
                 btnSubmit.innerHTML = originalText;
                 btnSubmit.disabled = false;
             });
         });
     });
 
-    // ── Filtro de fechas (atajos) ──
+    // ── Filtros ──
     function _fmtLocalDate(d) {
         const p = n => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+    function setPeriod(p) {
+        document.getElementById('filter-period').value = p;
+        document.getElementById('filter-date-from').value = '';
+        document.getElementById('filter-date-to').value = '';
+        document.getElementById('expense-filter-form').submit();
     }
     function setExpenseRange(preset) {
         const now = new Date();
@@ -353,6 +482,7 @@
         } else if (preset === 'month') {
             from.setDate(1);
         }
+        document.getElementById('filter-period').value = 'rango';
         document.getElementById('filter-date-from').value = _fmtLocalDate(from);
         document.getElementById('filter-date-to').value = _fmtLocalDate(to);
         document.getElementById('expense-filter-form').submit();
@@ -409,6 +539,22 @@
             btn.disabled = false;
         });
     });
+
+    // ── Anular un vale desde esta pantalla ──
+    function anularVale(id, etiqueta, monto) {
+        const txt = '$' + Number(monto).toLocaleString('es-CO');
+        if (!confirm(`¿Anular ${etiqueta} por ${txt}?\n\nEl monto vuelve a la caja y deja de descontarse del acumulado del barbero.`)) return;
+        fetch(`/api/admin/cashflow/barber-payments/advance/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) { window.location.reload(); }
+            else { alert('Error: ' + (data.error || 'No se pudo anular el vale')); }
+        })
+        .catch(() => alert('Error de conexión'));
+    }
 
     {% if user_role == 'superadmin' %}
     let _deleteExpenseId = null;

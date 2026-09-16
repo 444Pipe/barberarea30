@@ -86,9 +86,16 @@ def checkout_booking_view(request, booking_id):
     if can_send_frank_costs:
         frank_materials_cost = _safe_decimal(data.get('frank_materials_cost'), 0)
         frank_labor_cost = _safe_decimal(data.get('frank_labor_cost'), 0)
+        # De qué caja salió la plata de los materiales. 'none' es para el insumo
+        # que el barbero puso de su bolsillo o que ya estaba pagado: se registra
+        # igual (baja su base de comisión) pero no descuenta del control de caja.
+        frank_materials_source = (data.get('frank_materials_source') or 'cash').strip()
+        if frank_materials_source not in ('cash', 'transfer', 'none'):
+            frank_materials_source = 'cash'
     else:
         frank_materials_cost = Decimal(0)
         frank_labor_cost = Decimal(0)
+        frank_materials_source = 'cash'
 
     # Tomar la comisión configurada en el perfil del barbero. Si no hay barbero
     # o el valor no es válido, caer a un default razonable (40% / 50% Frank).
@@ -112,6 +119,7 @@ def checkout_booking_view(request, booking_id):
             commission_percentage=comm_percentage,
             notes=data.get('notes', ''),
             frank_materials_cost=frank_materials_cost,
+            frank_materials_source=frank_materials_source,
             frank_labor_cost=frank_labor_cost,
             request=request,
         )
@@ -256,7 +264,7 @@ def daily_close_view(request):
                 frank_expense = Expense.objects.create(
                     description="Pago Diario: Franko",
                     amount=frank_paid,
-                    expense_type='variable',
+                    expense_type=Expense.TYPE_BARBER_PAYMENT,
                     payment_source=frank_pay_source,
                     registered_by=request.user
                 )
@@ -506,7 +514,7 @@ def daily_close_detail_view(request, close_id):
     total_materials = 0.0
     for exp in expenses:
         amt = float(exp.amount)
-        is_materials = cashflow_services.is_materials_expense(exp.description)
+        is_materials = cashflow_services.is_materials_expense(exp)
         if is_materials:
             total_materials += amt
         expenses_data.append({
@@ -577,7 +585,7 @@ def daily_close_detail_view(request, close_id):
 @permission_classes([IsSuperAdmin])
 def delete_daily_close_view(request, close_id):
     """DELETE /api/admin/cashflow/daily-close/<id>/delete/ - Eliminar cierre de caja (solo superadmin)."""
-    from apps.cashflow.models import DailyClose, Commission
+    from apps.cashflow.models import DailyClose, Commission, Expense
     from django.db import transaction
     try:
         daily_close = DailyClose.objects.get(pk=close_id)
@@ -592,6 +600,12 @@ def delete_daily_close_view(request, close_id):
                 sale__included_in_daily_close=daily_close,
                 is_paid_in_daily_close=True,
             ).update(is_paid=False, is_paid_in_daily_close=False, paid_at=None)
+            # Solo el egreso AUTOMÁTICO de Frank, identificado por su
+            # descripción reservada (que ni add_expense_view ni
+            # edit_expense_view dejan escribir a mano). Filtrar por el tipo
+            # 'barber_payment' se llevaría por delante un bono registrado a
+            # mano que cayó en el mismo cierre, y ese egreso no se recrea al
+            # recerrar: sería plata borrada sin dejar rastro.
             daily_close.expenses.filter(
                 description__startswith='Pago Diario: Franko'
             ).delete()
@@ -751,7 +765,7 @@ def live_cashflow_detail_view(request):
     for exp in expenses:
         amt = float(exp.amount)
         total_expenses_overall += amt
-        is_materials = cashflow_services.is_materials_expense(exp.description)
+        is_materials = cashflow_services.is_materials_expense(exp)
         if is_materials:
             total_materials += amt
         expenses_data.append({
@@ -827,7 +841,7 @@ def add_expense_view(request):
     expense_type = data.get('expense_type', 'variable')
     notes = data.get('notes', '')
     payment_source = data.get('payment_source', 'cash')
-    if payment_source not in ('cash', 'transfer'):
+    if payment_source not in ('cash', 'transfer', 'none'):
         payment_source = 'cash'
     image = request.FILES.get('image') if hasattr(request, 'FILES') else None
 
@@ -842,9 +856,42 @@ def add_expense_view(request):
     except Exception as e:
         return Response({'error': f'Monto inválido: {str(e)}'}, status=400)
 
+    # "Pago Diario: Franko" y "(venta #N)" identifican egresos que crea el
+    # sistema: el cierre diario los borra y los recrea por ese patrón, y el ROI
+    # descuenta el primero del gasto operativo. Si alguien pudiera escribirlos a
+    # mano, ese monto saldría del neto sin dejar rastro.
+    if description.startswith('Pago Diario: Franko') or '(venta #' in description:
+        return Response({
+            'error': 'Esa descripción usa un patrón reservado del sistema '
+                     '("Pago Diario: Franko" o "(venta #"). Usa otra.',
+        }, status=400)
+
+    # Un adelanto a un barbero NO es un egreso suelto: si se registra así sale
+    # de la caja pero no baja su acumulado, y el cierre termina sugiriendo
+    # pagarle completo. El camino correcto es "Dar vale".
+    if cashflow_services.looks_like_advance(description):
+        return Response({
+            'error': 'Esto parece un adelanto a un barbero. Regístralo con el botón '
+                     '"Dar vale" en Caja: así sale del efectivo Y se le descuenta de '
+                     'su acumulado. Registrado como egreso, se le termina pagando dos veces.',
+            'code': 'advance_like',
+        }, status=400)
+
     profile = getattr(request.user, 'profile', None)
-    if profile and profile.role == 'operational_admin' and expense_type != 'variable':
-        return Response({'error': 'Solo los administradores principales pueden registrar egresos fijos o de inventario.'}, status=403)
+    role = profile.role if profile else None
+
+    valid_types = {t[0] for t in Expense.EXPENSE_TYPES}
+    if expense_type not in valid_types:
+        return Response({'error': 'Tipo de egreso inválido.'}, status=400)
+    if expense_type not in cashflow_services.allowed_expense_types(role):
+        return Response({
+            'error': 'No tienes permiso para registrar egresos de ese tipo.'
+        }, status=403)
+    if payment_source == 'none' and role != 'superadmin':
+        return Response({
+            'error': 'Solo un administrador principal puede marcar un egreso como '
+                     '"no salió de caja".'
+        }, status=403)
 
     try:
         expense = Expense.objects.create(
@@ -876,6 +923,18 @@ def delete_expense_view(request, expense_id):
     from apps.cashflow.models import Expense
     try:
         expense = Expense.objects.get(pk=expense_id)
+
+        # Los egresos que crea el sistema no se borran por aquí. El pago diario
+        # de Frank va enlazado a un BarberPayment: si desaparece el egreso, ese
+        # pago queda huérfano y la caja lo empieza a contar por su cuenta. El
+        # camino correcto es eliminar el cierre, que revierte todo junto.
+        if (cashflow_services.is_frank_daily_expense(expense)
+                or expense.barber_payments.exists()):
+            return Response({
+                'error': 'Este egreso es el pago diario a un barbero y lo administra '
+                         'el cierre de caja. Para revertirlo, elimina el cierre.',
+            }, status=400)
+
         description = expense.description
         amount = float(expense.amount)
         log_audit(
@@ -932,11 +991,15 @@ def edit_expense_view(request, expense_id):
     new_notes = data.get('notes') if 'notes' in data else None
     new_image = request.FILES.get('image') if hasattr(request, 'FILES') else None
 
-    # 2. Restricción de rol: Frank solo egresos variables, sin cambiar el tipo.
+    # 2. Restricción de rol: los operativos manejan el día a día y los
+    # materiales de un servicio; el resto (fijos, inventario, pagos a barberos)
+    # es de los administradores principales.
+    role = profile.role if profile else None
+    permitidos = cashflow_services.allowed_expense_types(role)
     if not is_superadmin:
-        if expense.expense_type != 'variable':
-            return Response({'error': 'Solo los administradores principales pueden editar egresos fijos o de inventario.'}, status=403)
-        if new_expense_type and new_expense_type != 'variable':
+        if expense.expense_type not in permitidos:
+            return Response({'error': 'Solo los administradores principales pueden editar egresos de ese tipo.'}, status=403)
+        if new_expense_type and new_expense_type not in permitidos:
             return Response({'error': 'Solo los administradores principales pueden cambiar el tipo de un egreso.'}, status=403)
 
     # 3. Egreso ya cerrado: monto y tipo bloqueados para todos.
@@ -956,6 +1019,18 @@ def edit_expense_view(request, expense_id):
     # ellos causaría borrados/tratamientos incorrectos.
     if new_description and (new_description.startswith('Pago Diario: Franko') or '(venta #' in new_description):
         return Response({'error': 'La descripción no puede usar un patrón reservado del sistema ("Pago Diario: Franko" o "(venta #").'}, status=400)
+
+    # Mismo criterio que al registrar: un vale va por "Dar vale", no por aquí.
+    # Solo se valida si la descripción CAMBIA: si no, los egresos que ya traían
+    # esa palabra de antes quedarían congelados, sin poder corregirles ni una
+    # nota, que es justo lo contrario de lo que se necesita para arreglarlos.
+    if (new_description and new_description != expense.description
+            and cashflow_services.looks_like_advance(new_description)):
+        return Response({
+            'error': 'Esto parece un adelanto a un barbero. Regístralo con el botón '
+                     '"Dar vale" en Caja para que se le descuente de su acumulado.',
+            'code': 'advance_like',
+        }, status=400)
 
     changes = {}
 
@@ -986,7 +1061,12 @@ def edit_expense_view(request, expense_id):
         expense.notes = new_notes
 
     new_source = data.get('payment_source') if 'payment_source' in data else None
-    if new_source in ('cash', 'transfer') and new_source != expense.payment_source:
+    if new_source == 'none' and (profile.role if profile else None) != 'superadmin':
+        return Response({
+            'error': 'Solo un administrador principal puede marcar un egreso como '
+                     '"no salió de caja".'
+        }, status=403)
+    if new_source in ('cash', 'transfer', 'none') and new_source != expense.payment_source:
         changes['payment_source'] = [expense.payment_source, new_source]
         expense.payment_source = new_source
 
@@ -1236,10 +1316,12 @@ def reject_sale_view(request, sale_id):
         # lo que podía borrar el egreso de OTRA venta del mismo cliente.
         if booking:
             from apps.cashflow.models import Expense
+            # 'variable' cubre los egresos creados antes de que 'materials'
+            # existiera como tipo propio (ver migración 0017).
             Expense.objects.filter(
                 description__endswith=f'(venta #{sale.id})',
                 included_in_daily_close__isnull=True,
-                expense_type='variable',
+                expense_type__in=['variable', Expense.TYPE_MATERIALS],
             ).delete()
 
         # Eliminar la venta (que por cascada elimina la comisión)
@@ -1340,7 +1422,7 @@ def fix_frank_history_view(request):
                     expense = Expense.objects.create(
                         description='Pago Diario: Franko',
                         amount=frank_pay,
-                        expense_type='variable',
+                        expense_type=Expense.TYPE_BARBER_PAYMENT,
                         registered_by=close.closed_by,
                         included_in_daily_close=close
                     )
@@ -1802,6 +1884,16 @@ def pay_barber_view(request, barber_id):
             status=400,
         )
 
+    # De dónde sale la plata. Antes se asumía efectivo siempre: si el pago se
+    # hacía por transferencia, el control de caja quedaba descuadrado en ese
+    # monto (el efectivo mostraba de menos y la cuenta de más).
+    payment_source = (request.data.get('payment_source') or '').strip()
+    if payment_source not in ('cash', 'transfer'):
+        return Response(
+            {'error': 'Indica si el pago se hizo en efectivo o por transferencia.'},
+            status=400,
+        )
+
     # Solo se liquida el periodo mostrado (últimos 30 días o el mes elegido), para
     # que lo que se paga coincida siempre con lo que se ve en la tarjeta.
     period_start, period_end, _ = _parse_barber_pay_period(request)
@@ -1841,6 +1933,7 @@ def pay_barber_view(request, barber_id):
             daily_close=None,
             amount=net_amount,
             suggested_amount=net_amount,
+            payment_source=payment_source,
             created_by=request.user,
             notes=f'Liquidación manual (acumulado ${earnings:,.0f}, vales ${total_advances:,.0f})',
         )

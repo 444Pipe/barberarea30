@@ -312,6 +312,16 @@
               oninput="updateCheckoutTotal()">
             <span class="text-[0.55rem] text-smoke/30">Se registrará como Egreso</span>
           </div>
+          <div class="col-span-2">
+            <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">¿De dónde salió la plata de los materiales?</label>
+            <select id="checkout-materials-source"
+              class="w-full bg-jet border border-white/10 rounded px-2 py-1.5 text-sm text-white focus:border-gold outline-none">
+              <option value="cash">Efectivo de la caja</option>
+              <option value="transfer">Transferencia</option>
+              <option value="none">No salió de caja (lo puso el barbero o ya estaba comprado)</option>
+            </select>
+            <span class="text-[0.55rem] text-smoke/30">Las dos primeras descuentan del control de caja.</span>
+          </div>
           <div>
             <label class="block text-[0.6rem] text-smoke/40 uppercase tracking-widest mb-0.5">Mano de Obra</label>
             <input type="number" id="checkout-labor-value" min="0" value="0"
@@ -832,6 +842,7 @@ const userCanSeePhone = {% if user_role == 'superadmin' or user_role == 'admin' 
       added_value_description: document.getElementById('checkout-has-added-value').checked ? document.getElementById('checkout-added-value-desc').value : '',
       notes: document.getElementById('checkout-notes').value,
       frank_materials_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-materials-value').value) || 0) : 0,
+      frank_materials_source: document.getElementById('checkout-materials-source').value,
       frank_labor_cost: document.getElementById('checkout-has-frank-materials').checked ? (parseFloat(document.getElementById('checkout-labor-value').value) || 0) : 0
     };
 

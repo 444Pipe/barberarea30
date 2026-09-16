@@ -21,6 +21,13 @@ export ADMIN_PASSWORD="tu_contraseña"
 
 ---
 
+## 💵 Manejo de la plata
+
+Cómo se registran los gastos, los vales, las liquidaciones y los retiros, y cómo
+cuadrar la caja: **[GUIA_CAJA.md](GUIA_CAJA.md)**.
+
+---
+
 ## 📊 Panel de Control - Funcionalidades
 
 ### 1. **Estadísticas Principales** (Superior)

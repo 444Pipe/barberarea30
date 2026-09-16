@@ -360,8 +360,11 @@ def monthly_report_view(request):
 
     # Egresos para el net: EXCLUIR el "Pago Diario: Franko" (evita doble-conteo
     # con la Commission de Frank, que sí cargamos abajo). Igual que ROI.
+    # Igual que el ROI: se descuenta el pago diario AUTOMÁTICO de Frank (ya
+    # está en su Commission), no la categoría completa. Un bono a un barbero es
+    # gasto real y tiene que bajar el neto.
     expenses_for_net = float(
-        expenses.exclude(description__iexact=FRANK_DAILY_EXPENSE_DESC)
+        expenses.exclude(description__startswith=FRANK_DAILY_EXPENSE_DESC)
         .aggregate(t=Sum('amount'))['t'] or 0
     )
     # Egresos NO relacionados con el pago a Frank (más útil para el KPI).
@@ -402,10 +405,35 @@ def monthly_report_view(request):
             })
     barber_ranking.sort(key=lambda x: x['generated'], reverse=True)
 
+    # Desglose por categoria: es la pregunta que el dueno hace cada mes
+    # ("cuanto en materiales, cuanto en el dia a dia, cuanto en barberos").
+    # Se arma sobre EXPENSE_TYPES para que un tipo nuevo aparezca solo.
+    by_type_raw = dict(
+        expenses.values_list('expense_type').annotate(t=Sum('amount'))
+    )
+    expenses_by_type = [
+        {
+            'key': key,
+            'label': label,
+            'amount': float(by_type_raw.get(key) or 0),
+        }
+        for key, label in Expense.EXPENSE_TYPES
+    ]
+    # Red de seguridad: si aparece un tipo que no esta en EXPENSE_TYPES (una
+    # fila vieja, un valor escrito a mano), se muestra igual en vez de
+    # desaparecer del total.
+    conocidos = {k for k, _ in Expense.EXPENSE_TYPES}
+    for key, monto in by_type_raw.items():
+        if key not in conocidos:
+            expenses_by_type.append({
+                'key': key, 'label': key or 'Sin tipo', 'amount': float(monto or 0),
+            })
+
     return Response({
         'period': f"{first_day.strftime('%B %Y')}",
         'year': year,
         'month': month,
+        'expenses_by_type': expenses_by_type,
         'kpis': {
             'total_sales': total_income,
             'total_tips': float(totals['total_tips'] or 0),

@@ -37,6 +37,8 @@ python manage.py seed_services                 # syncs the 9 canonical services
 python manage.py send_post_sale_surveys        # apps/bookings — manual trigger of the survey job
 python manage.py fix_frank_history             # apps/cashflow — backfill for Frank's commissions
 python manage.py reset_roi                     # apps/roi — wipe ROI snapshots
+python manage.py audit_cash_box                # apps/cashflow — audita el cuadre de caja (solo lectura)
+python manage.py convert_expense_to_advance --expense-id N --barber-id N --apply
 
 # Full idempotent seed run on every Railway boot (see Procfile)
 python seed.py
@@ -109,6 +111,30 @@ Permission checks live in two places — always use them, do not reinvent:
 2. DRF permission classes in [apps/users/permissions.py](apps/users/permissions.py): `IsSuperAdmin`, `IsOperationalAdminOrAbove`, `IsAdminOrAbove`, `IsBarberOrAbove`, `HasProfilePermission` (drives off a `required_permission` attr on the view). Use these on `APIView`/`ViewSet`s.
 
 Note the asymmetry: `is_admin` returns True for `admin`, `operational_admin`, and `superadmin`. `is_admin_only` is the one that returns True **just** for plain admin. Don't mix them up.
+
+### Salidas de dinero: una sola lista
+
+La plata sale por cuatro modelos distintos: `Expense`, `BarberAdvance` (vales),
+`BarberPayment` (liquidaciones) y `CashMovement` (retiros/traslados). Antes cada
+pantalla sumaba su propio subconjunto y los números no cuadraban.
+
+[`compute_outflows()`](apps/cashflow/services.py) es ahora la **única** función
+que arma esa lista. De ella cuelgan `compute_cash_box_detail()` y la pantalla
+`/admin-panel/expenses/`. El invariante es:
+
+```
+Σ compute_outflows(source=X)  ==  compute_cash_box()[f'{X}_out']
+```
+
+Lo verifica `ConciliacionCajaTests`. Si agregas una forma nueva de sacar plata,
+va en `compute_outflows` o los dos números dejan de cuadrar. Ver
+[PLAN_CONCILIACION_CAJA.md](PLAN_CONCILIACION_CAJA.md) y, para el uso diario,
+[GUIA_CAJA.md](GUIA_CAJA.md).
+
+`Expense.payment_source` admite `'none'` (no salió de caja): se registra el costo
+pero no descuenta del saldo. Los tipos `materials` y `barber_payment` los asigna
+el sistema; el ROI excluye del gasto operativo **solo** el "Pago Diario: Franko"
+automático, no la categoría entera.
 
 ### Booking integrity
 

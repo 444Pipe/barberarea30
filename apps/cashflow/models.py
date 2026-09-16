@@ -11,6 +11,15 @@ PAYMENT_SOURCE_CHOICES = [
     ('transfer', 'Transferencia'),
 ]
 
+# Los EGRESOS admiten una tercera opcion que las demas salidas no: un insumo
+# que nunca paso por la caja (lo puso el barbero de su bolsillo, o salio de
+# stock ya pagado). Se registra igual porque es costo del servicio y baja la
+# base de comision, pero NO descuenta del efectivo ni de la cuenta.
+EXPENSE_SOURCE_NONE = 'none'
+EXPENSE_SOURCE_CHOICES = PAYMENT_SOURCE_CHOICES + [
+    (EXPENSE_SOURCE_NONE, 'No salio de caja'),
+]
+
 
 class PaymentMethod(models.Model):
     """Métodos de pago. Ej: Transferencia (Nequi, Bancolombia), Efectivo, Tarjeta."""
@@ -328,20 +337,49 @@ class InventorySale(models.Model):
 
 
 class Expense(models.Model):
-    """Egresos fijos y variables."""
-    # Solo superadmins gestionan los "fixed". Operativos gestionan "variable".
+    """Egresos fijos y variables.
+
+    Los socios necesitan responder "¿cuánto se nos va en materiales, cuánto en
+    el día a día y cuánto en pagarle a los barberos?". Antes los tres caían en
+    'variable' y la única forma de separarlos era leer el texto de la
+    descripción, que se rompe en cuanto alguien la edita. Por eso `materials` y
+    `barber_payment` son tipos propios: el sistema los asigna solo, y el ROI y
+    los reportes filtran por tipo en vez de por texto.
+    """
+    # Solo superadmins gestionan 'fixed', 'inventory' y 'barber_payment'.
+    # Los operativos (Frank) gestionan 'variable' y 'materials'.
+    TYPE_FIXED = 'fixed'
+    TYPE_VARIABLE = 'variable'
+    TYPE_INVENTORY = 'inventory'
+    TYPE_MATERIALS = 'materials'
+    TYPE_BARBER_PAYMENT = 'barber_payment'
     EXPENSE_TYPES = [
-        ('fixed', 'Fijo (Arriendo, Servicios, Nómina)'),
-        ('variable', 'Variable (Mantenimiento, Compras menores)'),
-        ('inventory', 'Compra de Inventario'),
+        (TYPE_FIXED, 'Fijo (Arriendo, Servicios, Nómina)'),
+        (TYPE_VARIABLE, 'Variable (Día a día)'),
+        (TYPE_INVENTORY, 'Compra de Inventario'),
+        (TYPE_MATERIALS, 'Materiales / insumos de servicio'),
+        (TYPE_BARBER_PAYMENT, 'Pago a barberos'),
     ]
+    # Tipos que el ROI cuenta como gasto operativo del negocio.
+    #
+    # `barber_payment` SÍ entra: un bono o un pago suelto a un barbero es plata
+    # que sale de la empresa como cualquier otra. El único que se descuenta de
+    # este total es el "Pago Diario: Franko" automático, porque ese mismo costo
+    # ya viaja en la Commission de Frank y contarlo dos veces inflaría el gasto.
+    # La descripción de ese egreso es un patrón reservado que ni add_expense_view
+    # ni edit_expense_view dejan escribir a mano (ver apps/cashflow/views.py).
+    OPERATIONAL_TYPES = [TYPE_VARIABLE, TYPE_INVENTORY, TYPE_MATERIALS,
+                         TYPE_BARBER_PAYMENT]
 
     description = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=12, decimal_places=0)
     expense_type = models.CharField(max_length=20, choices=EXPENSE_TYPES, default='variable')
     payment_source = models.CharField(
-        max_length=10, choices=PAYMENT_SOURCE_CHOICES, default='cash',
-        help_text='De dónde salió el dinero: efectivo o transferencia'
+        max_length=10, choices=EXPENSE_SOURCE_CHOICES, default='cash',
+        help_text='De dónde salió el dinero: efectivo, transferencia, o ninguna '
+                  '("no salió de caja": insumo que puso el barbero o que ya '
+                  'estaba pagado). Solo efectivo y transferencia descuentan del '
+                  'control de caja.'
     )
     # Fecha local (America/Bogota), no la del servidor en UTC: un egreso
     # registrado de noche debe contar en el día/mes correcto para el ROI.
