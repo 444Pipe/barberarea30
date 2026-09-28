@@ -59,8 +59,8 @@ collectstatic → migrate → python seed.py → gunicorn
 `seed.py` runs on **every** boot. It is intentionally idempotent and is also the project's self-healing layer:
 
 - Re-creates the canonical 9 services and the two `PaymentMethod`s.
-- Re-creates/updates the canonical superusers (`camilorf`, `juandavid.castro`, `soporte_tecnico`) and the operational user `frank`.
-- Forces `Partner` rows to exactly the two socios (Camilo + Juan David at 50/50).
+- Re-creates/updates the canonical superusers (`camilorf`, `cristian.admin`, `soporte_tecnico`) and the operational user `frank`. `juandavid.castro` is kept but deactivated (ex-socio; his cash cuts reference him with PROTECT, so never delete him).
+- Forces `Partner` rows to exactly the two socios (Camilo + Cristian at 50/50). Cristian inherited Juan David's `Partner` row (same id, investments and history); his barber account is separate from `cristian.admin`.
 - Contains **schema-repair fallbacks** that use `connection.schema_editor()` to add tables/columns (e.g. `bookings_blockeddate`, `cashflow_sale.approval_status`) when a migration silently failed in production. If you add a new field that production-might-be-missing, follow this pattern rather than relying on `migrate` alone — Railway's migration history has been unreliable here in the past.
 
 The URL [/init-soporte/](config/urls.py) is a one-shot web endpoint that runs `createsoporte` + `seed_services` from the browser — used to recover access if a deploy goes sideways.
@@ -99,7 +99,7 @@ All apps live under [apps/](apps/) and are registered as `apps.<name>` in [INSTA
 [UserProfile](apps/users/models.py) has four roles with **non-overlapping permission properties**:
 
 ```
-superadmin         → Camilo, Juan David: prices, promos, fixed expenses, audit, staff mgmt
+superadmin         → Camilo, Cristian: prices, promos, fixed expenses, audit, staff mgmt
 operational_admin  → Frank: confirm sales, tips, daily close, inventory
 admin              → standard shop admin: client master data, basic ops
 barber             → own agenda + pre-approved discounts only

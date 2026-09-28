@@ -542,7 +542,8 @@ import secrets as _secrets
 
 users_to_create = [
     {'username': 'camilorf', 'env': 'SEED_CAMILO_PASSWORD', 'email': 'camilo@area30.co'},
-    {'username': 'juandavid.castro', 'env': 'SEED_JUANDAVID_PASSWORD', 'email': 'juandavid@area30.co'},
+    # Cuenta de socio de Cristian, aparte de su cuenta de barbero.
+    {'username': 'cristian.admin', 'env': 'SEED_CRISTIAN_PASSWORD', 'email': 'cristian@area30.co'},
     {'username': 'soporte_tecnico', 'env': 'SEED_SOPORTE_PASSWORD', 'email': 'soporte@area30.co'},
 ]
 
@@ -569,19 +570,49 @@ for user_data in users_to_create:
 # Eliminar usuarios antiguos si existen para evitar duplicados/confusión
 User.objects.filter(username__in=['camilo', 'juan david', 'juandavid', 'juan.david']).delete()
 
-# --- Asegurar que solo existan Camilo y Juan David como socios ---
+# --- Cambio de socio (sep-2026): Cristian toma el puesto de Juan David ---
+# Juan David se retira sin borrarlo: sus cortes de caja y cierres diarios lo
+# referencian con PROTECT, y el historial debe quedar a su nombre.
+try:
+    jd_old = User.objects.filter(username='juandavid.castro').first()
+    if jd_old and (jd_old.is_active or jd_old.is_staff or jd_old.is_superuser):
+        jd_old.is_active = False
+        jd_old.is_staff = False
+        jd_old.is_superuser = False
+        jd_old.save(update_fields=['is_active', 'is_staff', 'is_superuser'])
+        print("✓ Usuario juandavid.castro desactivado (retirado como socio)")
+except Exception as e:
+    print("Error retirando a Juan David:", e)
+
+# El registro Partner de Juan David pasa tal cual a Cristian: mismos aportes y
+# mismos repartos históricos, solo cambia la persona que ocupa el puesto.
 try:
     from apps.roi.models import Partner
-    
+    cristian_admin = User.objects.filter(username='cristian.admin').first()
+    if cristian_admin and not Partner.objects.filter(user=cristian_admin).exists():
+        seat = (Partner.objects.filter(user__username='juandavid.castro').first()
+                or Partner.objects.filter(display_name='Juan David').first())
+        if seat:
+            seat.user = cristian_admin
+            seat.display_name = 'Cristian'
+            seat.save(update_fields=['user', 'display_name'])
+            print(f"✓ Puesto de socio #{seat.pk} transferido de Juan David a Cristian")
+except Exception as e:
+    print("Error transfiriendo el puesto de socio a Cristian:", e)
+
+# --- Asegurar que solo existan Camilo y Cristian como socios ---
+try:
+    from apps.roi.models import Partner
+
     # 1. Obtener usuarios canónicos
     camilo_user = User.objects.filter(username='camilorf').first()
-    jd_user = User.objects.filter(username='juandavid.castro').first()
-    
+    cristian_user = User.objects.filter(username='cristian.admin').first()
+
     # 2. Desactivar socios no canónicos (duplicados, con alias o con user=None).
     #    NO se borran: eliminar en cascada arrastraría PartnerInvestment /
     #    PartnerMonthlyShare y se perderían datos históricos. En su lugar se
     #    marcan is_active=False para que no cuenten como socios activos al 50%.
-    valid_users = [u for u in [camilo_user, jd_user] if u]
+    valid_users = [u for u in [camilo_user, cristian_user] if u]
     Partner.objects.exclude(user__in=valid_users).update(is_active=False)
     # Los socios con user=None no entran en el exclude anterior (NULL NOT IN → NULL),
     # así que se desactivan aparte para no dejar "socios zombis" activos al 50%.
@@ -594,11 +625,11 @@ try:
             defaults={'display_name': 'Camilo', 'share_percentage': 50.00, 'is_active': True}
         )
 
-    # 4. Crear/Asegurar socio Juan David (reactivándolo si estaba inactivo)
-    if jd_user:
+    # 4. Crear/Asegurar socio Cristian (el puesto heredado de Juan David)
+    if cristian_user:
         Partner.objects.update_or_create(
-            user=jd_user,
-            defaults={'display_name': 'Juan David', 'share_percentage': 50.00, 'is_active': True}
+            user=cristian_user,
+            defaults={'display_name': 'Cristian', 'share_percentage': 50.00, 'is_active': True}
         )
 except Exception as e:
     print(f"Error gestionando los socios únicos: {e}")

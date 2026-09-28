@@ -1,6 +1,6 @@
 # Cómo se maneja la plata en el sistema
 
-Guía para Camilo, Juan David y Frank.
+Guía para Camilo, Cristian y Frank.
 Escrita el 16 de septiembre de 2026, después del arreglo de la caja.
 
 ---

@@ -3,7 +3,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
 class IsSuperAdmin(BasePermission):
-    """Only super admins (Camilo, Juan David): precios, egresos fijos, auditoría."""
+    """Only super admins (Camilo, Cristian): precios, egresos fijos, auditoría."""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False

@@ -29,7 +29,7 @@ class UserProfile(models.Model):
     """Perfil de usuario con roles del sistema.
 
     Jerarquía de roles:
-      superadmin       → Acceso total (Camilo, Juan David): precios, promociones, egresos fijos, auditoría.
+      superadmin       → Acceso total (Camilo, Cristian): precios, promociones, egresos fijos, auditoría.
       operational_admin → Líder de piso (Frank): agenda, propinas, ventas, inventario, cierre diario.
       admin            → Admin de barbería: gestión operativa estándar.
       barber           → Barbero: solo su agenda y descuentos pre-aprobados.

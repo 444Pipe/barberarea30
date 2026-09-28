@@ -34,7 +34,7 @@ def admin_required(view_func):
 
 
 def superadmin_required(view_func):
-    """Shortcut: only superadmins (Camilo, Juan David)."""
+    """Shortcut: only superadmins (Camilo, Cristian)."""
     return role_required('superadmin')(view_func)
 
 

@@ -1965,7 +1965,7 @@ def pay_barber_view(request, barber_id):
 def delete_barber_payment_view(request, payment_id):
     """DELETE /api/admin/cashflow/barber-payments/payment/<id>/delete/ - Anula una liquidación.
 
-    Solo superadmin (Camilo / Juan David): sirve para corregir un pago
+    Solo superadmin (Camilo / Cristian): sirve para corregir un pago
     registrado de más. Revierte exactamente lo que este pago liquidó —las
     comisiones y vales que lo referencian— y vuelve a dejar el saldo pendiente.
 

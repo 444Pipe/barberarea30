@@ -1,5 +1,5 @@
 """
-ROI Views — Acceso exclusivo para SuperAdministradores (Camilo, Juan David).
+ROI Views — Acceso exclusivo para SuperAdministradores (Camilo, Cristian).
 
 El decorador @superadmin_required garantiza que solo usuarios con
 role='superadmin' puedan acceder. Cualquier otro perfil es redirigido.
@@ -27,7 +27,7 @@ from .models import MonthlyROISnapshot, Partner, PartnerInvestment
 @superadmin_required
 def roi_dashboard_view(request):
     """
-    Panel de ROI — solo accesible para superadmin (Camilo / Juan David).
+    Panel de ROI — solo accesible para superadmin (Camilo / Cristian).
     Muestra inversión inicial, ganancias del mes seleccionado y saldos pendientes.
 
     Acepta ?year=YYYY&month=M para navegar entre meses. Por defecto muestra el
