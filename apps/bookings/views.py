@@ -475,6 +475,7 @@ def admin_my_agenda_view(request):
     shop_blocks = {
         bd.date: bd for bd in BlockedDate.objects.filter(date__range=(start, end))
     }
+    work_hours = list(barber.work_hours.filter(date_from__lte=end, date_to__gte=start))
 
     def hhmm(t):
         return t.strftime('%H:%M') if t else None
@@ -485,7 +486,7 @@ def admin_my_agenda_view(request):
     days = []
     cur = start
     while cur <= end:
-        window = barber.day_window(cur)
+        window = barber.day_window(cur, work_hours)
         day_blocks = sorted(blocks_by_day.get(cur, []), key=lambda u: u.start_time)
         block_ranges = [
             (_dt.combine(cur, u.start_time), _dt.combine(cur, u.end_time))
@@ -538,6 +539,7 @@ def admin_my_agenda_view(request):
                 'end': hhmm(window['end']),
                 'last_start': hhmm(window['last_start']),
                 'source': window['source'],
+                'reason': window.get('reason', ''),
             } if window else None,
             'shop_block': {
                 'all_day': not (shop.start_time and shop.end_time),

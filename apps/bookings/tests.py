@@ -198,3 +198,69 @@ class BookingBlockTests(TestCase):
         # Un barbero no puede ver la agenda de otro.
         r = self.client.get(f'/api/admin/my-agenda/?barber={self.frank.id}')
         self.assertEqual(r.status_code, 403)
+
+
+@mock.patch('threading.Thread')
+class WorkHoursTests(TestCase):
+    """Horario de trabajo temporal: "del X al Y trabaja de H1 a H2"."""
+
+    def setUp(self):
+        self.shop = Barbershop.objects.create(name='Área 30 Test')
+        self.frank_user = User.objects.create_user('frank_w', password='x')
+        UserProfile.objects.create(user=self.frank_user, role='operational_admin', barbershop=self.shop)
+        self.frank = Barber.objects.create(user=self.frank_user, barbershop=self.shop, display_name='Frank')
+        self.service = Service.objects.create(
+            name='Corte', slug='corte-w', price=Decimal('30000'), duration_minutes=60,
+        )
+        self.day = _next_working_wednesday()
+        self.client.force_login(self.frank_user)
+        r = self.client.post(f'/api/admin/barbers/{self.frank.id}/work-hours/', {
+            'date_from': self.day.strftime('%Y-%m-%d'),
+            'date_to': (self.day + timedelta(days=30)).strftime('%Y-%m-%d'),
+            'start_time': '10:00', 'end_time': '13:00', 'reason': 'Solo mañanas',
+        }, content_type='application/json')
+        self.assertEqual(r.status_code, 201)
+        self.client.logout()
+
+    def _public(self, t):
+        return self.client.post('/api/bookings/', {
+            'client_name': 'Cliente', 'client_phone': '3001234567',
+            'service_id': self.service.id, 'barber_id': self.frank.id,
+            'date': self.day.strftime('%Y-%m-%d'), 'time': t, 'privacy_accepted': True,
+        }, content_type='application/json')
+
+    def test_ventana_recortada(self, _thread):
+        w = self.frank.day_window(self.day)
+        self.assertEqual((w['start'], w['end'], w['source']), (time(10, 0), time(13, 0), 'custom'))
+        # Fuera del rango de fechas sigue el horario normal.
+        self.assertEqual(self.frank.day_window(self.day - timedelta(days=7))['end'], time(20, 0))
+
+    def test_web_solo_ofrece_la_franja(self, _thread):
+        r = self.client.get(f'/api/barbers/{self.frank.id}/availability/'
+                            f'?date={self.day:%Y-%m-%d}&service_id={self.service.id}')
+        libres = [s['time'] for s in r.json()['slots'] if s['available']]
+        # Frank ocupa 2 h: la última que cabe antes de la 1 p.m. es a las 11:00.
+        self.assertEqual(libres, ['10:00', '10:30', '11:00'])
+
+    def test_reserva_fuera_del_horario_se_rechaza(self, _thread):
+        self.assertEqual(self._public('11:30').status_code, 409)
+        self.assertEqual(self._public('15:00').status_code, 409)
+        self.assertEqual(self._public('11:00').status_code, 201)
+
+    def test_cita_previa_fuera_del_horario_aparece_en_conflictos(self, _thread):
+        Booking.objects.create(
+            client_name='Previa', barber=self.frank, service=self.service,
+            date=self.day, time=time(15, 0), duration_minutes=120,
+            price=Decimal('30000'), status='confirmed',
+        )
+        self.client.force_login(self.frank_user)
+        r = self.client.get(f'/api/admin/barbers/{self.frank.id}/unavailability/conflicts/')
+        self.assertEqual([c['kind'] for c in r.json()], ['hours'])
+
+    def test_agenda_muestra_horario_especial(self, _thread):
+        self.client.force_login(self.frank_user)
+        ds = self.day.strftime('%Y-%m-%d')
+        day = self.client.get(f'/api/admin/my-agenda/?start={ds}&end={ds}').json()['days'][0]
+        self.assertEqual(day['window']['source'], 'custom')
+        self.assertEqual(day['window']['end'], '13:00')
+        self.assertEqual(day['window']['reason'], 'Solo mañanas')

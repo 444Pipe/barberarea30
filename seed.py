@@ -159,6 +159,18 @@ except Exception as check_err:
     except Exception as e:
         print("⚠ Fallo forzando la tabla (probablemente ya existe o hay otro error):", e)
 
+# --- Autocuración para barbers_barberworkhours (horario de trabajo temporal) ---
+try:
+    from apps.barbers.models import BarberWorkHours
+    try:
+        BarberWorkHours.objects.exists()
+    except Exception:
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(BarberWorkHours)
+        print("✓ Tabla barbers_barberworkhours creada vía Schema Editor")
+except Exception as e:
+    print("⚠ No se pudo verificar/crear barbers_barberworkhours:", e)
+
 # --- Autocuración para services_service.requires_consultation ---
 from apps.services.models import Service as _SvcModel
 try:
@@ -542,7 +554,8 @@ import secrets as _secrets
 
 users_to_create = [
     {'username': 'camilorf', 'env': 'SEED_CAMILO_PASSWORD', 'email': 'camilo@area30.co'},
-    # Cuenta de socio de Cristian, aparte de su cuenta de barbero.
+    # Cuenta única de Cristian: socio (superadmin) y barbero a la vez. Su antigua
+    # cuenta de barbero `cristiang` se unió a esta en oct-2026 (merge_user_accounts).
     {'username': 'cristian.admin', 'env': 'SEED_CRISTIAN_PASSWORD', 'email': 'cristian@area30.co'},
     {'username': 'soporte_tecnico', 'env': 'SEED_SOPORTE_PASSWORD', 'email': 'soporte@area30.co'},
 ]

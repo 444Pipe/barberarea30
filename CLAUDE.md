@@ -39,6 +39,8 @@ python manage.py fix_frank_history             # apps/cashflow — backfill for 
 python manage.py reset_roi                     # apps/roi — wipe ROI snapshots
 python manage.py audit_cash_box                # apps/cashflow — audita el cuadre de caja (solo lectura)
 python manage.py convert_expense_to_advance --expense-id N --barber-id N --apply
+python manage.py find_bookings_in_blocks [--barber frank]   # apps/bookings — citas activas dentro de bloqueos (solo lectura)
+python manage.py merge_user_accounts --keep A --remove B [--apply]  # apps/users — une dos cuentas sin perder historial
 
 # Full idempotent seed run on every Railway boot (see Procfile)
 python seed.py
@@ -60,7 +62,7 @@ collectstatic → migrate → python seed.py → gunicorn
 
 - Re-creates the canonical 9 services and the two `PaymentMethod`s.
 - Re-creates/updates the canonical superusers (`camilorf`, `cristian.admin`, `soporte_tecnico`) and the operational user `frank`. `juandavid.castro` is kept but deactivated (ex-socio; his cash cuts reference him with PROTECT, so never delete him).
-- Forces `Partner` rows to exactly the two socios (Camilo + Cristian at 50/50). Cristian inherited Juan David's `Partner` row (same id, investments and history); his barber account is separate from `cristian.admin`.
+- Forces `Partner` rows to exactly the two socios (Camilo + Cristian at 50/50). Cristian inherited Juan David's `Partner` row (same id, investments and history). Since oct-2026 `cristian.admin` is his **only** account: superadmin + socio + barber profile (the old `cristiang` barber login was merged into it with `python manage.py merge_user_accounts`; never delete a user that owns a `Barber` — it cascades commissions).
 - Contains **schema-repair fallbacks** that use `connection.schema_editor()` to add tables/columns (e.g. `bookings_blockeddate`, `cashflow_sale.approval_status`) when a migration silently failed in production. If you add a new field that production-might-be-missing, follow this pattern rather than relying on `migrate` alone — Railway's migration history has been unreliable here in the past.
 
 The URL [/init-soporte/](config/urls.py) is a one-shot web endpoint that runs `createsoporte` + `seed_services` from the browser — used to recover access if a deploy goes sideways.
@@ -146,6 +148,8 @@ automático, no la categoría entera.
 If you bypass the constraint (e.g. `update()` instead of `save()`), you also bypass the overlap check. Prefer the serializer path.
 
 Bloqueos de inactividad (`BarberUnavailability`, una fila por día): toda creación pasa por `_slot_problem()` en [apps/bookings/views.py](apps/bookings/views.py), que usa los helpers de [validators.py](apps/bookings/validators.py). Si la fecha/hora no se puede parsear se responde 400 — nunca seguir sin chequear. El público (`/api/bookings/`) jamás es walk-in ni fuerza; el walk-in del panel va por `/api/admin/bookings/walk-in/` (sesión + CSRF) y puede forzar con confirmación. Para auditar producción: `python manage.py find_bookings_in_blocks [--barber frank]`.
+
+Además del bloqueo existe el **horario de trabajo** (`BarberWorkHours`): "del X al Y trabaja de H1 a H2". Recorta la ventana en `Barber.day_window` (source=`custom`), así que la web, la validación y la agenda lo respetan solas. Nunca amplía el horario semanal.
 
 El teléfono del cliente lo ve **todo** el personal del panel (barberos incluidos, decisión del dueño oct-2026). En JS usa `window.phoneLinks()` de `base_admin.html`; en plantillas server-side, `Booking.phone_digits`.
 

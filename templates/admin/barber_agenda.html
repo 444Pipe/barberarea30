@@ -247,6 +247,7 @@
     const chips = [];
     if (d.is_today) chips.push('<span class="px-2 py-0.5 rounded-full bg-gold/15 text-gold">Hoy</span>');
     if (d.holiday) chips.push(`<span class="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300">Festivo · ${esc(d.holiday)}</span>`);
+    if (d.window && d.window.source === 'custom') chips.push('<span class="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">Horario especial</span>');
     if (d.shop_block) chips.push(`<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">${d.shop_block.all_day ? 'Local cerrado' : `Local abre ${fmt12(d.shop_block.start)} – ${fmt12(d.shop_block.end)}`}${d.shop_block.description ? ' · ' + esc(d.shop_block.description) : ''}</span>`);
     if (!d.window && !d.shop_block) chips.push('<span class="px-2 py-0.5 rounded-full bg-white/10 text-smoke/60">Descanso</span>');
     if (d.blocks.some(b => b.all_day)) chips.push('<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">Bloqueado todo el día</span>');
@@ -257,8 +258,9 @@
     if (d.shop_block && d.shop_block.all_day) return 'El local no atiende este día';
     if (d.shop_block) return `Atención especial: ${fmt12(d.shop_block.start)} – ${fmt12(d.shop_block.end)}`;
     if (!d.window) return 'Día de descanso';
-    let s = `Horario: ${fmt12(d.window.start)} – ${fmt12(d.window.end)}`;
+    let s = `${d.window.source === 'custom' ? 'Horario especial' : 'Horario'}: ${fmt12(d.window.start)} – ${fmt12(d.window.end)}`;
     if (d.window.last_start) s += ` · última cita ${fmt12(d.window.last_start)}`;
+    if (d.window.source === 'custom' && d.window.reason) s += ` · ${d.window.reason}`;
     return s;
   }
 

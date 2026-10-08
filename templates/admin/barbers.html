@@ -190,7 +190,7 @@ function renderBarberCards(barbers) {
       <div class="flex gap-2">
         <a href="/admin-panel/barbers/my-agenda/?barber=${b.id}" class="flex-1 py-2 rounded-md bg-jet-lighter border border-white/10 text-center text-[0.65rem] tracking-wider uppercase text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">Ver Agenda</a>
         ${['operational_admin', 'admin', 'superadmin'].includes(userRole) ? `
-        <button onclick="openUnavailability(${b.id}, '${b.display_name.replace(/'/g, "\\'")}')" title="Marcar inactivo en un horario" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-amber-400 hover:border-amber-400/30 transition-all">
+        <button onclick="openUnavailability(${b.id}, '${b.display_name.replace(/'/g, "\\'")}')" title="Bloqueos y horario de trabajo" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-amber-400 hover:border-amber-400/30 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </button>
         ` : ''}
@@ -448,6 +448,9 @@ function deleteBarber() {
     max-height: 100vh;
     min-height: 100vh;
     margin: 0;
+    /* El contenido (bloqueos + horario + conflictos) puede ser más alto que la
+       pantalla: el scroll va DENTRO del cuadro para que el fondo no se corte. */
+    overflow-y: auto;
   }
   @media (min-width: 640px) {
     #unavailability-modal { align-items: center; padding: 1rem; }
@@ -493,7 +496,7 @@ function deleteBarber() {
           <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <div class="min-w-0">
-          <h3 class="text-sm tracking-[0.15em] uppercase text-white font-semibold truncate">Bloquear Horario</h3>
+          <h3 class="text-sm tracking-[0.15em] uppercase text-white font-semibold truncate">Bloqueos y horario</h3>
           <p class="text-[0.65rem] text-smoke/40 truncate" id="unavail-barber-subtitle">Cargando...</p>
         </div>
       </div>
@@ -507,6 +510,7 @@ function deleteBarber() {
       <div class="flex gap-1 bg-jet rounded-md p-1 border border-white/5">
         <button type="button" data-tab="single" class="unavail-tab flex-1 text-[0.7rem] font-bold uppercase tracking-widest rounded transition-colors is-active">Un día</button>
         <button type="button" data-tab="bulk" class="unavail-tab flex-1 text-[0.7rem] font-bold uppercase tracking-widest rounded transition-colors">Por rango</button>
+        <button type="button" data-tab="hours" class="unavail-tab flex-1 text-[0.7rem] font-bold uppercase tracking-widest rounded transition-colors">Horario</button>
       </div>
     </div>
 
@@ -601,11 +605,69 @@ function deleteBarber() {
       </form>
     </div>
 
+    <!-- Pane: Horario de trabajo (lo contrario de un bloqueo) -->
+    <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/5 unavail-pane hidden" data-pane="hours">
+      <p class="text-[0.65rem] text-sky-300/80 uppercase tracking-widest font-semibold mb-1">Horario de trabajo</p>
+      <p class="text-[0.7rem] text-smoke/50 leading-snug mb-3">En vez de bloquear, indica <strong class="text-smoke/80">de qué hora a qué hora trabaja</strong>. Fuera de esa franja la web no le ofrece citas. Se puede combinar con bloqueos.</p>
+      <form id="hours-form" class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="admin-label">Desde el día</label>
+            <input type="date" id="hours-from" class="admin-input" required>
+          </div>
+          <div>
+            <label class="admin-label">Hasta el día</label>
+            <input type="date" id="hours-to" class="admin-input" required>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="admin-label">Trabaja desde</label>
+            <input type="time" id="hours-start" class="admin-input" required>
+          </div>
+          <div>
+            <label class="admin-label">Hasta</label>
+            <input type="time" id="hours-end" class="admin-input" required>
+          </div>
+        </div>
+        <div>
+          <label class="admin-label">Estos días</label>
+          <div class="grid grid-cols-7 gap-1.5 mt-1.5" id="hours-weekdays">
+            <button type="button" data-day="0" class="weekday-btn is-active">L</button>
+            <button type="button" data-day="1" class="weekday-btn is-active">M</button>
+            <button type="button" data-day="2" class="weekday-btn is-active">X</button>
+            <button type="button" data-day="3" class="weekday-btn is-active">J</button>
+            <button type="button" data-day="4" class="weekday-btn is-active">V</button>
+            <button type="button" data-day="5" class="weekday-btn is-active">S</button>
+            <button type="button" data-day="6" class="weekday-btn is-active">D</button>
+          </div>
+          <p class="text-[0.65rem] text-smoke/40 mt-2 leading-snug">Los días desmarcados siguen con su horario normal.</p>
+        </div>
+        <div>
+          <label class="admin-label">Motivo (opcional)</label>
+          <input type="text" id="hours-reason" class="admin-input" placeholder="Solo mañanas, temporada, estudio...">
+        </div>
+        <div id="hours-preview" class="bg-sky-400/5 border border-sky-400/20 rounded-md px-3 py-2.5 text-sm text-sky-200 leading-snug">
+          Completa las fechas y las horas.
+        </div>
+        <div class="unavail-actions flex flex-col sm:flex-row gap-2 pt-2">
+          <button type="submit" id="hours-submit-btn" class="flex-1 rounded-md bg-sky-500 hover:bg-sky-400 text-jet text-xs tracking-widest uppercase font-bold transition-colors">Guardar horario</button>
+          <button type="button" onclick="closeUnavailabilityModal()" class="sm:px-5 rounded-md bg-jet border border-white/10 text-smoke/60 text-xs tracking-wider uppercase">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Horarios de trabajo vigentes -->
+    <div id="hours-list-wrap" class="px-4 sm:px-6 pt-4 hidden">
+      <p class="text-[0.65rem] text-smoke/40 uppercase tracking-widest font-semibold mb-3">Horarios de trabajo vigentes</p>
+      <div id="hours-list" class="space-y-2"></div>
+    </div>
+
     <!-- Citas activas que caen dentro de un bloqueo -->
     <div id="unavail-conflicts-wrap" class="px-4 sm:px-6 pt-4 hidden">
       <div class="rounded-lg border border-red-500/30 bg-red-500/5 p-3 sm:p-4">
-        <p class="text-[0.65rem] text-red-300 uppercase tracking-widest font-semibold">Citas activas dentro de los bloqueos</p>
-        <p class="text-[0.7rem] text-smoke/50 mt-1 leading-snug">Siguen en la agenda (y reciben recordatorio) aunque el barbero esté bloqueado. Llama al cliente y reagenda o cancela.</p>
+        <p class="text-[0.65rem] text-red-300 uppercase tracking-widest font-semibold">Citas activas en horas que no trabaja</p>
+        <p class="text-[0.7rem] text-smoke/50 mt-1 leading-snug">Caen dentro de un bloqueo o fuera de su horario de trabajo, pero siguen en la agenda (y reciben recordatorio). Llama al cliente y reagenda o cancela.</p>
         <div id="unavail-conflicts" class="space-y-2 mt-3"></div>
       </div>
     </div>
@@ -623,9 +685,11 @@ function deleteBarber() {
 <script>
 // ─── Inactividad Temporal ─────────────────────────────────
 let currentUnavailBarberId = null;
+let currentUnavailBarberName = '';
 
 function openUnavailability(barberId, barberName) {
   currentUnavailBarberId = barberId;
+  currentUnavailBarberName = barberName || '';
   document.getElementById('unavail-barber-subtitle').textContent = barberName;
   // Setear fecha mínima como hoy (fecha local de Bogotá, no UTC)
   const _d = new Date();
@@ -648,12 +712,23 @@ function openUnavailability(barberId, barberName) {
   document.getElementById('unavail-bulk-hours').classList.add('hidden');
   // Todos los días activos por defecto
   document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
+  // Reset del formulario de horario de trabajo
+  document.getElementById('hours-from').min = today;
+  document.getElementById('hours-from').value = today;
+  document.getElementById('hours-to').min = today;
+  document.getElementById('hours-to').value = today;
+  document.getElementById('hours-start').value = '';
+  document.getElementById('hours-end').value = '';
+  document.getElementById('hours-reason').value = '';
+  document.querySelectorAll('#hours-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
+  _refreshHoursPreview();
   // Reset a la tab "Un día"
   _setUnavailTab('single');
   _refreshBulkPreview();
 
   document.getElementById('unavailability-modal').classList.remove('hidden');
   loadUnavailabilities(barberId);
+  loadWorkHours(barberId);
 }
 
 function closeUnavailabilityModal() {
@@ -678,6 +753,13 @@ document.addEventListener('click', e => {
     _setUnavailTab(tab.dataset.tab);
     return;
   }
+  // Toggle weekday button (horario de trabajo)
+  const hwd = e.target.closest('#hours-weekdays .weekday-btn');
+  if (hwd) {
+    hwd.classList.toggle('is-active');
+    _refreshHoursPreview();
+    return;
+  }
   // Toggle weekday button
   const wd = e.target.closest('#unavail-bulk-weekdays .weekday-btn');
   if (wd) {
@@ -694,6 +776,9 @@ document.addEventListener('change', e => {
   }
   if (e.target && (e.target.id === 'unavail-bulk-from' || e.target.id === 'unavail-bulk-to')) {
     _refreshBulkPreview();
+  }
+  if (e.target && e.target.id && e.target.id.startsWith('hours-')) {
+    _refreshHoursPreview();
   }
 });
 
@@ -817,11 +902,15 @@ function loadUnavailConflicts(barberId) {
       if (!items.length) { wrap.classList.add('hidden'); box.innerHTML = ''; return; }
       wrap.classList.remove('hidden');
       box.innerHTML = items.map(c => {
-        const cause = c.forced
-          ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Agendada a la fuerza</span>'
-          : (c.created_before_block
-              ? '<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">Ya existía antes del bloqueo</span>'
-              : '<span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">Creada después del bloqueo</span>');
+        const rule = c.kind === 'hours' ? 'del horario' : 'del bloqueo';
+        const cause = (c.kind === 'hours'
+            ? `<span class="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300">Fuera del horario (${formatTime12(c.work_hours.start_time)} – ${formatTime12(c.work_hours.end_time)})</span> `
+            : '')
+          + (c.forced
+            ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Agendada a la fuerza</span>'
+            : (c.created_before_block
+                ? `<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">Ya existía antes ${rule}</span>`
+                : `<span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">Creada después ${rule}</span>`));
         return `
         <div class="bg-jet rounded-lg px-3 py-3 border border-white/5">
           <div class="flex items-start justify-between gap-3">
@@ -869,6 +958,129 @@ function deleteUnavailGroup(idx) {
     else alert('Error al eliminar el bloqueo');
   }).catch(() => alert('Error de conexión'));
 }
+
+// ─── Horario de trabajo temporal ──────────────────────────
+const _DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+function _hoursWeekdays() {
+  const days = [];
+  document.querySelectorAll('#hours-weekdays .weekday-btn.is-active').forEach(b => days.push(parseInt(b.dataset.day, 10)));
+  return days;
+}
+
+function _refreshHoursPreview() {
+  const el = document.getElementById('hours-preview');
+  if (!el) return;
+  const from = document.getElementById('hours-from').value;
+  const to = document.getElementById('hours-to').value;
+  const start = document.getElementById('hours-start').value;
+  const end = document.getElementById('hours-end').value;
+  const days = _hoursWeekdays();
+  if (!from || !to || !start || !end) { el.textContent = 'Completa las fechas y las horas.'; return; }
+  if (from > to) { el.textContent = 'La fecha "desde" debe ser anterior o igual a "hasta".'; return; }
+  if (start >= end) { el.textContent = 'La hora "desde" debe ser anterior a "hasta".'; return; }
+  if (!days.length) { el.textContent = 'Selecciona al menos un día.'; return; }
+  const dayTxt = days.length === 7 ? 'todos los días' : days.map(d => _DAY_LETTERS[d]).join(', ');
+  const name = window.esc(currentUnavailBarberName || 'El barbero');
+  let html = `Del <strong>${formatDate(from)}</strong> al <strong>${formatDate(to)}</strong> (${dayTxt}), ${name} recibe citas solo de <strong>${formatTime12(start)} a ${formatTime12(end)}</strong>. Fuera de esa franja no aparece en la web.`;
+  if (/frank/i.test(currentUnavailBarberName)) {
+    const [h, m] = end.split(':').map(Number);
+    const last = h * 60 + m - 120;
+    if (last >= 0) {
+      const lh = String(Math.floor(last / 60)).padStart(2, '0'), lm = String(last % 60).padStart(2, '0');
+      html += ` <span class="block mt-1 text-sky-300/80 text-xs">Frank ocupa 2 h por cita: la última empezaría a las ${formatTime12(`${lh}:${lm}`)}.</span>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+function loadWorkHours(barberId) {
+  const wrap = document.getElementById('hours-list-wrap');
+  const list = document.getElementById('hours-list');
+  fetch(`/api/admin/barbers/${barberId}/work-hours/`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(items => {
+      if (!items.length) { wrap.classList.add('hidden'); list.innerHTML = ''; return; }
+      wrap.classList.remove('hidden');
+      list.innerHTML = items.map(h => {
+        const days = !h.weekdays.length || h.weekdays.length === 7 ? 'Todos los días' : h.weekdays.map(d => _DAY_LETTERS[d]).join(' · ');
+        const range = h.date_from === h.date_to ? formatDate(h.date_from) : `${formatDate(h.date_from)} → ${formatDate(h.date_to)}`;
+        return `
+        <div class="flex items-start justify-between gap-3 bg-jet rounded-lg px-3 sm:px-4 py-3 border border-sky-500/20">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0"></span>
+              <span class="text-white text-xs sm:text-sm font-semibold">${range}</span>
+              <span class="text-sky-300 text-xs font-mono whitespace-nowrap">Trabaja ${formatTime12(h.start_time)} – ${formatTime12(h.end_time)}</span>
+            </div>
+            <p class="text-smoke/40 text-[0.65rem] mt-1.5 ml-3.5">${days}</p>
+            ${h.reason ? `<p class="text-smoke/40 text-[0.65rem] mt-1 ml-3.5 break-words">${window.esc(h.reason)}</p>` : ''}
+          </div>
+          <button onclick="deleteWorkHours(${h.id})" title="Quitar horario"
+                  class="flex-shrink-0 w-9 h-9 sm:w-8 sm:h-8 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors flex items-center justify-center"
+                  style="touch-action:manipulation;">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => { wrap.classList.add('hidden'); });
+}
+
+function deleteWorkHours(id) {
+  if (!currentUnavailBarberId) return;
+  if (!confirm('¿Quitar este horario de trabajo? El barbero vuelve a su horario normal esos días.')) return;
+  fetch(`/api/admin/barbers/${currentUnavailBarberId}/work-hours/${id}/`, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': getCSRF() },
+  }).then(r => {
+    if (!r.ok && r.status !== 204) { alert('Error al quitar el horario'); return; }
+    loadWorkHours(currentUnavailBarberId);
+    loadUnavailConflicts(currentUnavailBarberId);
+  }).catch(() => alert('Error de conexión'));
+}
+
+document.getElementById('hours-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  if (!currentUnavailBarberId) return;
+  const btn = document.getElementById('hours-submit-btn');
+  const payload = {
+    date_from: document.getElementById('hours-from').value,
+    date_to: document.getElementById('hours-to').value,
+    start_time: document.getElementById('hours-start').value,
+    end_time: document.getElementById('hours-end').value,
+    weekdays: _hoursWeekdays(),
+    reason: document.getElementById('hours-reason').value.trim(),
+  };
+  if (!payload.date_from || !payload.date_to || !payload.start_time || !payload.end_time) {
+    alert('Completa las fechas y las horas.');
+    return;
+  }
+  if (payload.date_from > payload.date_to) { alert('La fecha "desde" debe ser anterior o igual a "hasta".'); return; }
+  if (payload.start_time >= payload.end_time) { alert('La hora "desde" debe ser anterior a "hasta".'); return; }
+  if (!payload.weekdays.length) { alert('Selecciona al menos un día.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  fetch(`/api/admin/barbers/${currentUnavailBarberId}/work-hours/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify(payload),
+  })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) { alert('Error: ' + (data.error || JSON.stringify(data))); return; }
+      if (data.outside_count) {
+        alert(`Horario guardado. ${data.outside_count} cita(s) activa(s) quedan fuera de ese horario: aparecen abajo para que llames al cliente.`);
+      } else {
+        window.showToast('Horario de trabajo guardado', 'success');
+      }
+      loadWorkHours(currentUnavailBarberId);
+      loadUnavailConflicts(currentUnavailBarberId);
+    })
+    .catch(() => alert('Error de conexión'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Guardar horario'; });
+});
 
 function formatDate(dateStr) {
   const [y, m, d] = dateStr.split('-');

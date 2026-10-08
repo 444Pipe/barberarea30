@@ -15,7 +15,7 @@ from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin, IsAdminOrAboveWithWriteBatman
 from apps.bookings.models import Booking, BlockedDate
 from apps.services.models import Service
-from .models import Barber, GalleryImage, Reel, BarberUnavailability
+from .models import Barber, GalleryImage, Reel, BarberUnavailability, BarberWorkHours
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
 
 
@@ -628,40 +628,167 @@ def barber_unavailability_conflicts(request, barber_id):
     """GET /api/admin/barbers/{id}/unavailability/conflicts/
 
     Citas ACTIVAS (pendientes/confirmadas) de hoy en adelante que caen dentro
-    de un bloqueo del barbero. Son las que hacen ver que "siguen agendando"
-    con un barbero bloqueado: las que ya existían al crear el bloqueo y las
-    forzadas como walk-in. Hay que llamar al cliente y reagendar o cancelar.
+    de un bloqueo del barbero (kind='block') o fuera de su horario de trabajo
+    temporal (kind='hours'). Son las que hacen ver que "siguen agendando" con
+    un barbero que no está: las que ya existían al crear el bloqueo/horario y
+    las forzadas como walk-in. Hay que llamar al cliente y reagendar o cancelar.
     """
     from apps.bookings.validators import bookings_in_unavailability
 
     barber = get_object_or_404(Barber, pk=barber_id)
-    hits = bookings_in_unavailability(barber=barber, date_from=timezone.localdate())
-    data = []
-    for hit in hits:
-        bk, u = hit['booking'], hit['block']
-        end = datetime.combine(bk.date, bk.time) + timedelta(
+    today = timezone.localdate()
+    data = [
+        _conflict_row(barber, hit['booking'], 'block', hit['block'].created_at, block=hit['block'])
+        for hit in bookings_in_unavailability(barber=barber, date_from=today)
+    ]
+
+    work_hours = list(barber.work_hours.filter(date_to__gte=today))
+    if work_hours:
+        seen = {row['id'] for row in data}
+        for bk in Booking.objects.filter(
+            barber=barber, date__gte=today, status__in=['pending', 'confirmed'],
+        ).select_related('service').order_by('date', 'time'):
+            wh = barber.work_hours_for(bk.date, work_hours)
+            if bk.id in seen or wh is None:
+                continue
+            end = datetime.combine(bk.date, bk.time) + timedelta(
+                minutes=barber.occupied_minutes(bk.duration_minutes)
+            )
+            if barber.window_violation(bk.date, bk.time, end.time()):
+                data.append(_conflict_row(barber, bk, 'hours', wh.created_at, work_hours=wh))
+        data.sort(key=lambda row: (row['date'], row['time']))
+    return Response(data)
+
+
+def _conflict_row(barber, bk, kind, rule_created_at, block=None, work_hours=None):
+    end = datetime.combine(bk.date, bk.time) + timedelta(
+        minutes=barber.occupied_minutes(bk.duration_minutes)
+    )
+    row = {
+        'id': bk.id,
+        'kind': kind,
+        'client_name': bk.client_name,
+        'client_phone': bk.client_phone,
+        'service_name': bk.service.name if bk.service else '',
+        'date': bk.date.strftime('%Y-%m-%d'),
+        'time': bk.time.strftime('%H:%M'),
+        'end_time': end.strftime('%H:%M'),
+        'status': bk.status,
+        'is_walk_in': bk.is_walk_in,
+        'forced': 'bloqueo de inactividad' in (bk.notes or ''),
+        'created_before_block': bk.created_at < rule_created_at,
+    }
+    if block is not None:
+        row['block'] = {
+            'start_time': block.start_time.strftime('%H:%M'),
+            'end_time': block.end_time.strftime('%H:%M'),
+            'all_day': _is_all_day_block(block),
+            'reason': block.reason,
+        }
+    if work_hours is not None:
+        row['work_hours'] = {
+            'start_time': work_hours.start_time.strftime('%H:%M'),
+            'end_time': work_hours.end_time.strftime('%H:%M'),
+        }
+    return row
+
+
+# ─── Horario de trabajo temporal ──────────────────────────
+
+def _work_hours_json(wh):
+    return {
+        'id': wh.id,
+        'date_from': wh.date_from.strftime('%Y-%m-%d'),
+        'date_to': wh.date_to.strftime('%Y-%m-%d'),
+        'weekdays': wh.weekdays or [],
+        'start_time': wh.start_time.strftime('%H:%M'),
+        'end_time': wh.end_time.strftime('%H:%M'),
+        'reason': wh.reason,
+    }
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminOrAbove])
+def barber_work_hours_list(request, barber_id):
+    """
+    GET  /api/admin/barbers/{id}/work-hours/ — horarios vigentes (de hoy en adelante)
+    POST /api/admin/barbers/{id}/work-hours/ — "trabaja de X a Y entre tal y tal fecha"
+    Body JSON: {date_from, date_to, start_time, end_time, weekdays?: [0..6], reason?}
+
+    Es la alternativa al bloqueo: en vez de tapar las horas en que NO trabaja,
+    se dice en cuáles SÍ. Fuera de esa franja la web no lo ofrece.
+    """
+    barber = get_object_or_404(Barber, pk=barber_id)
+
+    if request.method == 'GET':
+        items = barber.work_hours.filter(date_to__gte=timezone.localdate())
+        return Response([_work_hours_json(wh) for wh in items])
+
+    payload = request.data
+    try:
+        date_from = datetime.strptime(payload.get('date_from') or '', '%Y-%m-%d').date()
+        date_to = datetime.strptime(payload.get('date_to') or '', '%Y-%m-%d').date()
+    except ValueError:
+        return Response({'error': 'Fechas inválidas (use YYYY-MM-DD).'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        start = datetime.strptime(payload.get('start_time') or '', '%H:%M').time()
+        end = datetime.strptime(payload.get('end_time') or '', '%H:%M').time()
+    except ValueError:
+        return Response({'error': 'Horas inválidas (use HH:MM).'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if date_from > date_to:
+        return Response({'error': 'La fecha inicial debe ser anterior o igual a la final.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if (date_to - date_from).days > 365:
+        return Response({'error': 'El rango no puede exceder 365 días.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if start >= end:
+        return Response({'error': 'La hora de inicio debe ser anterior a la de fin.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    weekdays = payload.get('weekdays') or []
+    if not isinstance(weekdays, list):
+        return Response({'error': 'weekdays debe ser una lista (0=lunes … 6=domingo).'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        weekdays = sorted({int(w) for w in weekdays if 0 <= int(w) <= 6})
+    except (TypeError, ValueError):
+        return Response({'error': 'weekdays inválidos.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(weekdays) == 7:
+        weekdays = []  # todos los días
+
+    wh = BarberWorkHours.objects.create(
+        barber=barber, date_from=date_from, date_to=date_to, weekdays=weekdays,
+        start_time=start, end_time=end, reason=(payload.get('reason') or '').strip()[:255],
+    )
+
+    # Citas activas que quedan por fuera del nuevo horario (para avisar).
+    outside = 0
+    for bk in Booking.objects.filter(
+        barber=barber, date__range=(max(date_from, timezone.localdate()), date_to),
+        status__in=['pending', 'confirmed'],
+    ):
+        if not wh.applies_to(bk.date):
+            continue
+        bk_end = datetime.combine(bk.date, bk.time) + timedelta(
             minutes=barber.occupied_minutes(bk.duration_minutes)
         )
-        data.append({
-            'id': bk.id,
-            'client_name': bk.client_name,
-            'client_phone': bk.client_phone,
-            'service_name': bk.service.name if bk.service else '',
-            'date': bk.date.strftime('%Y-%m-%d'),
-            'time': bk.time.strftime('%H:%M'),
-            'end_time': end.strftime('%H:%M'),
-            'status': bk.status,
-            'is_walk_in': bk.is_walk_in,
-            'forced': 'bloqueo de inactividad' in (bk.notes or ''),
-            'created_before_block': bk.created_at < u.created_at,
-            'block': {
-                'start_time': u.start_time.strftime('%H:%M'),
-                'end_time': u.end_time.strftime('%H:%M'),
-                'all_day': _is_all_day_block(u),
-                'reason': u.reason,
-            },
-        })
-    return Response(data)
+        if barber.window_violation(bk.date, bk.time, bk_end.time()):
+            outside += 1
+
+    data = _work_hours_json(wh)
+    data['outside_count'] = outside
+    return Response(data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAdminOrAbove])
+def barber_work_hours_delete(request, barber_id, wh_id):
+    """DELETE /api/admin/barbers/{id}/work-hours/{wid}/"""
+    wh = get_object_or_404(BarberWorkHours, pk=wh_id, barber_id=barber_id)
+    wh.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ─── Gallery ─────────────────────────────────────────────

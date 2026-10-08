@@ -88,17 +88,60 @@ class Barber(models.Model):
             self.schedule = self.get_default_schedule()
         super().save(*args, **kwargs)
 
-    def day_window(self, target_date):
+    def work_hours_for(self, target_date, candidates=None):
+        """Horario de trabajo temporal (BarberWorkHours) vigente ese día, o None.
+
+        Si hay varios, gana el más reciente. `candidates` permite pasar una
+        lista ya cargada para no consultar la BD día por día.
+        """
+        if candidates is None:
+            candidates = self.work_hours.filter(
+                date_from__lte=target_date, date_to__gte=target_date
+            )
+        matches = [wh for wh in candidates if wh.applies_to(target_date)]
+        if not matches:
+            return None
+        return max(matches, key=lambda wh: (wh.created_at, wh.pk))
+
+    def day_window(self, target_date, work_hours=None):
         """Ventana de atención de ESTE barbero en `target_date`.
 
         Devuelve un dict con `start`, `end`, `last_start` (`datetime.time`, el
         último puede ser None) y `source`, o None si ese día no se atiende.
 
         Los festivos colombianos usan la ventana del domingo — decisión de los
-        socios: festivo = horario dominical. `BlockedDate` NO se resuelve aquí:
-        es un override global que manda sobre todo y vive en la capa de
-        disponibilidad.
+        socios: festivo = horario dominical. Un horario de trabajo temporal
+        (BarberWorkHours) recorta esa ventana (source='custom'). `BlockedDate`
+        NO se resuelve aquí: es un override global que manda sobre todo y vive
+        en la capa de disponibilidad.
         """
+        window = self._base_day_window(target_date)
+        if window is None:
+            return None
+        custom = self.work_hours_for(target_date, work_hours)
+        if custom is None:
+            return window
+        start = max(window['start'], custom.start_time)
+        end = min(window['end'], custom.end_time)
+        if start >= end:
+            return None
+        # La "última cita" del domingo/festivo solo sigue valiendo si el horario
+        # temporal no corta antes del cierre; si corta, el servicio debe
+        # terminar dentro del horario.
+        last_start = window['last_start'] if custom.end_time >= window['end'] else None
+        if last_start is not None and last_start < start:
+            last_start = None
+        return {
+            'start': start,
+            'end': end,
+            'last_start': last_start,
+            'source': 'custom',
+            'base_source': window['source'],
+            'reason': custom.reason,
+        }
+
+    def _base_day_window(self, target_date):
+        """Ventana según el horario semanal (con festivo → horario dominical)."""
         from apps.bookings.holidays import is_holiday
 
         day_names = ['monday', 'tuesday', 'wednesday', 'thursday',
@@ -140,6 +183,19 @@ class Barber(models.Model):
                 f'{self.display_name} no atiende el {target_date.strftime("%d/%m/%Y")}. '
                 f'Por favor elige otra fecha.'
             )
+
+        if window['source'] == 'custom':
+            etiqueta = f'Ese día {self.display_name} trabaja solo de'
+            limite = window['last_start'] or window['end']
+            franja = f'{window["start"].strftime("%I:%M %p")} a {limite.strftime("%I:%M %p")}'
+            if start_time < window['start'] or (
+                window['last_start'] and start_time > window['last_start']
+            ) or (not window['last_start'] and (end_time > window['end'] or end_time <= start_time)):
+                return (
+                    f'{etiqueta} {franja}. '
+                    f'El servicio tiene que caber dentro de ese horario.'
+                )
+            return None
 
         etiqueta = 'En los festivos' if window['source'] == 'holiday' else 'Ese día'
         limite = window['last_start'] or window['end']
@@ -190,6 +246,44 @@ class Barber(models.Model):
         if self.is_frank:
             return 120
         return stored_duration_minutes or 60
+
+
+class BarberWorkHours(models.Model):
+    """Horario de trabajo temporal: lo contrario de un bloqueo.
+
+    En vez de decir cuándo NO trabaja, dice cuándo SÍ: entre `date_from` y
+    `date_to` (inclusive), en los días de la semana elegidos, el barbero solo
+    recibe citas de `start_time` a `end_time`. Se cruza con su horario semanal
+    (nunca lo amplía) y se aplica en `Barber.day_window`, así que la web, la
+    validación de reservas y la agenda lo respetan sin código aparte.
+    Nace del caso de Frank (oct-2026): un bloqueo de 1 a 9 p.m. se leía como
+    "bloqueado todo el día" y las mañanas quedaban abiertas sin que nadie lo notara.
+    """
+    barber = models.ForeignKey(
+        Barber, on_delete=models.CASCADE, related_name='work_hours'
+    )
+    date_from = models.DateField()
+    date_to = models.DateField()
+    # 0=lunes … 6=domingo. Vacío = todos los días.
+    weekdays = models.JSONField(default=list, blank=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Horario de trabajo'
+        verbose_name_plural = 'Horarios de trabajo'
+        ordering = ['date_from', 'start_time']
+
+    def __str__(self):
+        return (f'{self.barber.display_name} – {self.date_from}→{self.date_to} '
+                f'{self.start_time}–{self.end_time}')
+
+    def applies_to(self, target_date):
+        if not (self.date_from <= target_date <= self.date_to):
+            return False
+        return not self.weekdays or target_date.weekday() in self.weekdays
 
 
 class BarberUnavailability(models.Model):
