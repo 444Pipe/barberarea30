@@ -4,6 +4,8 @@ from . import views
 urlpatterns = [
     path('bookings/', views.admin_bookings_list_view, name='admin_bookings_api'),
     path('bookings/bulk-delete/', views.admin_delete_all_bookings_view, name='admin_bookings_bulk_delete'),
+    path('bookings/walk-in/', views.admin_walkin_booking_view, name='admin_bookings_walkin'),
+    path('my-agenda/', views.admin_my_agenda_view, name='admin_my_agenda_api'),
     path('bookings/<int:booking_id>/', views.admin_booking_detail_view, name='admin_booking_detail_api'),
     path('bookings/<int:booking_id>/reschedule/', views.admin_reschedule_booking_view, name='admin_booking_reschedule_api'),
     path('bookings/export/', views.admin_bookings_export_csv, name='admin_bookings_export'),

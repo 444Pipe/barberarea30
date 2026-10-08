@@ -61,33 +61,65 @@ def public_blocked_dates_list(request):
         }, status=500)
 
 
-@api_view(['POST'])
-@authentication_classes([])
-@permission_classes([AllowAny])
-def create_booking_view(request):
-    """POST /api/bookings/ — crear nueva reserva desde el frontend público."""
-    # BIZ-17: request.data puede ser un QueryDict inmutable (form-data), y más abajo
-    # mutamos claves en el flujo walk-in. Copiamos a un dict mutable para evitar el
-    # AttributeError ('QueryDict instance is immutable') preservando el comportamiento.
-    data = request.data.copy()
+def _slot_problem(barber, service, req_d, req_t, *, is_walk_in):
+    """Revisa si `barber` puede tomar el servicio en req_d/req_t.
 
-    is_walk_in = str(data.get('is_walk_in', '')).lower() == 'true'
-    # En walk-in (presencial) el barbero/admin puede forzar el agendamiento sobre
-    # su propio bloqueo de inactividad, con confirmación previa (force=true).
-    force = str(data.get('force', '')).lower() == 'true'
+    Devuelve None si está libre, o una tupla (tipo, mensaje) con tipo:
+      'conflict' → local cerrado (BlockedDate) o cruce con otra cita (firme)
+      'schedule' → fuera del horario del barbero (los walk-in están exentos)
+      'block'    → cae sobre un bloqueo de inactividad del barbero
+    Es el ÚNICO chequeo de la creación: se usa al elegir barbero y otra vez
+    dentro de la transacción, ya con el barbero bloqueado con select_for_update.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+    from .validators import check_booking_conflict, unavailability_conflict
+
+    dur = barber.effective_duration_minutes(service)
+    err = check_booking_conflict(
+        barber=barber, date=req_d, time=req_t,
+        duration_minutes=dur, check_unavailability=False,
+    )
+    if err:
+        return ('conflict', err)
+
+    # Sin BlockedDate manda el horario semanal, que ya resuelve festivo →
+    # ventana dominical (Barber.day_window). Con BlockedDate parcial, su franja
+    # ya se validó arriba. Los walk-in (presenciales) quedan exentos: registran
+    # algo que está pasando en el local.
+    if not is_walk_in and not BlockedDate.objects.filter(date=req_d).exists():
+        req_end = _dt.combine(req_d, req_t) + _td(minutes=barber.occupied_minutes(dur))
+        violation = barber.window_violation(req_d, req_t, req_end.time())
+        if violation:
+            return ('schedule', violation)
+
+    block = unavailability_conflict(barber, req_d, req_t, dur)
+    if block:
+        return ('block', block)
+    return None
+
+
+def _create_booking(request, data, *, is_walk_in, force=False):
+    """Crea una reserva. Lo comparten el sitio público y el walk-in del panel.
+
+    Todas las validaciones pasan por `_slot_problem`. Si la fecha u hora no se
+    pueden leer se responde 400: antes un formato raro hacía que se saltaran
+    TODOS los chequeos de bloqueo (un `except Exception` dejaba pasar la cita).
+    """
+    from .validators import parse_booking_date, parse_booking_time
+
     override_block_note = None
     if is_walk_in:
         data['client_name'] = data.get('client_name') or 'Cliente General'
-        data['privacy_accepted'] = True  # Admin creating walk-ins overrides this
-    else:
-        # Require explicit privacy acceptance for regular booking
-        if str(data.get('privacy_accepted', '')).lower() != 'true':
-            return Response({'error': 'Debe aceptar los términos y condiciones (Habeas Data).'}, status=400)
-    
+        data['privacy_accepted'] = True  # Walk-in creado por el personal
+    elif str(data.get('privacy_accepted', '')).lower() != 'true':
+        return Response({'error': 'Debe aceptar los términos y condiciones (Habeas Data).'}, status=400)
+    # El flag lo decide el endpoint, nunca el cliente.
+    data['is_walk_in'] = is_walk_in
+
     # 1. Validar servicio
     try:
         service = Service.objects.get(pk=data.get('service_id'), is_active=True)
-    except Service.DoesNotExist:
+    except (Service.DoesNotExist, ValueError, TypeError):
         return Response({'error': 'Servicio no válido'}, status=400)
 
     # 1b. Servicios "a consulta" no se reservan online.
@@ -101,254 +133,69 @@ def create_booking_view(request):
             'requires_consultation': True,
         }, status=400)
 
-    # 2. Lógica "Cualquier barbero" vs barbero específico
+    # 1c. Fecha y hora: se parsean UNA vez. Si no se pueden leer → 400.
+    try:
+        req_d = parse_booking_date(data.get('date'))
+        req_t = parse_booking_time(data.get('time'))
+    except (ValueError, TypeError):
+        return Response({
+            'ok': False,
+            'error': 'Fecha u hora inválida. Usa el formato AAAA-MM-DD y HH:MM.',
+        }, status=400)
+    data['date'] = req_d.strftime('%Y-%m-%d')
+    data['time'] = req_t.strftime('%H:%M')
+
+    # 2. "Cualquier barbero" vs barbero específico
     barber_id = data.get('barber_id')
-    barber = None
-    
-    if not barber_id or str(barber_id).lower() == 'any':
-        date = data.get('date')
-        time = data.get('time')
-        
-        # Encontrar un barbero disponible
-        # Primero, buscamos todos los barberos activos
-        available_barbers = Barber.objects.filter(is_available=True)
-        
-        # Si el servicio excluye barberos (exclusive_barber), solo considerar el asignado o fallar
+    any_barber = not barber_id or str(barber_id).lower() == 'any'
+
+    if any_barber:
+        candidates = Barber.objects.filter(is_available=True).order_by('display_order', 'id')
         if service.exclusive_barber:
-            available_barbers = available_barbers.filter(id=service.exclusive_barber.id)
-            if not available_barbers.exists():
+            candidates = candidates.filter(id=service.exclusive_barber.id)
+            if not candidates.exists():
                 return Response({'error': 'El barbero asignado para este servicio exclusivo no está disponible.'}, status=400)
-
-        # Parsear fecha/hora una sola vez antes del loop
-        from datetime import datetime as _dt, timedelta
-        date_val = date
-        time_val = time
-        try:
-            req_d = _dt.strptime(date_val, '%Y-%m-%d').date()
-            req_t = _dt.strptime(time_val, '%H:%M').time()
-            req_start = _dt.combine(req_d, req_t)
-            parsed_ok = True
-        except (ValueError, TypeError):
-            req_d = req_start = None
-            parsed_ok = False
-
-        # Buscar quién está libre (sin reservas NI bloqueos de inactividad).
-        # OJO: la ventana del servicio depende del barbero (Frank usa 2h en
-        # cualquier servicio), así que se recalcula req_end por candidato.
-        for b in available_barbers:
-            if parsed_ok:
-                eff_dur = b.effective_duration_minutes(service)
-                req_end = req_start + timedelta(minutes=eff_dur)
-
-                # 1. Conflicto con reservas existentes (overlap real)
-                conflicts = False
-                for bk_time, bk_duration in Booking.objects.filter(
-                    barber=b, date=date_val, status__in=['pending', 'confirmed']
-                ).values_list('time', 'duration_minutes'):
-                    bk_start = _dt.combine(req_d, bk_time)
-                    bk_end = bk_start + timedelta(minutes=b.occupied_minutes(bk_duration))
-                    if req_start < bk_end and req_end > bk_start:
-                        conflicts = True
-                        break
-            else:
-                conflicts = Booking.objects.filter(
-                    barber=b, date=date_val, time=time_val, status__in=['pending', 'confirmed']
-                ).exists()
-                req_end = None
-
-            if conflicts:
-                continue
-
-            # 2. Conflicto con inactividad temporal (solape real, no solo hora de inicio)
-            blocked_now = False
-            if parsed_ok:
-                for u_start, u_end in BarberUnavailability.objects.filter(
-                    barber=b, date=date_val
-                ).values_list('start_time', 'end_time'):
-                    u_s = _dt.combine(req_d, u_start)
-                    u_e = _dt.combine(req_d, u_end)
-                    if u_s < req_end and u_e > req_start:
-                        blocked_now = True
-                        break
-            if blocked_now:
-                continue
-
-            barber = b
-            break
-                
-        if not barber:
+        # Se asigna solo un barbero SIN cruces, dentro de su horario y SIN
+        # bloqueo. "Cualquiera" nunca fuerza sobre un bloqueo.
+        barber = next(
+            (b for b in candidates
+             if _slot_problem(b, service, req_d, req_t, is_walk_in=is_walk_in) is None),
+            None,
+        )
+        if barber is None:
             return Response({'error': 'No hay barberos disponibles en la franja horaria seleccionada.'}, status=400)
     else:
         try:
             barber = Barber.objects.get(pk=barber_id, is_available=True)
-            # Validar servicio exclusivo
-            if service.exclusive_barber and service.exclusive_barber.id != barber.id:
-                return Response({'error': 'Este servicio exclusivo solo puede ser realizado por otro barbero.'}, status=400)
-            # Validar inactividad temporal (solape real con la ventana del servicio)
-            date_val = data.get('date')
-            time_val = data.get('time')
-            from datetime import datetime as _dt, timedelta as _td
-            eff_dur = barber.effective_duration_minutes(service)
-            try:
-                slot_time = _dt.strptime(time_val, '%H:%M').time()
-                req_d = _dt.strptime(date_val, '%Y-%m-%d').date()
-                req_s = _dt.combine(req_d, slot_time)
-                req_e = req_s + _td(minutes=eff_dur)
-            except (ValueError, TypeError):
-                req_s = req_e = req_d = None
-            if req_s is not None:
-                for u_start, u_end in BarberUnavailability.objects.filter(
-                    barber=barber, date=date_val
-                ).values_list('start_time', 'end_time'):
-                    u_s = _dt.combine(req_d, u_start)
-                    u_e = _dt.combine(req_d, u_end)
-                    if u_s < req_e and u_e > req_s:
-                        warning_msg = (
-                            f'{barber.display_name} está bloqueado de '
-                            f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
-                            f'el {date_val}. La reserva ({time_val} – '
-                            f'{req_e.strftime("%I:%M %p")}) se cruza con ese bloqueo.'
-                        )
-                        # Walk-in: el barbero/admin puede forzar sobre su bloqueo.
-                        if is_walk_in and force:
-                            override_block_note = warning_msg
-                            break
-                        if is_walk_in:
-                            return Response({
-                                'ok': False,
-                                'requires_override': True,
-                                'warning': warning_msg + ' ¿Deseas agendarlo de todos modos?',
-                            }, status=409)
-                        return Response({
-                            'error': warning_msg + ' Por favor elige otra hora.',
-                        }, status=409)
-        except Barber.DoesNotExist:
+        except (Barber.DoesNotExist, ValueError, TypeError):
             return Response({'error': 'Barbero no disponible'}, status=400)
+        if service.exclusive_barber and service.exclusive_barber.id != barber.id:
+            return Response({'error': 'Este servicio exclusivo solo puede ser realizado por otro barbero.'}, status=400)
 
-    # ── Nivel 2: Validación explícita de doble agendamiento (Con overlaps) ───────────────────
-    # BIZ-06: el chequeo de solape y la creación se serializan por barbero con
-    # select_for_update dentro de una transacción para evitar la condición de
-    # carrera. Dos requests concurrentes para el mismo barbero se ordenan: el
-    # segundo espera el commit del primero y así su chequeo ya ve la reserva
-    # recién creada (el UniqueConstraint solo cubre la hora de inicio exacta).
+    # ── Nivel 2: chequeo final + creación, serializados por barbero ─────────
+    # BIZ-06: select_for_update dentro de la transacción ordena dos requests
+    # concurrentes para el mismo barbero: el segundo espera el commit del
+    # primero y su chequeo ya ve la reserva recién creada.
     with transaction.atomic():
-        # Lock sobre el barbero ya determinado, antes del chequeo de solape.
         Barber.objects.select_for_update().filter(id=barber.id).first()
 
-        requested_date = data.get('date')
-        requested_time_str = data.get('time')
-        effective_duration = barber.effective_duration_minutes(service)
-        try:
-            from datetime import datetime as _dt, timedelta
-            # Acepta 'HH:MM' y 'HH:MM:SS': si la hora llega con segundos, el
-            # parseo estricto fallaba y se saltaban los chequeos de bloqueo.
-            try:
-                req_time = _dt.strptime(requested_time_str, '%H:%M').time()
-            except (ValueError, TypeError):
-                req_time = _dt.strptime(str(requested_time_str)[:5], '%H:%M').time()
-            req_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), req_time)
-            req_end = req_start + timedelta(minutes=effective_duration)
-
-            # ── Nivel 2a: Validar bloqueos globales del local (BlockedDate) ─────────
-            # Si la fecha tiene un BlockedDate sin horario → todo el día está cerrado.
-            # Si tiene start_time/end_time → solo se atiende en esa franja; el
-            # servicio completo debe caber adentro (start..end - duration).
-            try:
-                blocked = BlockedDate.objects.get(date=req_start.date())
-            except BlockedDate.DoesNotExist:
-                blocked = None
-
-            if blocked is not None:
-                if not blocked.start_time or not blocked.end_time:
-                    desc = f' ({blocked.description})' if blocked.description else ''
+        problem = _slot_problem(barber, service, req_d, req_t, is_walk_in=is_walk_in)
+        if problem is not None:
+            kind, msg = problem
+            if kind == 'block' and is_walk_in and not any_barber:
+                # Walk-in (personal del panel, con sesión): puede forzar sobre
+                # el bloqueo con confirmación previa (force=true).
+                if not force:
                     return Response({
                         'ok': False,
-                        'error': (
-                            f'El {requested_date} la barbería está cerrada{desc}. '
-                            f'Por favor elige otra fecha.'
-                        )
+                        'requires_override': True,
+                        'warning': msg + ' ¿Deseas agendarlo de todos modos?',
                     }, status=409)
-                # Franja parcial: la reserva debe caber dentro de [start_time, end_time]
-                if req_time < blocked.start_time or req_end.time() > blocked.end_time \
-                        or req_end.date() != req_start.date():
-                    return Response({
-                        'ok': False,
-                        'error': (
-                            f'El {requested_date} solo se atiende de '
-                            f'{blocked.start_time.strftime("%I:%M %p")} a '
-                            f'{blocked.end_time.strftime("%I:%M %p")}. '
-                            f'El horario que elegiste no cabe en esa franja.'
-                        )
-                    }, status=409)
-            # ── Nivel 2b: Validar el horario del barbero ────────────────────────────
-            # Sin BlockedDate manda el horario semanal, que ya resuelve
-            # festivo → ventana dominical (Barber.day_window). El front oculta
-            # estas horas, pero un POST directo o una página cacheada con el
-            # horario viejo las colaba. Los walk-in (presenciales) quedan
-            # exentos: registran algo que ya ocurrió en el local.
-            elif not is_walk_in:
-                violation = barber.window_violation(
-                    req_start.date(), req_time, req_end.time()
-                )
-                if violation:
-                    return Response({'ok': False, 'error': violation}, status=409)
-            # ────────────────────────────────────────────────────────────────────────
-
-            # ── Nivel 2c: RED DE SEGURIDAD del bloqueo del barbero ──────────────────
-            # El bloqueo de inactividad (BarberUnavailability) ya se revisa antes,
-            # pero ese chequeo puede saltarse (hora con segundos, o una carrera).
-            # Aquí se revalida DENTRO de la transacción, con la ventana efectiva ya
-            # calculada, para garantizar que una reserva del PÚBLICO nunca caiga
-            # sobre un bloqueo. Los walk-in ya se resolvieron antes (con su
-            # confirmación de forzado), por eso quedan exentos.
-            if not is_walk_in:
-                for u_start, u_end in BarberUnavailability.objects.filter(
-                    barber=barber, date=requested_date
-                ).values_list('start_time', 'end_time'):
-                    u_s = _dt.combine(req_start.date(), u_start)
-                    u_e = _dt.combine(req_start.date(), u_end)
-                    if u_s < req_end and u_e > req_start:
-                        return Response({
-                            'ok': False,
-                            'error': (
-                                f'{barber.display_name} está bloqueado de '
-                                f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
-                                f'el {requested_date}. Por favor elige otra hora.'
-                            )
-                        }, status=409)
-
-            existing_bookings = Booking.objects.filter(
-                barber=barber,
-                date=requested_date,
-                status__in=['pending', 'confirmed']
-            ).values_list('time', 'duration_minutes')
-
-            duplicate = False
-            for bk_time, bk_duration in existing_bookings:
-                bk_start = _dt.combine(_dt.strptime(requested_date, '%Y-%m-%d').date(), bk_time)
-                bk_end = bk_start + timedelta(minutes=barber.occupied_minutes(bk_duration))
-
-                if req_start < bk_end and req_end > bk_start:
-                    duplicate = True
-                    break
-        except Exception:
-            duplicate = Booking.objects.filter(
-                barber=barber,
-                date=requested_date,
-                time=requested_time_str,
-                status__in=['pending', 'confirmed'],
-            ).exists()
-
-        if duplicate:
-            return Response({
-                'ok': False,
-                'error': (
-                    f'{barber.display_name} ya tiene una cita activa que se cruza con las '
-                    f'{requested_time_str} el {requested_date}. '
-                    f'Por favor elige otro horario u otro barbero.'
-                )
-            }, status=409)
-        # ─────────────────────────────────────────────────────────────────────────
+                override_block_note = msg
+            elif kind == 'block':
+                return Response({'ok': False, 'error': msg + ' Por favor elige otra hora.'}, status=409)
+            else:
+                return Response({'ok': False, 'error': msg}, status=409)
 
         serializer = BookingCreateSerializer(data=data)
         if not serializer.is_valid():
@@ -358,12 +205,16 @@ def create_booking_view(request):
             barber=barber,
             service=service,
             price=service.price,
-            duration_minutes=effective_duration,
+            duration_minutes=barber.effective_duration_minutes(service),
         )
 
         # Si se agendó forzando sobre un bloqueo de inactividad, dejar constancia.
         if override_block_note:
-            extra = '⚠ Agendado manualmente sobre un bloqueo de inactividad del barbero.'
+            who = request.user.get_full_name() or request.user.username
+            extra = (
+                '⚠ Agendado manualmente sobre un bloqueo de inactividad del barbero '
+                f'(por {who}).'
+            )
             booking.notes = f'{booking.notes}\n{extra}'.strip() if booking.notes else extra
             booking.save(update_fields=['notes'])
 
@@ -396,6 +247,33 @@ def create_booking_view(request):
         'barber_name': barber.display_name,
         'message': 'Reserva creada exitosamente'
     }, status=201)
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def create_booking_view(request):
+    """POST /api/bookings/ — reserva desde el sitio público.
+
+    Nunca es walk-in ni puede forzar sobre un bloqueo, diga lo que diga el
+    body: eso solo lo hace el personal desde /api/admin/bookings/walk-in/.
+    """
+    # BIZ-17: request.data puede ser un QueryDict inmutable (form-data).
+    return _create_booking(request, request.data.copy(), is_walk_in=False)
+
+
+@api_view(['POST'])
+@permission_classes([IsBarberOrAbove])
+def admin_walkin_booking_view(request):
+    """POST /api/admin/bookings/walk-in/ — walk-in creado por el personal.
+
+    Requiere sesión (y CSRF). Si el barbero elegido está bloqueado, responde
+    409 con `requires_override`; reenviando con force=true se agenda encima
+    (queda nota en la reserva con quién lo hizo).
+    """
+    data = request.data.copy()
+    force = str(data.get('force', '')).lower() == 'true'
+    return _create_booking(request, data, is_walk_in=True, force=force)
 
 
 @api_view(['POST'])
@@ -529,6 +407,169 @@ def public_reviews_view(request):
     return Response({'reviews': data})
 
 # ─── Admin ───────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsBarberOrAbove])
+def admin_my_agenda_view(request):
+    """GET /api/admin/my-agenda/?start=YYYY-MM-DD&end=YYYY-MM-DD[&barber=ID]
+
+    Todo lo que necesita la agenda del barbero, día por día: horario de
+    atención (con festivos → horario dominical), cierres del local, bloqueos de
+    inactividad, citas con su hora de FIN real (Frank = 2h) y totales.
+
+    El barbero ve su propia agenda. Admin, operativo y superadmin pueden pedir
+    la de cualquiera con ?barber=ID (y reciben la lista para elegir).
+    """
+    from datetime import date as _date, datetime as _dt, timedelta as _td
+    from .holidays import holiday_name
+
+    profile = getattr(request.user, 'profile', None)
+    is_admin = bool(profile and profile.is_admin)
+    own_barber = getattr(request.user, 'barber_profile', None)
+
+    barber = own_barber
+    requested = request.query_params.get('barber')
+    if requested and is_admin:
+        barber = Barber.objects.filter(pk=requested).first()
+    elif requested and own_barber is not None and str(own_barber.pk) != str(requested):
+        return Response({'error': 'Solo puedes ver tu propia agenda.'}, status=403)
+
+    barbers = []
+    if is_admin:
+        barbers = [
+            {'id': b.id, 'name': b.display_name, 'color': b.color_tag}
+            for b in Barber.objects.order_by('display_order', 'id')
+        ]
+    if barber is None:
+        if is_admin and barbers:
+            barber = Barber.objects.get(pk=barbers[0]['id'])
+        else:
+            return Response({
+                'error': 'Tu usuario no tiene un perfil de barbero asociado.',
+            }, status=400)
+
+    today = timezone.localdate()
+    try:
+        start = _dt.strptime(request.query_params.get('start', ''), '%Y-%m-%d').date()
+    except ValueError:
+        start = today
+    try:
+        end = _dt.strptime(request.query_params.get('end', ''), '%Y-%m-%d').date()
+    except ValueError:
+        end = start
+    if end < start:
+        end = start
+    if (end - start).days > 41:
+        end = start + _td(days=41)
+
+    bookings_by_day = {}
+    for bk in Booking.objects.filter(
+        barber=barber, date__range=(start, end)
+    ).select_related('service').order_by('date', 'time'):
+        bookings_by_day.setdefault(bk.date, []).append(bk)
+
+    blocks_by_day = {}
+    for u in BarberUnavailability.objects.filter(barber=barber, date__range=(start, end)):
+        blocks_by_day.setdefault(u.date, []).append(u)
+
+    shop_blocks = {
+        bd.date: bd for bd in BlockedDate.objects.filter(date__range=(start, end))
+    }
+
+    def hhmm(t):
+        return t.strftime('%H:%M') if t else None
+
+    def is_all_day(s, e):
+        return s <= _dt.min.time() and e.hour == 23 and e.minute >= 59
+
+    days = []
+    cur = start
+    while cur <= end:
+        window = barber.day_window(cur)
+        day_blocks = sorted(blocks_by_day.get(cur, []), key=lambda u: u.start_time)
+        block_ranges = [
+            (_dt.combine(cur, u.start_time), _dt.combine(cur, u.end_time))
+            for u in day_blocks
+        ]
+
+        items = []
+        totals = {'active': 0, 'completed': 0, 'cancelled': 0, 'value': 0}
+        for bk in bookings_by_day.get(cur, []):
+            minutes = barber.occupied_minutes(bk.duration_minutes)
+            bk_start = _dt.combine(cur, bk.time)
+            bk_end = bk_start + _td(minutes=minutes)
+            active = bk.status in ('pending', 'confirmed')
+            if active:
+                totals['active'] += 1
+            elif bk.status == 'completed':
+                totals['completed'] += 1
+            else:
+                totals['cancelled'] += 1
+            if bk.status != 'cancelled':
+                totals['value'] += int(bk.price or 0)
+            items.append({
+                'id': bk.id,
+                'client_name': bk.client_name,
+                'client_phone': bk.client_phone,
+                'client_email': bk.client_email,
+                'service_name': bk.service.name if bk.service else '',
+                'time': hhmm(bk.time),
+                'end_time': bk_end.strftime('%H:%M'),
+                'duration': minutes,
+                'status': bk.status,
+                'price': int(bk.price or 0),
+                'notes': bk.notes,
+                'is_walk_in': bk.is_walk_in,
+                'completed_at': bk.completed_at.isoformat() if bk.completed_at else None,
+                # Cita activa que cae dentro de un bloqueo del barbero.
+                'in_block': active and any(
+                    s < bk_end and e > bk_start for s, e in block_ranges
+                ),
+            })
+
+        shop = shop_blocks.get(cur)
+        days.append({
+            'date': cur.strftime('%Y-%m-%d'),
+            'weekday': cur.weekday(),
+            'is_today': cur == today,
+            'holiday': holiday_name(cur),
+            'window': {
+                'start': hhmm(window['start']),
+                'end': hhmm(window['end']),
+                'last_start': hhmm(window['last_start']),
+                'source': window['source'],
+            } if window else None,
+            'shop_block': {
+                'all_day': not (shop.start_time and shop.end_time),
+                'start': hhmm(shop.start_time),
+                'end': hhmm(shop.end_time),
+                'description': shop.description,
+            } if shop else None,
+            'blocks': [{
+                'id': u.id,
+                'start': hhmm(u.start_time),
+                'end': hhmm(u.end_time),
+                'all_day': is_all_day(u.start_time, u.end_time),
+                'reason': u.reason,
+            } for u in day_blocks],
+            'bookings': items,
+            'totals': totals,
+        })
+        cur += _td(days=1)
+
+    return Response({
+        'barber': {
+            'id': barber.id,
+            'name': barber.display_name,
+            'color': barber.color_tag,
+        },
+        'can_pick_barber': is_admin,
+        'barbers': barbers,
+        'start': start.strftime('%Y-%m-%d'),
+        'end': end.strftime('%Y-%m-%d'),
+        'days': days,
+    })
+
 
 @api_view(['GET'])
 @permission_classes([IsBarberOrAbove])
@@ -686,10 +727,17 @@ def admin_booking_detail_view(request, booking_id):
             booking.duration_minutes = new_eff
             effective_dur_for_check = new_eff
         else:
-            effective_dur_for_check = (
-                booking.service.duration_minutes if booking.service else booking.duration_minutes
+            effective_dur_for_check = booking.duration_minutes or (
+                booking.service.duration_minutes if booking.service else 60
             )
-        if changed_slot and booking.status not in ('cancelled', 'completed'):
+        # Reactivar una cita cancelada (o devolver una completada a activa) la
+        # vuelve a poner en la agenda: se revisan bloqueos y cruces igual que al
+        # crearla. Antes un PATCH {status:'confirmed'} no revisaba nada.
+        reactivating = (
+            old_status not in ('pending', 'confirmed')
+            and booking.status in ('pending', 'confirmed')
+        )
+        if (changed_slot or reactivating) and booking.status not in ('cancelled', 'completed'):
             from .validators import check_booking_conflict
             err = check_booking_conflict(
                 barber=booking.barber,

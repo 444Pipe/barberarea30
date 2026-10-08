@@ -225,6 +225,18 @@
     }
     window.renderFromCache = renderFromCache;
 
+    // Teléfono del cliente con Llamar / WhatsApp. En los href solo van dígitos.
+    function phoneLine(phone) {
+      let d = String(phone || '').replace(/[^0-9]/g, '');
+      if (!d) return '';
+      if (d.length === 10 && !d.startsWith('57')) d = '57' + d;
+      return `<div class="flex items-center gap-2 mt-2 flex-wrap text-[0.7rem]">
+        <a href="tel:+${d}" class="text-smoke/80 tabular-nums hover:text-gold">${escH(phone)}</a>
+        <a href="tel:+${d}" class="uppercase tracking-widest px-2 py-0.5 rounded-sm border border-sky-500/30 bg-sky-500/10 text-sky-300">Llamar</a>
+        <a href="https://wa.me/${d}" target="_blank" rel="noopener noreferrer" class="uppercase tracking-widest px-2 py-0.5 rounded-sm border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">WhatsApp</a>
+      </div>`;
+    }
+
     function renderCard(b) {
       const manageable = b.status !== 'completed' && b.status !== 'cancelled';
       const timeHHMM = (b.time || '').slice(0, 5);
@@ -239,6 +251,7 @@
               <span class="w-2 h-2 rounded-full" style="background:${b.barber_color || '#D4AF37'}"></span>
               <span>${escH(b.barber_name || 'Sin barbero')}</span>
             </div>
+            ${phoneLine(b.client_phone)}
           </div>
           <div class="text-right shrink-0">
             <div class="text-sm font-semibold text-white">${fmtMoney(b.price)}</div>

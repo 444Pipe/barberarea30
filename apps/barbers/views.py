@@ -343,6 +343,7 @@ def obtener_barberos_nativos(request):
 def barber_unavailability_list(request, barber_id):
     """
     GET  /api/admin/barbers/{id}/unavailability/ — lista bloqueos
+         (?date_from=YYYY-MM-DD para omitir los ya pasados)
     POST /api/admin/barbers/{id}/unavailability/ — crear bloqueo
     Body JSON: {date, start_time, end_time, reason?}
     """
@@ -350,11 +351,21 @@ def barber_unavailability_list(request, barber_id):
 
     if request.method == 'GET':
         items = BarberUnavailability.objects.filter(barber=barber)
+        date_from = request.query_params.get('date_from')
+        if date_from:
+            try:
+                items = items.filter(
+                    date__gte=datetime.strptime(date_from, '%Y-%m-%d').date()
+                )
+            except ValueError:
+                return Response({'error': 'date_from inválido (use YYYY-MM-DD).'},
+                                status=status.HTTP_400_BAD_REQUEST)
         data = [{
             'id': u.id,
             'date': u.date.strftime('%Y-%m-%d'),
             'start_time': u.start_time.strftime('%H:%M'),
             'end_time': u.end_time.strftime('%H:%M'),
+            'all_day': _is_all_day_block(u),
             'reason': u.reason,
         } for u in items]
         return Response(data)
@@ -582,6 +593,75 @@ def barber_unavailability_delete(request, barber_id, unavail_id):
     u = get_object_or_404(BarberUnavailability, pk=unavail_id, barber_id=barber_id)
     u.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _is_all_day_block(u):
+    """Bloqueo de día completo: 00:00 → 23:59 (o 23:59:59)."""
+    return u.start_time <= dt_time(0, 0) and u.end_time >= dt_time(23, 59)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOrAbove])
+def barber_unavailability_bulk_delete(request, barber_id):
+    """POST /api/admin/barbers/{id}/unavailability/bulk-delete/  Body: {ids: [...]}
+
+    Borra varios bloqueos de una vez (un rango completo, ej. vacaciones).
+    Solo toca bloqueos de ESE barbero.
+    """
+    ids = request.data.get('ids')
+    if not isinstance(ids, list) or not ids:
+        return Response({'error': 'Envía la lista de ids a borrar.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        ids = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return Response({'error': 'ids inválidos.'}, status=status.HTTP_400_BAD_REQUEST)
+    deleted, _ = BarberUnavailability.objects.filter(
+        barber_id=barber_id, pk__in=ids
+    ).delete()
+    return Response({'deleted': deleted})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminOrAbove])
+def barber_unavailability_conflicts(request, barber_id):
+    """GET /api/admin/barbers/{id}/unavailability/conflicts/
+
+    Citas ACTIVAS (pendientes/confirmadas) de hoy en adelante que caen dentro
+    de un bloqueo del barbero. Son las que hacen ver que "siguen agendando"
+    con un barbero bloqueado: las que ya existían al crear el bloqueo y las
+    forzadas como walk-in. Hay que llamar al cliente y reagendar o cancelar.
+    """
+    from apps.bookings.validators import bookings_in_unavailability
+
+    barber = get_object_or_404(Barber, pk=barber_id)
+    hits = bookings_in_unavailability(barber=barber, date_from=timezone.localdate())
+    data = []
+    for hit in hits:
+        bk, u = hit['booking'], hit['block']
+        end = datetime.combine(bk.date, bk.time) + timedelta(
+            minutes=barber.occupied_minutes(bk.duration_minutes)
+        )
+        data.append({
+            'id': bk.id,
+            'client_name': bk.client_name,
+            'client_phone': bk.client_phone,
+            'service_name': bk.service.name if bk.service else '',
+            'date': bk.date.strftime('%Y-%m-%d'),
+            'time': bk.time.strftime('%H:%M'),
+            'end_time': end.strftime('%H:%M'),
+            'status': bk.status,
+            'is_walk_in': bk.is_walk_in,
+            'forced': 'bloqueo de inactividad' in (bk.notes or ''),
+            'created_before_block': bk.created_at < u.created_at,
+            'block': {
+                'start_time': u.start_time.strftime('%H:%M'),
+                'end_time': u.end_time.strftime('%H:%M'),
+                'all_day': _is_all_day_block(u),
+                'reason': u.reason,
+            },
+        })
+    return Response(data)
 
 
 # ─── Gallery ─────────────────────────────────────────────

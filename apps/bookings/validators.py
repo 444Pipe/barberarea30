@@ -15,7 +15,7 @@ def _parse_date(value):
     if isinstance(value, date_cls) and not isinstance(value, datetime):
         return value
     if isinstance(value, str):
-        return datetime.strptime(value, '%Y-%m-%d').date()
+        return datetime.strptime(value.strip(), '%Y-%m-%d').date()
     raise ValueError(f'Fecha inválida: {value!r}')
 
 
@@ -25,10 +25,89 @@ def _parse_time(value):
     if isinstance(value, str):
         for fmt in ('%H:%M:%S', '%H:%M'):
             try:
-                return datetime.strptime(value, fmt).time()
+                return datetime.strptime(value.strip(), fmt).time()
             except ValueError:
                 continue
     raise ValueError(f'Hora inválida: {value!r}')
+
+
+# Nombres públicos: las vistas parsean UNA vez con estas funciones y, si fallan,
+# responden 400. Antes cada vista parseaba a su manera y, si el parseo fallaba,
+# seguía de largo SIN revisar bloqueos.
+parse_booking_date = _parse_date
+parse_booking_time = _parse_time
+
+
+def unavailability_conflict(barber, date, time, duration_minutes):
+    """Mensaje de error si [date time, +duración) cae sobre un bloqueo de
+    inactividad (BarberUnavailability) del barbero; None si no.
+
+    `duration_minutes` pasa por `occupied_minutes` (Frank = 2h siempre).
+    """
+    if barber is None:
+        return None
+    d = _parse_date(date)
+    t = _parse_time(time)
+    req_start = datetime.combine(d, t)
+    req_end = req_start + timedelta(minutes=barber.occupied_minutes(duration_minutes))
+    for u_start, u_end in BarberUnavailability.objects.filter(
+        barber=barber, date=d
+    ).values_list('start_time', 'end_time'):
+        u_s = datetime.combine(d, u_start)
+        u_e = datetime.combine(d, u_end)
+        if u_s < req_end and u_e > req_start:
+            name = getattr(barber, 'display_name', None) or 'El barbero'
+            return (
+                f'{name} está bloqueado de '
+                f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
+                f'el {d.strftime("%Y-%m-%d")}. La reserva '
+                f'({t.strftime("%I:%M %p")}–{req_end.strftime("%I:%M %p")}) '
+                f'se cruza con ese bloqueo.'
+            )
+    return None
+
+
+def bookings_in_unavailability(barber=None, date_from=None, date_to=None):
+    """Reservas ACTIVAS (pending/confirmed) que caen dentro de un bloqueo de
+    inactividad de su barbero.
+
+    Son las citas que "siguen apareciendo" aunque el barbero esté bloqueado:
+    las que ya existían cuando se creó el bloqueo, las forzadas como walk-in y
+    las que entraron por huecos ya cerrados. Devuelve una lista de dicts
+    `{'booking', 'block'}` ordenada por fecha y hora. Solo lee, no cambia nada.
+    """
+    blocks = BarberUnavailability.objects.all()
+    bookings = Booking.objects.filter(
+        status__in=['pending', 'confirmed'], barber__isnull=False,
+    ).select_related('barber', 'service')
+    if barber is not None:
+        blocks = blocks.filter(barber=barber)
+        bookings = bookings.filter(barber=barber)
+    if date_from is not None:
+        blocks = blocks.filter(date__gte=date_from)
+        bookings = bookings.filter(date__gte=date_from)
+    if date_to is not None:
+        blocks = blocks.filter(date__lte=date_to)
+        bookings = bookings.filter(date__lte=date_to)
+
+    by_day = {}
+    for u in blocks:
+        by_day.setdefault((u.barber_id, u.date), []).append(u)
+    if not by_day:
+        return []
+
+    hits = []
+    for bk in bookings.order_by('date', 'time'):
+        day_blocks = by_day.get((bk.barber_id, bk.date))
+        if not day_blocks:
+            continue
+        bk_start = datetime.combine(bk.date, bk.time)
+        bk_end = bk_start + timedelta(minutes=bk.barber.occupied_minutes(bk.duration_minutes))
+        for u in day_blocks:
+            if datetime.combine(bk.date, u.start_time) < bk_end                     and datetime.combine(bk.date, u.end_time) > bk_start:
+                hits.append({'booking': bk, 'block': u})
+                break
+    return hits
 
 
 def check_booking_conflict(
@@ -89,20 +168,9 @@ def check_booking_conflict(
 
     # 2. BarberUnavailability del barbero (solape real)
     if check_unavailability and barber is not None:
-        for u_start, u_end in BarberUnavailability.objects.filter(
-            barber=barber, date=d
-        ).values_list('start_time', 'end_time'):
-            u_s = datetime.combine(d, u_start)
-            u_e = datetime.combine(d, u_end)
-            if u_s < req_end and u_e > req_start:
-                name = getattr(barber, 'display_name', None) or 'El barbero'
-                return (
-                    f'{name} está bloqueado de '
-                    f'{u_start.strftime("%I:%M %p")} a {u_end.strftime("%I:%M %p")} '
-                    f'el {d.strftime("%Y-%m-%d")}. La reserva '
-                    f'({t.strftime("%I:%M %p")}–{req_end.strftime("%I:%M %p")}) '
-                    f'se cruza con ese bloqueo.'
-                )
+        err = unavailability_conflict(barber, d, t, duration_minutes)
+        if err:
+            return err
 
     # 3. Otras reservas del barbero (solape real)
     if check_overlap and barber is not None:

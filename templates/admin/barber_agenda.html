@@ -2,56 +2,537 @@
 {% block title %}Mi Agenda{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<style>
+  /* Agenda del barbero — mobile-first. Datos: /api/admin/my-agenda/ */
+  .ag-strip { position: sticky; top: 0; z-index: 20; }
+  .ag-day-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; min-height: 58px; border-radius: 0.75rem;
+    border: 1px solid rgba(255,255,255,0.06); background: #111111;
+    color: rgba(245,245,245,0.6); transition: background .15s, border-color .15s, color .15s;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .ag-day-btn:hover { border-color: rgba(212,175,55,0.3); }
+  .ag-day-btn.is-today { border-color: rgba(212,175,55,0.5); }
+  .ag-day-btn.is-selected { background: #D4AF37; border-color: #D4AF37; color: #0a0a0a; }
+  .ag-day-btn.is-off { opacity: .45; }
+  .ag-dot { width: 5px; height: 5px; border-radius: 9999px; background: #D4AF37; }
+  .ag-day-btn.is-selected .ag-dot { background: #0a0a0a; }
+  .ag-blocked-pattern {
+    background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+  }
+  .ag-card { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .ag-card:active { transform: scale(0.995); }
+  .ag-skel { background: linear-gradient(90deg, #151515 25%, #1d1d1d 50%, #151515 75%); background-size: 200% 100%; animation: ag-shimmer 1.2s infinite; }
+  @keyframes ag-shimmer { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .ag-skel { animation: none; } .ag-card:active { transform: none; } }
+  #ag-sheet-panel { max-height: 88vh; max-height: 88dvh; }
+  .ag-scroll-x { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .ag-scroll-x::-webkit-scrollbar { display: none; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-  <div>
-    <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Mi Agenda</h1>
-    <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase">Tus citas programadas</p>
+<div class="max-w-5xl mx-auto -mt-1">
+
+  <!-- Encabezado -->
+  <div class="flex items-start justify-between gap-3 mb-4">
+    <div class="min-w-0">
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Mi Agenda</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase truncate" id="ag-subtitle">Cargando…</p>
+    </div>
+    <div class="flex items-center gap-1 bg-jet-card border border-white/5 rounded-lg p-1 flex-shrink-0">
+      <button type="button" data-view="day" class="ag-view-btn px-3 h-9 rounded-md text-[0.65rem] font-bold uppercase tracking-widest">Día</button>
+      <button type="button" data-view="week" class="ag-view-btn px-3 h-9 rounded-md text-[0.65rem] font-bold uppercase tracking-widest">Semana</button>
+    </div>
   </div>
 
-  <div class="bg-jet-card border border-white/5 rounded-xl p-4 lg:p-6">
-    <div id="barber-calendar" class="text-xs"></div>
+  <!-- Selector de barbero (solo admins) -->
+  <div id="ag-barber-picker" class="ag-scroll-x flex gap-2 mb-4 hidden"></div>
+
+  <!-- Tira de la semana (sticky) -->
+  <div class="ag-strip -mx-4 sm:mx-0 px-4 sm:px-0 pt-1 pb-3 bg-black/95 backdrop-blur">
+    <div class="flex items-center justify-between gap-2 mb-2">
+      <button type="button" id="ag-prev" aria-label="Semana anterior" class="w-10 h-10 rounded-lg bg-jet-card border border-white/5 text-smoke/60 hover:text-gold flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="flex items-center gap-2 min-w-0">
+        <span id="ag-month" class="text-sm font-semibold text-white capitalize truncate"></span>
+        <button type="button" id="ag-today" class="px-3 h-8 rounded-md border border-gold/30 text-gold text-[0.6rem] font-bold uppercase tracking-widest hover:bg-gold/10">Hoy</button>
+      </div>
+      <button type="button" id="ag-next" aria-label="Semana siguiente" class="w-10 h-10 rounded-lg bg-jet-card border border-white/5 text-smoke/60 hover:text-gold flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <div id="ag-week" class="grid grid-cols-7 gap-1.5"></div>
   </div>
+
+  <!-- Contenido -->
+  <div id="ag-body" class="mt-2"></div>
 </div>
 
+<!-- Detalle de la cita (bottom sheet en móvil, modal centrado en escritorio) -->
+<div id="ag-sheet" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="ag-sheet-title">
+  <div class="absolute inset-0 bg-black/70" data-close></div>
+  <div class="absolute inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[28rem]">
+    <div id="ag-sheet-panel" class="bg-jet-card border border-white/10 rounded-t-2xl sm:rounded-2xl overflow-y-auto"
+         style="padding-bottom: env(safe-area-inset-bottom);">
+      <div class="sm:hidden flex justify-center pt-2"><span class="w-10 h-1 rounded-full bg-white/15"></span></div>
+      <div id="ag-sheet-body" class="p-5"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+(function () {
+  const esc = window.esc;
   const params = new URLSearchParams(window.location.search);
-  const barberId = params.get('barber') || '';
-  const url = barberId ? `/api/admin/bookings/?barber=${barberId}` : '/api/admin/bookings/';
+  const state = {
+    barberId: params.get('barber') || '',
+    date: params.get('date') || isoDate(new Date()),
+    view: params.get('view') || (window.innerWidth >= 1024 ? 'week' : 'day'),
+    week: null,       // respuesta de la API para la semana visible
+    loading: false,
+    error: '',
+  };
 
-  fetch(url)
-    .then(r => r.json())
-    .then(bookings => {
-      const events = bookings.map(b => ({
-        title: `${b.client_name} — ${b.service_name || ''}`,
-        start: `${b.date}T${b.time}`,
-        backgroundColor: b.barber_color || '#D4AF37',
-        borderColor: b.barber_color || '#D4AF37',
-        textColor: '#0a0a0a',
-      }));
+  const STATUS = {
+    pending:   { label: 'Pendiente',  chip: 'bg-amber-500/20 text-amber-300',     bar: '#f59e0b' },
+    confirmed: { label: 'Confirmada', chip: 'bg-blue-500/20 text-blue-300',       bar: '#3b82f6' },
+    completed: { label: 'Atendida',   chip: 'bg-emerald-500/20 text-emerald-300', bar: '#10b981' },
+    cancelled: { label: 'Cancelada',  chip: 'bg-red-500/20 text-red-300',         bar: '#ef4444' },
+  };
+  const DAY_SHORT = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  const DAY_LONG = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-      const cal = new FullCalendar.Calendar(document.getElementById('barber-calendar'), {
-        initialView: window.innerWidth < 640 ? 'listWeek' : 'timeGridWeek',
-        height: 600,
-        locale: 'es',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'timeGridWeek,timeGridDay,listWeek'
-        },
-        events: events,
-        slotMinTime: '08:00:00',
-        slotMaxTime: '21:00:00',
-        slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
-        eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
-      });
-      cal.render();
+  // ── Fechas (siempre locales; nunca new Date('YYYY-MM-DD'), que es UTC) ──
+  function isoDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function parseISO(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+  function addDays(s, n) { const d = parseISO(s); d.setDate(d.getDate() + n); return isoDate(d); }
+  function mondayOf(s) { const d = parseISO(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return isoDate(d); }
+  function toMin(hhmm) { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; }
+  function fmt12(hhmm) {
+    if (!hhmm) return '';
+    const [h, m] = hhmm.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  }
+  function fromMin(min) { return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; }
+  function money(n) { return '$' + Number(n || 0).toLocaleString('es-CO'); }
+  function longDate(s) { const d = parseISO(s); return `${DAY_LONG[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MONTHS[d.getMonth()]}`; }
+  function nowMinutes() { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
+  // Fin de la cita en minutos del día (una cita que pasa de medianoche no se corta).
+  function endMin(b) { const s = toMin(b.time); let e = toMin(b.end_time); if (e <= s) e = s + b.duration; return e; }
+
+  // ── Carga ──
+  async function load(opts) {
+    opts = opts || {};
+    const start = mondayOf(state.date);
+    const end = addDays(start, 6);
+    if (!opts.silent) { state.loading = true; state.error = ''; render(); }
+    const q = new URLSearchParams({ start, end });
+    if (state.barberId) q.set('barber', state.barberId);
+    try {
+      const r = await fetch(`/api/admin/my-agenda/?${q}`, { headers: { 'Accept': 'application/json' } });
+      if (r.status === 401) { window.location.href = '/admin-panel/login/'; return; }
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 403 && !data.error) { window.location.href = '/admin-panel/login/'; return; }
+      if (!r.ok) throw new Error(data.error || 'No se pudo cargar la agenda.');
+      state.week = data;
+      state.barberId = String(data.barber.id);
+      state.error = '';
+    } catch (e) {
+      if (!opts.silent) state.error = e.message || 'Error de conexión.';
+    } finally {
+      state.loading = false;
+      syncUrl();
+      render();
+    }
+  }
+
+  function syncUrl() {
+    const q = new URLSearchParams();
+    if (state.barberId && state.week && state.week.can_pick_barber) q.set('barber', state.barberId);
+    q.set('date', state.date);
+    q.set('view', state.view);
+    history.replaceState(null, '', `${location.pathname}?${q}`);
+  }
+
+  function dayData(dateStr) {
+    return state.week ? state.week.days.find(d => d.date === dateStr) : null;
+  }
+
+  // ── Render ──
+  function render() {
+    renderHeader();
+    renderStrip();
+    const body = document.getElementById('ag-body');
+    if (state.error) {
+      body.innerHTML = `
+        <div class="bg-jet-card border border-red-500/20 rounded-xl p-6 text-center">
+          <p class="text-red-300 text-sm">${esc(state.error)}</p>
+          <button type="button" id="ag-retry" class="mt-4 h-10 px-5 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest">Reintentar</button>
+        </div>`;
+      document.getElementById('ag-retry').onclick = () => load();
+      return;
+    }
+    if (state.loading && !state.week) {
+      body.innerHTML = `<div class="space-y-3">
+        <div class="grid grid-cols-3 gap-2">${'<div class="ag-skel h-16 rounded-xl"></div>'.repeat(3)}</div>
+        ${'<div class="ag-skel h-20 rounded-xl"></div>'.repeat(3)}</div>`;
+      return;
+    }
+    if (!state.week) return;
+    body.innerHTML = state.view === 'week' ? renderWeek() : renderDay(dayData(state.date));
+  }
+
+  function renderHeader() {
+    const sub = document.getElementById('ag-subtitle');
+    const w = state.week;
+    sub.textContent = w ? w.barber.name : 'Cargando…';
+    document.querySelectorAll('.ag-view-btn').forEach(b => {
+      const on = b.dataset.view === state.view;
+      b.classList.toggle('bg-gold', on);
+      b.classList.toggle('text-jet', on);
+      b.classList.toggle('text-smoke/50', !on);
     });
-});
+    const picker = document.getElementById('ag-barber-picker');
+    if (w && w.can_pick_barber && w.barbers.length) {
+      picker.classList.remove('hidden');
+      picker.innerHTML = w.barbers.map(b => `
+        <button type="button" data-barber="${b.id}" class="barber-filter-chip flex-shrink-0 h-9 gap-2 ${String(b.id) === state.barberId ? 'active' : ''}">
+          <span class="w-2 h-2 rounded-full" style="background:${esc(b.color)}"></span>${esc(b.name)}
+        </button>`).join('');
+    } else {
+      picker.classList.add('hidden');
+    }
+  }
+
+  function renderStrip() {
+    const start = mondayOf(state.date);
+    const today = isoDate(new Date());
+    const mon = parseISO(start), sun = parseISO(addDays(start, 6));
+    document.getElementById('ag-month').textContent = mon.getMonth() === sun.getMonth()
+      ? `${MONTHS[mon.getMonth()]} ${mon.getFullYear()}`
+      : `${MONTHS[mon.getMonth()].slice(0, 3)} – ${MONTHS[sun.getMonth()].slice(0, 3)} ${sun.getFullYear()}`;
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+      const ds = addDays(start, i);
+      const d = dayData(ds);
+      const active = d ? d.totals.active : 0;
+      const off = d && (!d.window || (d.shop_block && d.shop_block.all_day) || d.blocks.some(b => b.all_day));
+      const cls = [
+        'ag-day-btn',
+        ds === today ? 'is-today' : '',
+        state.view === 'day' && ds === state.date ? 'is-selected' : '',
+        off ? 'is-off' : '',
+      ].join(' ');
+      const dots = active
+        ? `<span class="flex items-center gap-0.5">${'<span class="ag-dot"></span>'.repeat(Math.min(active, 3))}${active > 3 ? '<span class="text-[0.55rem] font-bold leading-none">+</span>' : ''}</span>`
+        : '<span class="h-[5px]"></span>';
+      html += `<button type="button" class="${cls}" data-date="${ds}" aria-label="${longDate(ds)}">
+        <span class="text-[0.6rem] font-semibold uppercase tracking-wider">${DAY_SHORT[i]}</span>
+        <span class="text-base font-bold leading-none">${parseISO(ds).getDate()}</span>
+        ${dots}
+      </button>`;
+    }
+    document.getElementById('ag-week').innerHTML = html;
+  }
+
+  function dayChips(d) {
+    const chips = [];
+    if (d.is_today) chips.push('<span class="px-2 py-0.5 rounded-full bg-gold/15 text-gold">Hoy</span>');
+    if (d.holiday) chips.push(`<span class="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300">Festivo · ${esc(d.holiday)}</span>`);
+    if (d.shop_block) chips.push(`<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">${d.shop_block.all_day ? 'Local cerrado' : `Local abre ${fmt12(d.shop_block.start)} – ${fmt12(d.shop_block.end)}`}${d.shop_block.description ? ' · ' + esc(d.shop_block.description) : ''}</span>`);
+    if (!d.window && !d.shop_block) chips.push('<span class="px-2 py-0.5 rounded-full bg-white/10 text-smoke/60">Descanso</span>');
+    if (d.blocks.some(b => b.all_day)) chips.push('<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">Bloqueado todo el día</span>');
+    return chips.join('');
+  }
+
+  function scheduleLine(d) {
+    if (d.shop_block && d.shop_block.all_day) return 'El local no atiende este día';
+    if (d.shop_block) return `Atención especial: ${fmt12(d.shop_block.start)} – ${fmt12(d.shop_block.end)}`;
+    if (!d.window) return 'Día de descanso';
+    let s = `Horario: ${fmt12(d.window.start)} – ${fmt12(d.window.end)}`;
+    if (d.window.last_start) s += ` · última cita ${fmt12(d.window.last_start)}`;
+    return s;
+  }
+
+  function renderDay(d) {
+    if (!d) return '';
+    const active = d.bookings.filter(b => b.status !== 'cancelled');
+    const cancelled = d.bookings.filter(b => b.status === 'cancelled');
+
+    // Línea de tiempo: citas + bloqueos + huecos libres + "ahora"
+    const items = [];
+    active.forEach(b => items.push({ kind: 'booking', start: toMin(b.time), end: endMin(b), b }));
+    d.blocks.forEach(u => items.push({ kind: 'block', start: toMin(u.start), end: toMin(u.end), u }));
+    items.sort((a, b) => a.start - b.start || (a.kind === 'block' ? -1 : 1));
+
+    let win = null;
+    if (d.shop_block && !d.shop_block.all_day) win = { start: toMin(d.shop_block.start), end: toMin(d.shop_block.end) };
+    else if (d.window && !d.shop_block) win = { start: toMin(d.window.start), end: toMin(d.window.end) };
+    const allDayBlocked = d.blocks.some(b => b.all_day);
+    const withGaps = [];
+    if (win && !allDayBlocked) {
+      let cursor = win.start;
+      items.forEach(it => {
+        const gapEnd = Math.min(it.start, win.end);
+        if (gapEnd - cursor >= 30) withGaps.push({ kind: 'free', start: cursor, end: gapEnd });
+        withGaps.push(it);
+        cursor = Math.max(cursor, it.end);
+      });
+      if (win.end - cursor >= 30) withGaps.push({ kind: 'free', start: cursor, end: win.end });
+    } else {
+      withGaps.push(...items);
+    }
+
+    // Próxima cita (solo hoy) y marcador de "ahora"
+    const now = nowMinutes();
+    let nextId = null;
+    if (d.is_today) {
+      const nx = active
+        .filter(b => b.status !== 'completed' && endMin(b) > now)
+        .sort((a, b) => toMin(a.time) - toMin(b.time))[0];
+      if (nx) nextId = nx.id;
+    }
+
+    let timeline = '';
+    let nowPlaced = !d.is_today;
+    withGaps.forEach(it => {
+      if (!nowPlaced && it.start > now) { timeline += nowLine(now); nowPlaced = true; }
+      timeline += it.kind === 'booking' ? bookingCard(it.b, d, it.b.id === nextId)
+        : it.kind === 'block' ? blockCard(it.u)
+        : freeRow(it.start, it.end);
+    });
+    if (!nowPlaced && withGaps.length) timeline += nowLine(now);
+
+    const empty = !items.length
+      ? `<div class="bg-jet-card border border-white/5 rounded-xl p-8 text-center">
+          <p class="text-smoke/50 text-sm">Sin citas este día</p>
+          <p class="text-smoke/30 text-xs mt-1">${esc(scheduleLine(d))}</p>
+        </div>` : '';
+
+    return `
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <h2 class="text-lg font-serif font-semibold text-white mr-1">${longDate(d.date)}</h2>
+        <div class="flex flex-wrap gap-1.5 text-[0.6rem] font-semibold uppercase tracking-wider">${dayChips(d)}</div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mb-3">
+        ${kpi('Por atender', d.totals.active)}
+        ${kpi('Atendidas', d.totals.completed)}
+        ${kpi('Valor del día', money(d.totals.value), true)}
+      </div>
+      <p class="text-[0.7rem] text-smoke/40 tracking-wide mb-4">${esc(scheduleLine(d))}</p>
+      <div class="space-y-2">${empty || timeline}</div>
+      ${cancelled.length ? `
+        <details class="mt-4 bg-jet-card border border-white/5 rounded-xl">
+          <summary class="cursor-pointer select-none px-4 py-3 text-xs text-smoke/50 uppercase tracking-widest">Canceladas (${cancelled.length})</summary>
+          <div class="px-3 pb-3 space-y-2">${cancelled.map(b => bookingCard(b, d, false)).join('')}</div>
+        </details>` : ''}
+    `;
+  }
+
+  function kpi(label, value, small) {
+    return `<div class="kpi-card !p-3 min-w-0">
+      <p class="text-[0.55rem] tracking-widest uppercase text-smoke/40 font-semibold truncate">${label}</p>
+      <p class="${small ? 'text-sm sm:text-base' : 'text-xl'} font-bold text-white mt-1 tabular-nums truncate">${value}</p>
+    </div>`;
+  }
+
+  function bookingCard(b, d, isNext) {
+    const st = STATUS[b.status] || STATUS.pending;
+    const past = d.is_today && endMin(b) <= nowMinutes() && b.status !== 'cancelled';
+    const flags = [];
+    if (b.is_walk_in) flags.push('<span class="px-1.5 py-0.5 rounded bg-white/10 text-smoke/60">Walk-in</span>');
+    if (b.in_block) flags.push('<span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">Dentro de un bloqueo</span>');
+    return `
+      <div role="button" tabindex="0" data-booking="${b.id}" data-date="${d.date}"
+        class="ag-card cursor-pointer w-full text-left flex gap-3 rounded-xl border ${isNext ? 'border-gold/60 shadow-[0_0_0_1px_rgba(212,175,55,0.25)]' : 'border-white/5'} bg-jet-card p-3 sm:p-4 ${past || b.status === 'cancelled' ? 'opacity-60' : ''}"
+        style="border-left: 3px solid ${st.bar};">
+        <div class="w-[4.75rem] sm:w-20 flex-shrink-0 whitespace-nowrap">
+          <p class="text-sm font-bold text-white tabular-nums">${fmt12(b.time)}</p>
+          <p class="text-[0.65rem] text-smoke/40 tabular-nums">${fmt12(b.end_time)}</p>
+          <p class="text-[0.6rem] text-smoke/30 mt-0.5">${b.duration} min</p>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-semibold text-white truncate">${esc(b.client_name)}</p>
+            <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[0.55rem] font-bold uppercase tracking-wider ${st.chip}">${st.label}</span>
+          </div>
+          <p class="text-xs text-gold/80 truncate mt-0.5">${esc(b.service_name || 'Servicio')} · ${money(b.price)}</p>
+          ${isNext ? '<p class="text-[0.6rem] text-gold uppercase tracking-widest font-bold mt-1">Próxima cita</p>' : ''}
+          ${flags.length ? `<p class="text-[0.6rem] mt-1.5 flex flex-wrap gap-1">${flags.join('')}</p>` : ''}
+          ${b.client_phone ? `<div class="mt-2">${window.phoneLinks(b.client_phone)}</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function blockCard(u) {
+    return `
+      <div class="ag-blocked-pattern rounded-xl border border-dashed border-red-500/30 p-3 sm:p-4 flex gap-3">
+        <div class="w-[4.75rem] sm:w-20 flex-shrink-0 whitespace-nowrap">
+          ${u.all_day ? '<p class="text-xs font-bold text-red-300">Todo el día</p>' : `
+          <p class="text-sm font-bold text-red-300 tabular-nums">${fmt12(u.start)}</p>
+          <p class="text-[0.65rem] text-red-300/60 tabular-nums">${fmt12(u.end)}</p>`}
+        </div>
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-red-200">Bloqueado</p>
+          <p class="text-xs text-smoke/50 break-words">${u.reason ? esc(u.reason) : 'Sin reservas en esta franja'}</p>
+        </div>
+      </div>`;
+  }
+
+  function freeRow(start, end) {
+    return `<div class="flex items-center gap-3 px-3 py-1.5 text-[0.65rem] text-smoke/30">
+      <span class="w-[4.75rem] sm:w-20 flex-shrink-0 tabular-nums whitespace-nowrap">${fmt12(fromMin(start))}</span>
+      <span class="flex-1 border-t border-dashed border-white/10"></span>
+      <span class="uppercase tracking-widest">Libre hasta ${fmt12(fromMin(end))}</span>
+    </div>`;
+  }
+
+  function nowLine(now) {
+    return `<div class="flex items-center gap-2 py-1" aria-label="Hora actual">
+      <span class="text-[0.6rem] font-bold text-red-400 tabular-nums w-[4.75rem] sm:w-20 whitespace-nowrap">${fmt12(fromMin(now))}</span>
+      <span class="w-2 h-2 rounded-full bg-red-500"></span>
+      <span class="flex-1 h-px bg-red-500/60"></span>
+    </div>`;
+  }
+
+  function renderWeek() {
+    const days = state.week.days;
+    const totals = days.reduce((a, d) => ({
+      active: a.active + d.totals.active,
+      completed: a.completed + d.totals.completed,
+      value: a.value + d.totals.value,
+    }), { active: 0, completed: 0, value: 0 });
+    return `
+      <div class="grid grid-cols-3 gap-2 mb-4">
+        ${kpi('Por atender', totals.active)}
+        ${kpi('Atendidas', totals.completed)}
+        ${kpi('Valor semana', money(totals.value), true)}
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-7 gap-2">
+        ${days.map(d => {
+          const list = d.bookings.filter(b => b.status !== 'cancelled');
+          const rows = [
+            ...d.blocks.map(u => ({
+              t: u.all_day ? -1 : toMin(u.start),
+              html: `<div class="ag-blocked-pattern rounded-md border border-dashed border-red-500/30 px-2 py-1.5 text-[0.65rem] text-red-300">${u.all_day ? 'Bloqueado todo el día' : `Bloqueado ${fmt12(u.start)} – ${fmt12(u.end)}`}</div>`,
+            })),
+            ...list.map(b => {
+              const st = STATUS[b.status] || STATUS.pending;
+              return {
+                t: toMin(b.time),
+                html: `<div role="button" tabindex="0" data-booking="${b.id}" data-date="${d.date}" class="ag-card cursor-pointer w-full text-left rounded-md bg-jet-lighter border border-white/5 px-2 py-1.5" style="border-left:3px solid ${st.bar}">
+                  <span class="block text-[0.65rem] text-smoke/50 tabular-nums whitespace-nowrap">${fmt12(b.time)} · ${b.duration} min</span>
+                  <span class="block text-xs text-white truncate">${esc(b.client_name)}</span>
+                  <span class="block text-[0.6rem] text-gold/70 truncate">${esc(b.service_name || '')}</span>
+                </div>`,
+              };
+            }),
+          ].sort((a, b) => a.t - b.t);
+          const note = !d.window && !d.shop_block ? 'Descanso' : (d.shop_block && d.shop_block.all_day ? 'Local cerrado' : '');
+          return `<section class="bg-jet-card border ${d.is_today ? 'border-gold/40' : 'border-white/5'} rounded-xl p-2.5 min-w-0">
+            <button type="button" data-goto="${d.date}" class="w-full flex items-center justify-between mb-2 text-left">
+              <span class="text-xs font-semibold text-white">${DAY_LONG[d.weekday].slice(0, 3)} ${parseISO(d.date).getDate()}</span>
+              <span class="text-[0.6rem] text-smoke/40">${d.totals.active ? d.totals.active + ' cita(s)' : esc(note)}</span>
+            </button>
+            ${d.holiday ? `<p class="text-[0.6rem] text-purple-300 mb-1.5">Festivo · ${esc(d.holiday)}</p>` : ''}
+            <div class="space-y-1.5">${rows.length ? rows.map(r => r.html).join('') : '<p class="text-[0.65rem] text-smoke/25 py-2 text-center">—</p>'}</div>
+          </section>`;
+        }).join('')}
+      </div>`;
+  }
+
+  // ── Detalle (bottom sheet) ──
+  function openSheet(id, dateStr) {
+    const d = dayData(dateStr);
+    const b = d && d.bookings.find(x => String(x.id) === String(id));
+    if (!b) return;
+    const st = STATUS[b.status] || STATUS.pending;
+    const row = (k, v) => `<div class="flex justify-between gap-4 py-2 border-b border-white/5"><span class="text-smoke/40 text-xs uppercase tracking-wider">${k}</span><span class="text-white text-sm text-right">${v}</span></div>`;
+    document.getElementById('ag-sheet-body').innerHTML = `
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div class="min-w-0">
+          <h3 id="ag-sheet-title" class="text-xl font-serif font-bold text-white break-words">${esc(b.client_name)}</h3>
+          <p class="text-xs text-gold mt-1">${esc(b.service_name || 'Servicio')}</p>
+        </div>
+        <span class="flex-shrink-0 px-2.5 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-wider ${st.chip}">${st.label}</span>
+      </div>
+      ${b.in_block ? '<p class="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-xs px-3 py-2">Esta cita cae dentro de un bloqueo del barbero. Confirma con el cliente o reagéndala.</p>' : ''}
+      <div class="mb-4">${b.client_phone ? window.phoneLinks(b.client_phone, { size: 'lg' }) : '<span class="text-smoke/30 text-sm italic">El cliente no dejó teléfono</span>'}</div>
+      ${row('Fecha', esc(longDate(d.date)))}
+      ${row('Hora', `${fmt12(b.time)} – ${fmt12(b.end_time)} (${b.duration} min)`)}
+      ${row('Precio', money(b.price))}
+      ${b.is_walk_in ? row('Tipo', 'Walk-in (presencial)') : ''}
+      ${b.client_email ? row('Correo', `<a class="hover:text-gold break-all" href="mailto:${esc(b.client_email)}">${esc(b.client_email)}</a>`) : ''}
+      ${b.notes ? `<div class="mt-3"><p class="text-smoke/40 text-xs uppercase tracking-wider mb-1">Notas</p><p class="text-sm text-smoke/80 whitespace-pre-wrap break-words">${esc(b.notes)}</p></div>` : ''}
+      <div class="grid grid-cols-2 gap-2 mt-5">
+        <a href="/admin-panel/bookings/" class="h-11 rounded-lg border border-white/10 text-smoke/70 text-xs uppercase tracking-widest flex items-center justify-center hover:text-gold">Ir a Reservas</a>
+        <button type="button" data-close class="h-11 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest">Cerrar</button>
+      </div>`;
+    document.getElementById('ag-sheet').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSheet() {
+    document.getElementById('ag-sheet').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  // ── Navegación ──
+  function goToDate(dateStr, view) {
+    const prevMonday = mondayOf(state.date);
+    state.date = dateStr;
+    if (view) state.view = view;
+    if (mondayOf(state.date) !== prevMonday) load(); else { syncUrl(); render(); }
+  }
+
+  document.addEventListener('click', e => {
+    const dayBtn = e.target.closest('#ag-week [data-date]');
+    if (dayBtn) { goToDate(dayBtn.dataset.date, 'day'); return; }
+    const go = e.target.closest('[data-goto]');
+    if (go) { goToDate(go.dataset.goto, 'day'); window.scrollTo({ top: 0 }); return; }
+    const card = e.target.closest('[data-booking]');
+    if (card && !e.target.closest('a')) { openSheet(card.dataset.booking, card.dataset.date); return; }
+    if (e.target.closest('#ag-sheet [data-close]')) { closeSheet(); return; }
+    const vb = e.target.closest('.ag-view-btn');
+    if (vb) { state.view = vb.dataset.view; syncUrl(); render(); return; }
+    const pick = e.target.closest('#ag-barber-picker [data-barber]');
+    if (pick) { state.barberId = pick.dataset.barber; state.week = null; load(); return; }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeSheet(); return; }
+    const card = e.target.closest && e.target.closest('[data-booking]');
+    if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSheet(card.dataset.booking, card.dataset.date); }
+  });
+
+  document.getElementById('ag-prev').onclick = () => goToDate(addDays(state.date, -7));
+  document.getElementById('ag-next').onclick = () => goToDate(addDays(state.date, 7));
+  document.getElementById('ag-today').onclick = () => goToDate(isoDate(new Date()), 'day');
+
+  // Deslizar a los lados en la vista de día cambia de día.
+  let touchX = null, touchY = null;
+  const bodyEl = document.getElementById('ag-body');
+  bodyEl.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
+  bodyEl.addEventListener('touchend', e => {
+    if (touchX === null || state.view !== 'day') return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    const dy = e.changedTouches[0].clientY - touchY;
+    touchX = null;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    goToDate(addDays(state.date, dx < 0 ? 1 : -1));
+  }, { passive: true });
+
+  // Refresco: cada 90 s y al volver a la pestaña (citas nuevas sin recargar).
+  setInterval(() => { if (!document.hidden) load({ silent: true }); }, 90000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load({ silent: true }); });
+
+  load();
+})();
 </script>
 {% endblock %}

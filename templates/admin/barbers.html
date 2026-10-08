@@ -555,11 +555,11 @@ function deleteBarber() {
         </div>
 
         <label class="flex items-center gap-2 cursor-pointer select-none py-2">
-          <input type="checkbox" id="unavail-bulk-allday" class="accent-amber-400 w-5 h-5">
+          <input type="checkbox" id="unavail-bulk-allday" class="accent-amber-400 w-5 h-5" checked>
           <span class="text-sm text-smoke/80">Día completo (12:00 AM – 11:59 PM)</span>
         </label>
 
-        <div class="grid grid-cols-2 gap-3" id="unavail-bulk-hours">
+        <div class="grid grid-cols-2 gap-3 hidden" id="unavail-bulk-hours">
           <div>
             <label class="admin-label">Hora desde</label>
             <input type="time" id="unavail-bulk-start" class="admin-input">
@@ -581,7 +581,7 @@ function deleteBarber() {
             <button type="button" data-day="5" class="weekday-btn">S</button>
             <button type="button" data-day="6" class="weekday-btn">D</button>
           </div>
-          <p class="text-[0.65rem] text-smoke/40 mt-2 leading-snug">Toca para desactivar un día (ej. tu día de descanso).</p>
+          <p class="text-[0.65rem] text-smoke/40 mt-2 leading-snug">Toca para desactivar un día. <span class="text-amber-300/80">Ojo: los días desmarcados quedan ABIERTOS para reservas en la web</span> (domingos y festivos se atiende de 2 a 7 p.m.).</p>
         </div>
 
         <div>
@@ -591,6 +591,7 @@ function deleteBarber() {
 
         <div id="unavail-bulk-preview" class="bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-2.5 text-sm text-amber-300 text-center sm:text-left">
           Se bloquearán <span id="unavail-bulk-preview-count" class="font-bold text-amber-200">0</span> día(s).
+          <span id="unavail-bulk-preview-open" class="block text-[0.7rem] text-red-300 mt-1 hidden"></span>
         </div>
 
         <div class="unavail-actions flex flex-col sm:flex-row gap-2 pt-2">
@@ -600,9 +601,18 @@ function deleteBarber() {
       </form>
     </div>
 
+    <!-- Citas activas que caen dentro de un bloqueo -->
+    <div id="unavail-conflicts-wrap" class="px-4 sm:px-6 pt-4 hidden">
+      <div class="rounded-lg border border-red-500/30 bg-red-500/5 p-3 sm:p-4">
+        <p class="text-[0.65rem] text-red-300 uppercase tracking-widest font-semibold">Citas activas dentro de los bloqueos</p>
+        <p class="text-[0.7rem] text-smoke/50 mt-1 leading-snug">Siguen en la agenda (y reciben recordatorio) aunque el barbero esté bloqueado. Llama al cliente y reagenda o cancela.</p>
+        <div id="unavail-conflicts" class="space-y-2 mt-3"></div>
+      </div>
+    </div>
+
     <!-- Lista de bloqueos existentes -->
     <div class="px-4 sm:px-6 py-4 pb-8 sm:pb-6 flex-1">
-      <p class="text-[0.65rem] text-smoke/40 uppercase tracking-widest font-semibold mb-3">Bloqueos registrados</p>
+      <p class="text-[0.65rem] text-smoke/40 uppercase tracking-widest font-semibold mb-3">Bloqueos vigentes (de hoy en adelante)</p>
       <div id="unavail-list" class="space-y-2">
         <div class="text-center text-smoke/30 text-xs py-4">Cargando...</div>
       </div>
@@ -634,8 +644,8 @@ function openUnavailability(barberId, barberName) {
   document.getElementById('unavail-bulk-start').value = '';
   document.getElementById('unavail-bulk-end').value = '';
   document.getElementById('unavail-bulk-reason').value = '';
-  document.getElementById('unavail-bulk-allday').checked = false;
-  document.getElementById('unavail-bulk-hours').classList.remove('hidden');
+  document.getElementById('unavail-bulk-allday').checked = true;
+  document.getElementById('unavail-bulk-hours').classList.add('hidden');
   // Todos los días activos por defecto
   document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
   // Reset a la tab "Un día"
@@ -704,47 +714,160 @@ function _refreshBulkPreview() {
     selected.add(parseInt(b.dataset.day, 10));
   });
   let count = 0;
+  const openDays = [];
   const one = 24 * 60 * 60 * 1000;
+  const dayNames = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
   // JS getDay(): 0=Sunday..6=Saturday. Convertir a ISO: 0=Mon..6=Sun
   for (let d = new Date(from); d <= to; d = new Date(d.getTime() + one)) {
     const jsDay = d.getDay();
     const isoDay = (jsDay + 6) % 7;
     if (selected.has(isoDay)) count++;
+    else openDays.push(isoDay);
   }
   countEl.textContent = count;
+  const openEl = document.getElementById('unavail-bulk-preview-open');
+  if (openEl) {
+    if (openDays.length) {
+      const names = [...new Set(openDays)].sort().map(i => dayNames[i]).join(', ');
+      openEl.textContent = `⚠ ${openDays.length} día(s) del rango quedan ABIERTOS para reservas (${names}).`;
+      openEl.classList.remove('hidden');
+    } else {
+      openEl.classList.add('hidden');
+    }
+  }
+}
+
+function _todayLocal() {
+  const _d = new Date();
+  return new Date(_d.getTime() - _d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+}
+
+function _daysBetween(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+
+// Cada día bloqueado es una fila en la BD. Para que se lea "bloqueado del X al
+// Y" se agrupan las filas con la misma franja y motivo cuyas fechas están a una
+// semana o menos (así un rango sin domingos sigue siendo UN grupo).
+function _groupBlocks(items) {
+  const groups = [];
+  items.forEach(u => {
+    const g = groups[groups.length - 1];
+    if (g && g.start_time === u.start_time && g.end_time === u.end_time
+        && g.reason === u.reason && _daysBetween(g.to, u.date) <= 7) {
+      g.to = u.date;
+      g.ids.push(u.id);
+    } else {
+      groups.push({ from: u.date, to: u.date, start_time: u.start_time, end_time: u.end_time,
+                    all_day: u.all_day, reason: u.reason, ids: [u.id] });
+    }
+  });
+  return groups;
 }
 
 function loadUnavailabilities(barberId) {
   const list = document.getElementById('unavail-list');
   list.innerHTML = '<div class="text-center text-smoke/30 text-xs py-4">Cargando...</div>';
-  fetch(`/api/admin/barbers/${barberId}/unavailability/`)
-    .then(r => r.json())
+  loadUnavailConflicts(barberId);
+  fetch(`/api/admin/barbers/${barberId}/unavailability/?date_from=${_todayLocal()}`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
     .then(items => {
       if (!items.length) {
-        list.innerHTML = '<div class="text-center text-smoke/30 text-xs py-4">Sin bloqueos registrados</div>';
+        list.innerHTML = '<div class="text-center text-smoke/30 text-xs py-4">Sin bloqueos vigentes</div>';
         return;
       }
-      list.innerHTML = items.map(u => `
+      window.__unavailGroups = _groupBlocks(items);
+      list.innerHTML = window.__unavailGroups.map((g, idx) => {
+        const span = _daysBetween(g.from, g.to) + 1;
+        const holes = span - g.ids.length;
+        const range = g.from === g.to ? formatDate(g.from) : `${formatDate(g.from)} → ${formatDate(g.to)}`;
+        const hours = g.all_day ? 'Día completo' : `${formatTime12(g.start_time)} – ${formatTime12(g.end_time)}`;
+        return `
         <div class="flex items-start justify-between gap-3 bg-jet rounded-lg px-3 sm:px-4 py-3 border border-white/5">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
-              <span class="text-white text-xs sm:text-sm font-semibold">${formatDate(u.date)}</span>
-              <span class="text-amber-400 text-xs font-mono whitespace-nowrap">${formatTime12(u.start_time)} – ${formatTime12(u.end_time)}</span>
+              <span class="text-white text-xs sm:text-sm font-semibold">${range}</span>
+              <span class="text-amber-400 text-xs font-mono whitespace-nowrap">${hours}</span>
             </div>
-            ${u.reason ? `<p class="text-smoke/40 text-[0.65rem] mt-1.5 ml-3.5 break-words">${u.reason}</p>` : ''}
+            <p class="text-smoke/40 text-[0.65rem] mt-1.5 ml-3.5">
+              ${g.ids.length} día(s) bloqueado(s)${holes > 0 ? ` · <span class="text-red-300">${holes} día(s) del rango quedan abiertos</span>` : ''}
+            </p>
+            ${g.reason ? `<p class="text-smoke/40 text-[0.65rem] mt-1 ml-3.5 break-words">${window.esc(g.reason)}</p>` : ''}
           </div>
-          <button onclick="deleteUnavailability(${u.id})" title="Eliminar bloqueo"
+          <button onclick="deleteUnavailGroup(${idx})" title="Eliminar bloqueo"
                   class="flex-shrink-0 w-9 h-9 sm:w-8 sm:h-8 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors flex items-center justify-center"
                   style="touch-action:manipulation;">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
     })
     .catch(() => {
       list.innerHTML = '<div class="text-center text-red-400/60 text-xs py-4">Error al cargar bloqueos</div>';
     });
+}
+
+function loadUnavailConflicts(barberId) {
+  const wrap = document.getElementById('unavail-conflicts-wrap');
+  const box = document.getElementById('unavail-conflicts');
+  fetch(`/api/admin/barbers/${barberId}/unavailability/conflicts/`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(items => {
+      if (!items.length) { wrap.classList.add('hidden'); box.innerHTML = ''; return; }
+      wrap.classList.remove('hidden');
+      box.innerHTML = items.map(c => {
+        const cause = c.forced
+          ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Agendada a la fuerza</span>'
+          : (c.created_before_block
+              ? '<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">Ya existía antes del bloqueo</span>'
+              : '<span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">Creada después del bloqueo</span>');
+        return `
+        <div class="bg-jet rounded-lg px-3 py-3 border border-white/5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-white text-sm font-semibold truncate">${window.esc(c.client_name)}</p>
+              <p class="text-[0.7rem] text-smoke/60">${formatDate(c.date)} · ${formatTime12(c.time)} – ${formatTime12(c.end_time)} · ${window.esc(c.service_name || 'Servicio')}</p>
+              <p class="text-[0.6rem] mt-1.5">${cause}${c.is_walk_in ? ' <span class="px-1.5 py-0.5 rounded bg-white/10 text-smoke/60">Walk-in</span>' : ''}</p>
+            </div>
+            <button onclick="cancelConflictBooking(${c.id})" class="flex-shrink-0 h-9 px-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-300 text-[0.65rem] uppercase tracking-wider hover:bg-red-500/20">Cancelar</button>
+          </div>
+          <div class="mt-2">${window.phoneLinks(c.client_phone)}</div>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => { wrap.classList.add('hidden'); });
+}
+
+function cancelConflictBooking(bookingId) {
+  if (!confirm('¿Cancelar esta cita? Recuerda avisarle al cliente (puedes llamarlo o escribirle desde aquí).')) return;
+  fetch(`/api/admin/bookings/${bookingId}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify({ status: 'cancelled' }),
+  })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) { alert('Error: ' + (data.error || 'No se pudo cancelar la cita.')); return; }
+      window.showToast('Cita cancelada', 'success');
+      if (currentUnavailBarberId) loadUnavailConflicts(currentUnavailBarberId);
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+function deleteUnavailGroup(idx) {
+  const g = (window.__unavailGroups || [])[idx];
+  if (!g || !currentUnavailBarberId) return;
+  const label = g.from === g.to ? formatDate(g.from) : `${formatDate(g.from)} → ${formatDate(g.to)}`;
+  if (g.ids.length > 1 && !confirm(`¿Quitar el bloqueo de ${label} (${g.ids.length} días)? El barbero quedará disponible para reservas esos días.`)) return;
+  fetch(`/api/admin/barbers/${currentUnavailBarberId}/unavailability/bulk-delete/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify({ ids: g.ids }),
+  }).then(r => {
+    if (r.ok) loadUnavailabilities(currentUnavailBarberId);
+    else alert('Error al eliminar el bloqueo');
+  }).catch(() => alert('Error de conexión'));
 }
 
 function formatDate(dateStr) {
@@ -762,20 +885,6 @@ function formatTime12(timeStr) {
   const suffix = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
   return `${h12}:${m} ${suffix}`;
-}
-
-function deleteUnavailability(unavailId) {
-  if (!currentUnavailBarberId) return;
-  fetch(`/api/admin/barbers/${currentUnavailBarberId}/unavailability/${unavailId}/`, {
-    method: 'DELETE',
-    headers: { 'X-CSRFToken': getCSRF() },
-  }).then(r => {
-    if (r.ok || r.status === 204) {
-      loadUnavailabilities(currentUnavailBarberId);
-    } else {
-      alert('Error al eliminar el bloqueo');
-    }
-  }).catch(() => alert('Error de conexión'));
 }
 
 document.getElementById('unavail-form').addEventListener('submit', function(e) {
@@ -816,7 +925,9 @@ document.getElementById('unavail-form').addEventListener('submit', function(e) {
     // Mostrar una sola advertencia si el bloqueo cae sobre reservas activas.
     // El bloqueo se aplica igual; el aviso es solo para que se contacte al cliente.
     if (data.warning) {
-      alert(data.warning);
+      alert(data.warning + '\n\nLa cita aparece abajo en "Citas activas dentro de los bloqueos".');
+    } else {
+      window.showToast('Bloqueo creado', 'success');
     }
     document.getElementById('unavail-form').reset();
     const _d = new Date();
@@ -907,23 +1018,20 @@ document.getElementById('unavail-bulk-form').addEventListener('submit', function
       alert('Error: ' + (data.error || JSON.stringify(data)));
       return;
     }
-    let msg = `Se crearon ${data.created} bloqueo(s).`;
     if (data.summary_warning) {
-      msg += '\n\n' + data.summary_warning;
-      if (data.warnings && data.warnings.length) {
-        const sample = data.warnings.slice(0, 5).join('\n');
-        msg += '\n\nDías afectados:\n' + sample;
-        if (data.warnings.length > 5) msg += `\n…y ${data.warnings.length - 5} más.`;
-      }
+      // La lista completa queda en "Citas activas dentro de los bloqueos".
+      alert(data.summary_warning);
+    } else {
+      window.showToast(`Se crearon ${data.created} bloqueo(s)`, 'success');
     }
-    alert(msg);
     document.getElementById('unavail-bulk-form').reset();
     const _d = new Date();
     const today = new Date(_d.getTime() - _d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
     document.getElementById('unavail-bulk-from').value = today;
     document.getElementById('unavail-bulk-to').value = today;
     document.querySelectorAll('#unavail-bulk-weekdays .weekday-btn').forEach(b => b.classList.add('is-active'));
-    document.getElementById('unavail-bulk-hours').classList.remove('hidden');
+    document.getElementById('unavail-bulk-allday').checked = true;
+    document.getElementById('unavail-bulk-hours').classList.add('hidden');
     _refreshBulkPreview();
     loadUnavailabilities(currentUnavailBarberId);
   })

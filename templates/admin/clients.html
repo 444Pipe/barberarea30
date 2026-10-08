@@ -77,7 +77,7 @@ function loadClients() {
       tbody.innerHTML = clients.map(c => `
         <tr class="hover:bg-white/[0.02]">
           <td class="px-4 py-3 text-white font-medium">${esc(c.name)}</td>
-          <td class="px-4 py-3 text-smoke/60">${esc(c.phone)}</td>
+          <td class="px-4 py-3 text-smoke/60">${window.phoneLinks(c.phone)}</td>
           <td class="px-4 py-3 text-smoke/80">${esc(c.total_visits)}</td>
           <td class="px-4 py-3 text-emerald-400 font-medium">$${Number(c.total_spent||0).toLocaleString('es-CO')}</td>
           <td class="px-4 py-3 text-smoke/60">${esc(c.last_visit)}</td>
@@ -102,7 +102,7 @@ function viewHistory(phone) {
       document.getElementById('client-modal-name').textContent = data.name;
       const container = document.getElementById('client-history');
       container.innerHTML = `
-        <div class="text-xs text-smoke/40 mb-2">${esc(data.phone)} · ${esc(data.total_visits)} visitas</div>
+        <div class="text-xs text-smoke/40 mb-2 flex items-center gap-2 flex-wrap">${window.phoneLinks(data.phone)} <span>· ${esc(data.total_visits)} visitas</span></div>
         ${data.history.map(h => `
           <div class="flex items-center justify-between py-2 border-b border-white/5 text-xs">
             <div>

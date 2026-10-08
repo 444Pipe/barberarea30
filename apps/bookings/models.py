@@ -95,6 +95,39 @@ class Booking(models.Model):
                     f'Por favor elige otro horario.'
                 )
 
+            # Bloqueo de inactividad del barbero: solo al dejar la cita ACTIVA en
+            # una franja nueva (crear, mover o reactivar). Una cita que ya estaba
+            # ahí debe poder editarse o cancelarse aunque luego la cubra un bloqueo.
+            if self.status in ('pending', 'confirmed'):
+                previous = None
+                if self.pk:
+                    previous = Booking.objects.filter(pk=self.pk).values(
+                        'barber_id', 'date', 'time', 'status'
+                    ).first()
+                slot_is_new = previous is None or (
+                    previous['barber_id'] != self.barber_id
+                    or previous['date'] != self.date
+                    or previous['time'] != self.time
+                    or previous['status'] not in ('pending', 'confirmed')
+                )
+                if slot_is_new:
+                    from .validators import unavailability_conflict
+                    err = unavailability_conflict(
+                        self.barber, self.date, self.time, self.duration_minutes
+                    )
+                    if err:
+                        raise ValidationError(err)
+
+    @property
+    def phone_digits(self):
+        """Teléfono del cliente solo con dígitos, con 57 si es un celular local
+        de 10 dígitos. Para armar enlaces tel:+… y wa.me/… en las plantillas."""
+        import re
+        digits = re.sub(r'[^0-9]', '', self.client_phone or '')
+        if len(digits) == 10 and not digits.startswith('57'):
+            digits = '57' + digits
+        return digits
+
     def __str__(self):
         return f'{self.client_name} — {self.service} ({self.date} {self.time})'
 

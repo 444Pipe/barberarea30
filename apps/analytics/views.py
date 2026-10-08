@@ -191,6 +191,7 @@ def dashboard_stats_view(request):
             'id': b.id,
             'time': b.time.strftime('%I:%M %p'),
             'client': b.client_name,
+            'phone': b.client_phone,
             'service': b.service.name if b.service else '',
             'status': b.status,
             'price': int(b.price),

@@ -137,8 +137,12 @@
 .fc {
   --fc-border-color: rgba(255,255,255,0.05);
   --fc-today-bg-color: rgba(212, 175, 55, 0.03);
-  --fc-page-bg-color: transparent;
+  /* Fondo opaco: el encabezado de día "sticky" de la vista lista se veía
+     transparente y el contenido se le cruzaba por debajo al hacer scroll. */
+  --fc-page-bg-color: #111111;
   --fc-neutral-bg-color: transparent;
+  /* El hover por defecto (#f5f5f5) dejaba el texto claro sobre fondo claro. */
+  --fc-list-event-hover-bg-color: rgba(212, 175, 55, 0.08);
 }
 
 .fc .fc-toolbar-title {

@@ -58,6 +58,12 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
           <span>Dashboard Diario</span>
         </a>
+        {% if user.barber_profile %}
+        <a href="/admin-panel/barbers/my-agenda/" class="sidebar-link {% if active_section == 'my_agenda' %}active{% endif %}" data-section="my_agenda">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Mi Agenda</span>
+        </a>
+        {% endif %}
         <a href="/admin-panel/calendar/" class="sidebar-link {% if active_section == 'calendar' %}active{% endif %}" data-section="calendar">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
           <span>Calendario</span>
@@ -174,7 +180,7 @@
           </div>
           <div class="min-w-0">
             <div class="text-sm font-medium text-white truncate">{{ user_name }}</div>
-            <div class="text-[10px] tracking-widest uppercase text-smoke/40">{{ user_role }}</div>
+            <div class="text-[10px] tracking-widest uppercase text-smoke/40">{% if user_role == 'superadmin' %}Socio{% elif user_role == 'operational_admin' %}Admin operativo{% elif user_role == 'admin' %}Administrador{% elif user_role == 'barber' %}Barbero{% else %}{{ user_role }}{% endif %}</div>
           </div>
         </div>
         <a href="/admin-panel/logout/" class="flex items-center gap-2 text-xs text-red-400/70 hover:text-red-400 transition-colors tracking-wider uppercase mb-3">
@@ -274,6 +280,43 @@
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    // Teléfono del cliente: lo ve TODO el personal con acceso al panel
+    // (barberos incluidos) y se puede tocar para llamar o abrir WhatsApp.
+    // El número llega de un formulario público: en los href solo van dígitos y
+    // el texto visible va escapado.
+    window.phoneDigits = function (phone) {
+      let digits = String(phone == null ? '' : phone).replace(/\D/g, '');
+      if (digits.length === 10 && !digits.startsWith('57')) digits = '57' + digits;
+      return digits;
+    };
+    window.phoneLinks = function (phone, opts) {
+      opts = opts || {};
+      const raw = String(phone == null ? '' : phone).trim();
+      const digits = window.phoneDigits(raw);
+      if (!digits) return '<span class="text-smoke/30 text-xs italic">Sin teléfono</span>';
+      const big = opts.size === 'lg';
+      const btn = big
+        ? 'inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-lg text-xs font-semibold tracking-wider uppercase border transition-colors'
+        : 'inline-flex items-center justify-center w-7 h-7 rounded-full border transition-colors';
+      const ico = big ? 'w-4 h-4' : 'w-3.5 h-3.5';
+      const num = opts.hideNumber ? '' :
+        `<a href="tel:+${digits}" onclick="event.stopPropagation()" class="${big ? 'block text-lg mb-2' : 'text-sm'} text-smoke/80 tabular-nums hover:text-gold">${window.esc(raw)}</a>`;
+      const wrap = big ? 'grid grid-cols-2 gap-2' : 'inline-flex items-center gap-2 flex-wrap';
+      return `${big ? `<div>${num}` : ''}<span class="${wrap}">
+        ${big ? '' : num}
+        <a href="tel:+${digits}" onclick="event.stopPropagation()" title="Llamar" aria-label="Llamar ${window.esc(raw)}"
+           class="${btn} bg-sky-500/15 hover:bg-sky-500 text-sky-300 hover:text-white border-sky-500/30">
+          <svg class="${ico}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          ${big ? '<span>Llamar</span>' : ''}
+        </a>
+        <a href="https://wa.me/${digits}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="WhatsApp" aria-label="WhatsApp ${window.esc(raw)}"
+           class="${btn} bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white border-emerald-500/30">
+          <svg class="${ico}" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.031-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.297-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.611-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 01-5.03-1.378l-.36-.214-3.742.982.999-3.648-.235-.374a9.86 9.86 0 01-1.511-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.886 9.884M20.52 3.449C18.24 1.245 15.24.013 12.045 0 5.463 0 .104 5.334.101 11.892c0 2.096.549 4.14 1.589 5.945L0 24l6.335-1.652a11.9 11.9 0 005.71 1.447h.005c6.581 0 11.94-5.335 11.943-11.893a11.82 11.82 0 00-3.473-8.413"/></svg>
+          ${big ? '<span>WhatsApp</span>' : ''}
+        </a>
+      </span>${big ? '</div>' : ''}`;
     };
 
     // Toast flotante reutilizable para feedback consistente en todo el panel.

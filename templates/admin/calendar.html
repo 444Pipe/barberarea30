@@ -2,8 +2,9 @@
 {% block title %}Calendario{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<!-- El bundle no trae idiomas: sin esto los botones salían en inglés ("today", "week"). -->
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales/es.global.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -153,14 +154,26 @@ document.addEventListener('DOMContentLoaded', function() {
         id: String(b.id),
         title: `${b.client_name} — ${b.service_name || ''}`,
         start: `${b.date}T${b.time}`,
+        // Sin `end`, FullCalendar pintaba todo de 1 h (falsos cruces y huecos).
+        end: bookingEnd(b),
         backgroundColor: b.barber_color || '#D4AF37',
         borderColor: b.barber_color || '#D4AF37',
         textColor: '#0a0a0a',
+        classNames: b.status === 'cancelled' ? ['opacity-40', 'line-through'] : [],
         extendedProps: b,
       }));
       initCalendar();
     });
 });
+
+// Fin real de la cita (fecha local, sin zona: FullCalendar la toma como local).
+function bookingEnd(b) {
+  const [y, mo, d] = b.date.split('-').map(Number);
+  const [h, mi] = b.time.split(':').map(Number);
+  const end = new Date(y, mo - 1, d, h, mi + (b.duration_minutes || 60));
+  const p = n => String(n).padStart(2, '0');
+  return `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}T${p(end.getHours())}:${p(end.getMinutes())}`;
+}
 
 function initCalendar() {
   const calendarEl = document.getElementById('admin-calendar');
@@ -177,6 +190,7 @@ function initCalendar() {
     },
     events: allEvents,
     editable: userCanEdit,
+    eventDurationEditable: false,
     eventClick: function(info) {
       info.jsEvent.preventDefault();
       openModal(info.event.extendedProps);
@@ -218,7 +232,7 @@ function openModal(data) {
   currentBookingId = data.id;
   document.getElementById('modal-id').textContent = `Reserva #${data.id}`;
   document.getElementById('modal-client').textContent = data.client_name;
-  document.getElementById('modal-phone').textContent = data.client_phone;
+  document.getElementById('modal-phone').innerHTML = window.phoneLinks(data.client_phone);
   document.getElementById('modal-service').textContent = data.service_name || '';
   document.getElementById('modal-barber').textContent = data.barber_name || '';
   document.getElementById('modal-date').textContent = data.date;

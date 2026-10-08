@@ -134,6 +134,13 @@
                 <div>
                   <h3 class="font-serif font-medium text-lg text-white mb-1">{{ cita.client_name }}</h3>
                   <p class="text-xs uppercase tracking-widest text-gold">{% if cita.service %}{{ cita.service.name }}{% else %}Corte general{% endif %}</p>
+                  {% if cita.phone_digits %}
+                  <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <a href="tel:+{{ cita.phone_digits }}" class="text-sm text-smoke/80 tabular-nums hover:text-gold">{{ cita.client_phone }}</a>
+                    <a href="tel:+{{ cita.phone_digits }}" class="text-[0.65rem] uppercase tracking-widest px-2.5 py-1 rounded-sm border border-sky-500/30 bg-sky-500/10 text-sky-300">Llamar</a>
+                    <a href="https://wa.me/{{ cita.phone_digits }}" target="_blank" rel="noopener noreferrer" class="text-[0.65rem] uppercase tracking-widest px-2.5 py-1 rounded-sm border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">WhatsApp</a>
+                  </div>
+                  {% endif %}
                 </div>
                 <!-- Status/Price -->
                 <div class="text-right">

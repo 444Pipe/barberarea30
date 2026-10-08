@@ -145,6 +145,10 @@ automático, no la categoría entera.
 
 If you bypass the constraint (e.g. `update()` instead of `save()`), you also bypass the overlap check. Prefer the serializer path.
 
+Bloqueos de inactividad (`BarberUnavailability`, una fila por día): toda creación pasa por `_slot_problem()` en [apps/bookings/views.py](apps/bookings/views.py), que usa los helpers de [validators.py](apps/bookings/validators.py). Si la fecha/hora no se puede parsear se responde 400 — nunca seguir sin chequear. El público (`/api/bookings/`) jamás es walk-in ni fuerza; el walk-in del panel va por `/api/admin/bookings/walk-in/` (sesión + CSRF) y puede forzar con confirmación. Para auditar producción: `python manage.py find_bookings_in_blocks [--barber frank]`.
+
+El teléfono del cliente lo ve **todo** el personal del panel (barberos incluidos, decisión del dueño oct-2026). En JS usa `window.phoneLinks()` de `base_admin.html`; en plantillas server-side, `Booking.phone_digits`.
+
 Statuses recently changed: manual-service bookings are now created as **`confirmed`** (not `completed`) so they remain manageable. See commit `6770249`.
 
 ### Sale / Commission auto-calculation

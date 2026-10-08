@@ -434,10 +434,11 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         const statusIcons = { pending: '⏳', confirmed: '✓', completed: '✅', cancelled: '🚫' };
         const cls = statusColors[b.status] || statusColors.pending;
-        html += `<div class="flex items-center justify-between px-3 py-2 rounded-md border ${cls} text-xs">
-          <div>
+        html += `<div class="flex items-center justify-between gap-2 px-3 py-2 rounded-md border ${cls} text-xs">
+          <div class="min-w-0">
             <span class="font-semibold">${esc(b.time)}</span>
             <span class="ml-2 text-white/80">${esc(b.client)}</span>
+            ${b.phone ? `<div class="mt-1">${window.phoneLinks(b.phone)}</div>` : ''}
           </div>
           <span>${statusIcons[b.status] || '⏳'}</span>
         </div>`;
