@@ -80,16 +80,36 @@ class BarberStatsTests(TestCase):
         self._sale(time(11, 0), 30000, barber=self.other)
         self.assertEqual(compute_barber_stats(self.barber, DAY, DAY)['totals']['services'], 1)
 
-    def test_api_y_permisos(self):
-        self._sale(time(10, 0), 30000)
+    def test_el_barbero_solo_recibe_lo_que_gana(self):
+        self._sale(time(10, 0), 30000, tip=2000)
         self.client.force_login(self.user)
         r = self.client.get(f'/api/admin/stats/barber/?start={DAY}&end={DAY}')
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['totals']['sold'], 30000)
-        self.assertEqual(len(r.json()['series']), 1)
+        data = r.json()
+        self.assertFalse(data['show_sold'])
+        self.assertEqual(data['totals']['earned'], 13500 + 2000)
+        # Nada de lo que pagó el cliente sale del servidor para el barbero.
+        self.assertNotIn('sold', data['totals'])
+        self.assertNotIn('avg_ticket', data['totals'])
+        self.assertNotIn('sold', data['previous'])
+        self.assertTrue(all('sold' not in x for x in data['series'] + data['top_services']
+                            + data['weekdays'] + data['sales']))
         # Un barbero no puede ver las ventas de otro.
         r = self.client.get(f'/api/admin/stats/barber/?barber={self.other.id}')
         self.assertEqual(r.status_code, 403)
+        # Ni el reporte de ingresos de la barbería.
+        self.assertEqual(self.client.get('/api/admin/stats/revenue/').status_code, 403)
+        dash = self.client.get(f'/api/admin/stats/dashboard/?date={DAY}').json()
+        self.assertIsNone(dash['revenue'])
+
+    def test_el_admin_si_ve_lo_vendido(self):
+        self._sale(time(10, 0), 30000)
+        admin = User.objects.create_user('socio_t', password='x')
+        UserProfile.objects.create(user=admin, role='superadmin')
+        self.client.force_login(admin)
+        r = self.client.get(f'/api/admin/stats/barber/?barber={self.barber.id}&start={DAY}&end={DAY}')
+        self.assertTrue(r.json()['show_sold'])
+        self.assertEqual(r.json()['totals']['sold'], 30000)
 
     @override_settings(STORAGES={
         'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
@@ -100,6 +120,6 @@ class BarberStatsTests(TestCase):
         self.client.force_login(self.user)
         r = self.client.get(f'/admin-panel/?date={DAY}')
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.context['barber_day']['sold'], '40.000')
         self.assertEqual(r.context['barber_day']['earned'], '18.000')
+        self.assertNotIn('sold', r.context['barber_day'])
         self.assertEqual(self.client.get('/admin-panel/mis-estadisticas/').status_code, 200)

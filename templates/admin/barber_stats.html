@@ -315,13 +315,18 @@
           <p class="text-xs text-smoke/60 mt-2">Comisión <span class="st-num text-smoke/90">${money(t.commission)}</span> + propinas <span class="st-num text-smoke/90">${money(t.tips)}</span></p>
           <div class="mt-3 flex flex-wrap items-center gap-2">${deltaBadge(d.previous.delta.earned, cmp)}<span class="text-[0.65rem] text-smoke/40">${esc(cmp)} (${money(d.previous.earned)})</span></div>
           ${t.pending_count ? `<p class="mt-3 text-[0.7rem] text-amber-200/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-            Incluye ${t.pending_count} venta(s) por aprobar (${money(t.pending_sold)} vendidos). Caja todavía no las confirma.</p>` : ''}
+            Incluye ${t.pending_count} servicio(s) por aprobar${d.show_sold ? ` (${money(t.pending_sold)} vendidos)` : ''}. Caja todavía no los confirma.</p>` : ''}
         </section>
         <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 sm:gap-4">
+          ${d.show_sold ? `
           ${kpi('Vendiste', money(t.sold), deltaBadge(d.previous.delta.sold, cmp), COLORS.sold)}
           ${kpi('Servicios', t.services.toLocaleString('es-CO'), deltaBadge(d.previous.delta.services, cmp))}
           ${kpi('Ticket promedio', money(t.avg_ticket), deltaBadge(d.previous.delta.avg_ticket, cmp), null, 'por servicio')}
+          ${kpi('Propinas', money(t.tips), deltaBadge(d.previous.delta.tips, cmp))}` : `
+          ${kpi('Servicios', t.services.toLocaleString('es-CO'), deltaBadge(d.previous.delta.services, cmp))}
+          ${kpi('Por servicio', money(t.avg_earned), deltaBadge(d.previous.delta.avg_earned, cmp), null, 'ganas en promedio')}
           ${kpi('Propinas', money(t.tips), deltaBadge(d.previous.delta.tips, cmp))}
+          ${kpi('Comisión', money(t.commission), '', null, `tu ${Number(d.barber.commission_percentage).toLocaleString('es-CO')}%`)}`}
         </div>
       </div>`;
   }
@@ -331,7 +336,7 @@
     if (d.best_day) items.push(['Tu mejor día', d.best_day]);
     if (d.peak_hour !== null && d.peak_hour !== undefined) items.push(['Hora con más clientes', hour12(d.peak_hour)]);
     if (t.clients) items.push(['Clientes atendidos', t.clients.toLocaleString('es-CO')]);
-    if (d.top_services.length) items.push(['Lo que más vendes', d.top_services[0].name]);
+    if (d.top_services.length) items.push([d.show_sold ? 'Lo que más vendes' : 'Lo que más te deja', d.top_services[0].name]);
     if (!items.length) return '';
     return `<div class="st-scroll-x flex gap-2 -mx-4 px-4 sm:mx-0 sm:px-0">
       ${items.map(([k, v]) => `<div class="flex-shrink-0 st-card px-4 py-3">
@@ -348,15 +353,16 @@
 
   function trendCard(d) {
     const many = d.series.length >= 2;
-    const title = d.granularity === 'month' ? 'Vendido y ganado por mes' : 'Vendido y ganado por día';
+    const per = d.granularity === 'month' ? 'por mes' : 'por día';
+    const title = d.show_sold ? `Vendido y ganado ${per}` : `Lo que ganaste ${per}`;
     return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-trend-title">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <h2 id="st-trend-title" class="text-sm font-semibold text-white">${title}</h2>
-          <div class="flex items-center gap-4 mt-1.5 text-xs text-smoke/70" aria-hidden="true">
+          ${d.show_sold ? `<div class="flex items-center gap-4 mt-1.5 text-xs text-smoke/70" aria-hidden="true">
             <span class="inline-flex items-center gap-1.5"><span class="st-mark" style="background:${COLORS.sold}"></span>Vendido</span>
             <span class="inline-flex items-center gap-1.5"><span class="st-mark" style="background:${COLORS.earned}"></span>Ganado</span>
-          </div>
+          </div>` : '<p class="text-[0.7rem] text-smoke/45 mt-0.5">Comisión + propinas</p>'}
         </div>
         ${many ? `<div class="flex bg-jet rounded-lg p-1 border border-white/5" role="group" aria-label="Ver como">
           <button type="button" data-view="chart" aria-pressed="${state.view === 'chart'}" class="h-9 px-3 rounded-md text-[0.65rem] font-bold uppercase tracking-widest ${state.view === 'chart' ? 'bg-white/10 text-white' : 'text-smoke/50'}">Gráfica</button>
@@ -364,7 +370,7 @@
         </div>` : ''}
       </div>
       ${!many ? `<p class="text-xs text-smoke/45 py-6 text-center">Con un solo día no hay tendencia que mostrar. Elige "Semana" o "Mes" para ver cómo vas día a día.</p>`
-        : state.view === 'table' ? trendTable(d) : `<div class="relative h-64 sm:h-72"><canvas id="st-chart" role="img" aria-label="${title}: barras de vendido y ganado"></canvas></div>`}
+        : state.view === 'table' ? trendTable(d) : `<div class="relative h-64 sm:h-72"><canvas id="st-chart" role="img" aria-label="${title}"></canvas></div>`}
     </section>`;
   }
 
@@ -372,13 +378,13 @@
     return `<div class="max-h-80 overflow-y-auto rounded-lg border border-white/5">
       <table class="w-full text-xs">
         <thead class="sticky top-0 bg-jet-lighter text-smoke/50 uppercase tracking-wider text-[0.6rem]">
-          <tr><th class="text-left px-3 py-2">${d.granularity === 'month' ? 'Mes' : 'Día'}</th><th class="text-right px-3 py-2">Servicios</th><th class="text-right px-3 py-2">Vendido</th><th class="text-right px-3 py-2">Ganado</th></tr>
+          <tr><th class="text-left px-3 py-2">${d.granularity === 'month' ? 'Mes' : 'Día'}</th><th class="text-right px-3 py-2">Servicios</th>${d.show_sold ? '<th class="text-right px-3 py-2">Vendido</th>' : ''}<th class="text-right px-3 py-2">Ganado</th></tr>
         </thead>
         <tbody class="divide-y divide-white/5">
           ${d.series.map(s => `<tr class="${s.services ? '' : 'text-smoke/30'}">
             <td class="px-3 py-2 text-smoke/80">${esc(s.label)}</td>
             <td class="px-3 py-2 text-right st-num">${s.services}</td>
-            <td class="px-3 py-2 text-right st-num">${money(s.sold)}</td>
+            ${d.show_sold ? `<td class="px-3 py-2 text-right st-num">${money(s.sold)}</td>` : ''}
             <td class="px-3 py-2 text-right st-num text-white">${money(s.earned)}</td></tr>`).join('')}
         </tbody>
       </table></div>`;
@@ -395,7 +401,12 @@
     });
     chart = new Chart(el, {
       type: 'bar',
-      data: { labels: d.series.map(s => s.label), datasets: [bars('Vendido', 'sold', COLORS.sold), bars('Ganado', 'earned', COLORS.earned)] },
+      data: {
+        labels: d.series.map(s => s.label),
+        datasets: d.show_sold
+          ? [bars('Vendido', 'sold', COLORS.sold), bars('Ganado', 'earned', COLORS.earned)]
+          : [bars('Ganado', 'earned', COLORS.earned)],
+      },
       options: {
         responsive: true, maintainAspectRatio: false,
         animation: reduceMotion ? false : { duration: 450 },
@@ -424,18 +435,19 @@
   }
 
   function servicesCard(d) {
-    const max = Math.max(...d.top_services.map(s => s.sold), 1);
+    const key = d.show_sold ? 'sold' : 'earned';
+    const max = Math.max(...d.top_services.map(s => s[key]), 1);
     return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-svc-title">
-      <h2 id="st-svc-title" class="text-sm font-semibold text-white">Tus servicios más vendidos</h2>
-      <p class="text-[0.7rem] text-smoke/45 mt-0.5 mb-4">Ordenados por lo vendido en el periodo</p>
+      <h2 id="st-svc-title" class="text-sm font-semibold text-white">${d.show_sold ? 'Tus servicios más vendidos' : 'Los servicios que más te dejan'}</h2>
+      <p class="text-[0.7rem] text-smoke/45 mt-0.5 mb-4">${d.show_sold ? 'Ordenados por lo vendido en el periodo' : 'Ordenados por lo que ganaste con cada uno'}</p>
       <ul class="space-y-3.5">
         ${d.top_services.map((s, i) => `<li>
           <div class="flex items-baseline justify-between gap-3 text-xs">
             <span class="text-smoke/85 truncate"><span class="text-smoke/35 st-num mr-1">${i + 1}.</span>${esc(s.name)}</span>
-            <span class="st-num text-white font-semibold whitespace-nowrap">${money(s.sold)}</span>
+            <span class="st-num text-white font-semibold whitespace-nowrap">${money(s[key])}</span>
           </div>
           <div class="flex items-center gap-2 mt-1.5">
-            <div class="st-bar-track flex-1" aria-hidden="true"><div class="st-bar" style="width:${Math.max(3, s.sold / max * 100)}%"></div></div>
+            <div class="st-bar-track flex-1" aria-hidden="true"><div class="st-bar" style="width:${Math.max(3, s[key] / max * 100)}%;${d.show_sold ? '' : `background:${COLORS.earned}`}"></div></div>
             <span class="text-[0.65rem] text-smoke/45 st-num whitespace-nowrap w-16 text-right">${s.count} ${s.count === 1 ? 'vez' : 'veces'}</span>
           </div>
         </li>`).join('')}
@@ -514,7 +526,9 @@
             <span>${shortDate(s.date)} · ${time12(s.time)} ${lateTag(s)}</span>
           </div>
           <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-            <div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Vendido</p><p class="st-num text-smoke/90">${money(s.sold)}</p></div>
+            ${d.show_sold
+              ? `<div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Vendido</p><p class="st-num text-smoke/90">${money(s.sold)}</p></div>`
+              : `<div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Comisión</p><p class="st-num text-smoke/90">${money(s.commission)}</p></div>`}
             <div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Ganaste</p><p class="st-num text-white font-semibold">${money(s.earned)}</p></div>
             <div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Propina</p><p class="st-num text-smoke/90">${money(s.tip)}</p></div>
           </div>
@@ -526,7 +540,7 @@
           <thead class="bg-jet-lighter text-smoke/50 uppercase tracking-wider text-[0.6rem]">
             <tr>
               <th class="text-left px-3 py-2.5">Fecha</th><th class="text-left px-3 py-2.5">Cliente</th><th class="text-left px-3 py-2.5">Servicio</th>
-              <th class="text-right px-3 py-2.5">Vendido</th><th class="text-right px-3 py-2.5">% </th><th class="text-right px-3 py-2.5">Ganaste</th>
+              ${d.show_sold ? '<th class="text-right px-3 py-2.5">Vendido</th>' : '<th class="text-right px-3 py-2.5">Comisión</th>'}<th class="text-right px-3 py-2.5">% </th><th class="text-right px-3 py-2.5">Ganaste</th>
               <th class="text-right px-3 py-2.5">Propina</th><th class="text-left px-3 py-2.5">Estado</th>
             </tr>
           </thead>
@@ -535,7 +549,7 @@
               <td class="px-3 py-2.5 whitespace-nowrap text-smoke/70">${shortDate(s.date)} · ${time12(s.time)}<div>${lateTag(s)}</div></td>
               <td class="px-3 py-2.5 text-white">${esc(s.client)}</td>
               <td class="px-3 py-2.5 text-smoke/70">${esc(s.service)}</td>
-              <td class="px-3 py-2.5 text-right st-num text-smoke/90">${money(s.sold)}</td>
+              <td class="px-3 py-2.5 text-right st-num text-smoke/90">${money(d.show_sold ? s.sold : s.commission)}</td>
               <td class="px-3 py-2.5 text-right st-num text-smoke/50">${s.percentage === null ? '—' : Number(s.percentage).toLocaleString('es-CO') + '%'}</td>
               <td class="px-3 py-2.5 text-right st-num text-white font-semibold">${money(s.earned)}</td>
               <td class="px-3 py-2.5 text-right st-num text-smoke/90">${money(s.tip)}</td>
@@ -556,7 +570,7 @@
         <svg class="w-4 h-4 text-smoke/50 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
       </summary>
       <ul class="mt-3 space-y-2 text-xs text-smoke/65 leading-relaxed list-disc pl-4">
-        <li><strong class="text-smoke/90">Vendiste</strong>: lo que pagaron tus clientes por los servicios (sin propina, con descuentos aplicados).</li>
+        ${d.show_sold ? '<li><strong class="text-smoke/90">Vendiste</strong>: lo que pagaron los clientes por los servicios (sin propina, con descuentos aplicados). Solo lo ven socios y administradores.</li>' : ''}
         <li><strong class="text-smoke/90">Ganaste</strong>: tu comisión (${Number(d.barber.commission_percentage).toLocaleString('es-CO')}%) más las propinas. Es lo que te corresponde.</li>
         <li>Cada servicio cuenta <strong class="text-smoke/90">el día que lo hiciste</strong>, aunque se haya cobrado en caja después.</li>
         <li>Las ventas rechazadas no cuentan. Las "por aprobar" sí, y se marcan hasta que Caja las confirme.</li>

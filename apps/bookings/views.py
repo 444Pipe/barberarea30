@@ -458,6 +458,21 @@ def admin_my_agenda_view(request):
     }
     work_hours = list(barber.work_hours.filter(date_from__lte=end, date_to__gte=start))
 
+    # Lo que gana el barbero por cita: real si ya se cobró (comisión + propina),
+    # estimado (precio × su %) si falta. El barbero ve solo esto, no el precio
+    # ni el "valor del día" (decisión del dueño, oct-2026).
+    from decimal import Decimal
+    from apps.cashflow.models import Commission
+    earned_by_booking = dict(
+        Commission.objects.filter(
+            sale__booking__barber=barber,
+            sale__booking__date__range=(start, end),
+        ).exclude(sale__approval_status='rejected')
+        .values_list('sale__booking_id', 'total_earnings')
+    )
+    pct = Decimal(barber.commission_percentage or 0) / Decimal('100')
+    show_sold = is_admin
+
     def hhmm(t):
         return t.strftime('%H:%M') if t else None
 
@@ -475,7 +490,8 @@ def admin_my_agenda_view(request):
         ]
 
         items = []
-        totals = {'active': 0, 'completed': 0, 'cancelled': 0, 'value': 0}
+        totals = {'active': 0, 'completed': 0, 'cancelled': 0, 'value': 0,
+                  'earned': 0, 'to_earn': 0}
         for bk in bookings_by_day.get(cur, []):
             minutes = barber.occupied_minutes(bk.duration_minutes)
             bk_start = _dt.combine(cur, bk.time)
@@ -489,6 +505,13 @@ def admin_my_agenda_view(request):
                 totals['cancelled'] += 1
             if bk.status != 'cancelled':
                 totals['value'] += int(bk.price or 0)
+            earned = earned_by_booking.get(bk.id)
+            estimate = None
+            if earned is not None:
+                totals['earned'] += int(earned)
+            elif active:
+                estimate = int((Decimal(bk.price or 0) * pct).quantize(Decimal('1')))
+                totals['to_earn'] += estimate
             items.append({
                 'id': bk.id,
                 'client_name': bk.client_name,
@@ -500,6 +523,8 @@ def admin_my_agenda_view(request):
                 'duration': minutes,
                 'status': bk.status,
                 'price': int(bk.price or 0),
+                'earned': int(earned) if earned is not None else None,
+                'earn_estimate': estimate,
                 'notes': bk.notes,
                 'is_walk_in': bk.is_walk_in,
                 'completed_at': bk.completed_at.isoformat() if bk.completed_at else None,
@@ -540,6 +565,13 @@ def admin_my_agenda_view(request):
         })
         cur += _td(days=1)
 
+    if not show_sold:
+        # Vista del barbero: solo sus ingresos, sin precios ni valor vendido.
+        for day in days:
+            day['totals'].pop('value', None)
+            for item in day['bookings']:
+                item.pop('price', None)
+
     return Response({
         'barber': {
             'id': barber.id,
@@ -547,6 +579,7 @@ def admin_my_agenda_view(request):
             'color': barber.color_tag,
         },
         'can_pick_barber': is_admin,
+        'show_sold': show_sold,
         'barbers': barbers,
         'start': start.strftime('%Y-%m-%d'),
         'end': end.strftime('%Y-%m-%d'),

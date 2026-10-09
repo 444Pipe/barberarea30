@@ -70,15 +70,12 @@
       </div>
       {% endif %}
     </div>
-    <!-- Vendiste: lo que pagaron los clientes -->
+    <!-- Por servicio: lo que gana en promedio por cada servicio (solo sus ingresos) -->
     <div class="kpi-card">
-      <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-sm" style="background:#A68A2B" aria-hidden="true"></span>
-        <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Vendiste</div>
-      </div>
-      <div class="text-xl font-bold text-white mt-2 tabular-nums">${{ barber_day.sold }}</div>
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Por servicio</div>
+      <div class="text-xl font-bold text-white mt-2 tabular-nums">${{ barber_day.avg_earned }}</div>
       <div class="text-[0.65rem] text-smoke/45 mt-1">
-        {% if barber_day.paid_later %}incluye {{ barber_day.paid_later }} cobrado(s) después{% else %}lo que pagaron tus clientes{% endif %}
+        {% if barber_day.paid_later %}incluye {{ barber_day.paid_later }} cobrado(s) después{% else %}lo que ganas en promedio{% endif %}
       </div>
     </div>
     <!-- Servicios del día -->
@@ -88,7 +85,7 @@
       <div class="text-[0.65rem] text-smoke/45 mt-1">{% if today_pending %}{{ today_pending }} por atender{% else %}todos atendidos{% endif %}</div>
     </div>
     <!-- Propinas -->
-    <div class="kpi-card">
+    <div class="kpi-card col-span-2 lg:col-span-1">
       <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Propinas</div>
       <div class="text-xl font-bold text-white mt-2 tabular-nums">${{ barber_day.tips }}</div>
       <div class="text-[0.65rem] text-smoke/45 mt-1">{% if barber_day.pending_count %}{{ barber_day.pending_count }} venta(s) por aprobar{% else %}en tus servicios{% endif %}</div>
@@ -254,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
   function updateRevenue(period) {
-    if (!dashData || !document.getElementById('kpi-revenue-day')) return;
+    if (!dashData || !dashData.revenue || !document.getElementById('kpi-revenue-day')) return;
     const val = dashData.revenue[period] || 0;
     document.getElementById('kpi-revenue-day').textContent = '$' + val.toLocaleString('es-CO');
   }
@@ -466,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="min-w-0">
             <p class="text-base font-bold text-white tabular-nums">${esc(b.time)}</p>
             <p class="text-sm text-white truncate mt-0.5">${esc(b.client)}</p>
-            <p class="text-xs text-gold/80 flex gap-1 min-w-0"><span class="truncate">${esc(b.service || 'Servicio')}</span><span class="flex-shrink-0">· $${Number(b.price || 0).toLocaleString('es-CO')}</span></p>
+            <p class="text-xs text-gold/80 truncate">${esc(b.service || 'Servicio')}</p>
           </div>
           <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[0.6rem] font-bold uppercase tracking-wider ${chip}">${label}</span>
         </div>

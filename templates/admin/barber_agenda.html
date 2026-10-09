@@ -125,6 +125,20 @@
   function money(n) { return '$' + Number(n || 0).toLocaleString('es-CO'); }
   function longDate(s) { const d = parseISO(s); return `${DAY_LONG[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MONTHS[d.getMonth()]}`; }
   function nowMinutes() { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
+  // El barbero solo ve lo que gana (sin precios ni "valor del día"); los
+  // admins ven también lo vendido. Lo decide el servidor (show_sold).
+  function showSold() { return !!(state.week && state.week.show_sold); }
+  function earnText(b) {
+    if (b.earned !== null && b.earned !== undefined) return `Ganaste ${money(b.earned)}`;
+    if (b.earn_estimate) return `Ganas ~${money(b.earn_estimate)}`;
+    return '';
+  }
+  function moneyKpi(totals, label) {
+    if (showSold()) return kpi(label, money(totals.value), true);
+    const sub = totals.to_earn ? `<span class="block text-[0.6rem] font-normal text-smoke/45 mt-0.5">+ ~${money(totals.to_earn)} por atender</span>` : '';
+    return kpi('Ganaste', money(totals.earned) + sub, true);
+  }
+
   // Fin de la cita en minutos del día (una cita que pasa de medianoche no se corta).
   function endMin(b) { const s = toMin(b.time); let e = toMin(b.end_time); if (e <= s) e = s + b.duration; return e; }
 
@@ -327,7 +341,7 @@
       <div class="grid grid-cols-3 gap-2 mb-3">
         ${kpi('Por atender', d.totals.active)}
         ${kpi('Atendidas', d.totals.completed)}
-        ${kpi('Valor del día', money(d.totals.value), true)}
+        ${moneyKpi(d.totals, 'Valor del día')}
       </div>
       <p class="text-[0.7rem] text-smoke/40 tracking-wide mb-4">${esc(scheduleLine(d))}</p>
       <div class="space-y-2">${empty || timeline}</div>
@@ -342,7 +356,7 @@
   function kpi(label, value, small) {
     return `<div class="kpi-card !p-3 min-w-0">
       <p class="text-[0.55rem] tracking-widest uppercase text-smoke/40 font-semibold truncate">${label}</p>
-      <p class="${small ? 'text-sm sm:text-base' : 'text-xl'} font-bold text-white mt-1 tabular-nums truncate">${value}</p>
+      <p class="${small ? 'text-sm sm:text-base' : 'text-xl'} font-bold text-white mt-1 tabular-nums">${value}</p>
     </div>`;
   }
 
@@ -366,7 +380,7 @@
             <p class="text-sm font-semibold text-white truncate">${esc(b.client_name)}</p>
             <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[0.55rem] font-bold uppercase tracking-wider ${st.chip}">${st.label}</span>
           </div>
-          <p class="text-xs text-gold/80 truncate mt-0.5">${esc(b.service_name || 'Servicio')} · ${money(b.price)}</p>
+          <p class="text-xs text-gold/80 truncate mt-0.5">${esc(b.service_name || 'Servicio')}${showSold() ? ` · ${money(b.price)}` : (earnText(b) ? ` · ${earnText(b)}` : '')}</p>
           ${isNext ? '<p class="text-[0.6rem] text-gold uppercase tracking-widest font-bold mt-1">Próxima cita</p>' : ''}
           ${flags.length ? `<p class="text-[0.6rem] mt-1.5 flex flex-wrap gap-1">${flags.join('')}</p>` : ''}
           ${b.client_phone ? `<div class="mt-2">${window.phoneLinks(b.client_phone)}</div>` : ''}
@@ -410,13 +424,15 @@
     const totals = days.reduce((a, d) => ({
       active: a.active + d.totals.active,
       completed: a.completed + d.totals.completed,
-      value: a.value + d.totals.value,
-    }), { active: 0, completed: 0, value: 0 });
+      value: a.value + (d.totals.value || 0),
+      earned: a.earned + (d.totals.earned || 0),
+      to_earn: a.to_earn + (d.totals.to_earn || 0),
+    }), { active: 0, completed: 0, value: 0, earned: 0, to_earn: 0 });
     return `
       <div class="grid grid-cols-3 gap-2 mb-4">
         ${kpi('Por atender', totals.active)}
         ${kpi('Atendidas', totals.completed)}
-        ${kpi('Valor semana', money(totals.value), true)}
+        ${moneyKpi(totals, 'Valor semana')}
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-7 gap-2">
         ${days.map(d => {
@@ -470,7 +486,7 @@
       <div class="mb-4">${b.client_phone ? window.phoneLinks(b.client_phone, { size: 'lg' }) : '<span class="text-smoke/30 text-sm italic">El cliente no dejó teléfono</span>'}</div>
       ${row('Fecha', esc(longDate(d.date)))}
       ${row('Hora', `${fmt12(b.time)} – ${fmt12(b.end_time)} (${b.duration} min)`)}
-      ${row('Precio', money(b.price))}
+      ${showSold() ? row('Precio', money(b.price)) : (earnText(b) ? row(b.earned !== null && b.earned !== undefined ? 'Ganaste' : 'Ganas (estimado)', earnText(b).replace(/^Ganaste |^Ganas /, '')) : '')}
       ${b.is_walk_in ? row('Tipo', 'Walk-in (presencial)') : ''}
       ${b.client_email ? row('Correo', `<a class="hover:text-gold break-all" href="mailto:${esc(b.client_email)}">${esc(b.client_email)}</a>`) : ''}
       ${b.notes ? `<div class="mt-3"><p class="text-smoke/40 text-xs uppercase tracking-wider mb-1">Notas</p><p class="text-sm text-smoke/80 whitespace-pre-wrap break-words">${esc(b.notes)}</p></div>` : ''}

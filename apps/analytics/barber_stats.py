@@ -7,6 +7,11 @@ SERVICIO (`Booking.date`), no el día en que se registró el cobro
 siguiente y su tablero mostraba $60.000. Caja y Cierre sí deben usar la fecha
 de cobro (es plata que entró ese día); esto es la vista del barbero.
 
+Visibilidad (decisión del dueño, oct-2026): el BARBERO solo ve lo que él
+gana. "Vendido" (lo que pagó el cliente) solo lo reciben admin, operativo y
+socios; para el barbero se quita en el servidor (`include_sales_amounts=False`),
+no solo en pantalla.
+
 "Vendido" = lo que pagó el cliente por el servicio (`final_price`, sin propina).
 "Ganado"  = lo que le toca al barbero (`Commission.total_earnings`: comisión +
             propina). Las ventas rechazadas no cuentan; las pendientes de
@@ -80,6 +85,7 @@ def _totals(rows):
         'tips': sum(r['tip'] for r in rows),
         'services': len(rows),
         'avg_ticket': round(sold / len(rows)) if rows else 0,
+        'avg_earned': round(sum(r['earned'] for r in rows) / len(rows)) if rows else 0,
         'clients': len(clients),
         'pending_sold': sum(r['sold'] for r in rows if r['pending']),
         'pending_count': sum(1 for r in rows if r['pending']),
@@ -93,7 +99,8 @@ def _delta(current, previous):
     return round((current - previous) / previous * 100, 1)
 
 
-def compute_barber_stats(barber, start, end, include_detail=True, prev_start=None, prev_end=None):
+def compute_barber_stats(barber, start, end, include_detail=True, prev_start=None, prev_end=None,
+                         include_sales_amounts=True):
     """Todo lo que muestra el panel de estadísticas para [start, end].
 
     Se compara con [prev_start, prev_end]; si no se pasa, con el periodo
@@ -121,6 +128,7 @@ def compute_barber_stats(barber, start, end, include_detail=True, prev_start=Non
             'earned': _delta(totals['earned'], prev['earned']),
             'services': _delta(totals['services'], prev['services']),
             'avg_ticket': _delta(totals['avg_ticket'], prev['avg_ticket']),
+            'avg_earned': _delta(totals['avg_earned'], prev['avg_earned']),
             'tips': _delta(totals['tips'], prev['tips']),
         },
     }
@@ -137,7 +145,7 @@ def compute_barber_stats(barber, start, end, include_detail=True, prev_start=Non
         'previous': comparison,
     }
     if not include_detail:
-        return data
+        return data if include_sales_amounts else _only_earnings(data)
 
     # Serie: por día hasta ~2 meses; por mes en rangos más largos.
     granularity = 'day' if length <= 62 else 'month'
@@ -162,7 +170,7 @@ def compute_barber_stats(barber, start, end, include_detail=True, prev_start=Non
             b['services'] += 1
 
     by_service = defaultdict(lambda: {'count': 0, 'sold': 0, 'earned': 0})
-    by_weekday = [{'day': name, 'services': 0, 'sold': 0} for name in WEEKDAYS]
+    by_weekday = [{'day': name, 'services': 0, 'sold': 0, 'earned': 0} for name in WEEKDAYS]
     by_hour = defaultdict(int)
     for r in rows:
         svc = by_service[r['service']]
@@ -172,11 +180,13 @@ def compute_barber_stats(barber, start, end, include_detail=True, prev_start=Non
         wd = by_weekday[r['date'].weekday()]
         wd['services'] += 1
         wd['sold'] += r['sold']
+        wd['earned'] = wd.get('earned', 0) + r['earned']
         by_hour[r['time'].hour] += 1
 
     top_services = sorted(
         ({'name': k, **v} for k, v in by_service.items()),
-        key=lambda x: (-x['sold'], -x['count']),
+        key=(lambda x: (-x['sold'], -x['count'])) if include_sales_amounts
+        else (lambda x: (-x['earned'], -x['count'])),
     )
     best_day = max(by_weekday, key=lambda x: x['services']) if rows else None
     peak_hour = max(by_hour.items(), key=lambda kv: kv[1])[0] if by_hour else None
@@ -209,4 +219,22 @@ def compute_barber_stats(barber, start, end, include_detail=True, prev_start=Non
         } for r in rows[:300]],
         'sales_total_count': len(rows),
     })
+    return data if include_sales_amounts else _only_earnings(data)
+
+
+# Campos con lo que pagó el cliente: el barbero no los recibe.
+_SALES_KEYS = ('sold', 'avg_ticket', 'pending_sold', 'discount')
+
+
+def _only_earnings(data):
+    """Quita de `data` todo monto de venta (lo que pagó el cliente)."""
+    def strip(d):
+        return {k: v for k, v in d.items() if k not in _SALES_KEYS}
+
+    data['totals'] = strip(data['totals'])
+    prev = data['previous']
+    data['previous'] = {**strip(prev), 'delta': strip(prev['delta'])}
+    for key in ('series', 'top_services', 'weekdays', 'sales'):
+        if key in data:
+            data[key] = [strip(item) for item in data[key]]
     return data

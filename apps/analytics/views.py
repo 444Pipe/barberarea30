@@ -26,12 +26,11 @@ def revenue_stats_view(request):
     from apps.cashflow.models import Sale
 
     profile = getattr(request.user, 'profile', None)
-    queryset = Sale.objects.filter(approval_status=Sale.STATUS_APPROVED)
-
-    # Barbers can only see their own stats
+    # Lo vendido (lo que pagan los clientes) no se le muestra al barbero: él
+    # ve solo lo que gana, en /api/admin/stats/barber/.
     if profile and profile.is_barber and not profile.is_admin:
-        barber = getattr(request.user, 'barber_profile', None)
-        queryset = queryset.filter(barber=barber) if barber else queryset.none()
+        return Response({'error': 'Disponible solo para administradores.'}, status=403)
+    queryset = Sale.objects.filter(approval_status=Sale.STATUS_APPROVED)
 
     barber_id = request.query_params.get('barber')
     if barber_id:
@@ -59,11 +58,9 @@ def revenue_stats_view(request):
 def services_stats_view(request):
     """GET /api/admin/stats/services/ — servicios más vendidos."""
     profile = getattr(request.user, 'profile', None)
-    queryset = Booking.objects.filter(status='completed')
-
     if profile and profile.is_barber and not profile.is_admin:
-        barber = getattr(request.user, 'barber_profile', None)
-        queryset = queryset.filter(barber=barber) if barber else queryset.none()
+        return Response({'error': 'Disponible solo para administradores.'}, status=403)
+    queryset = Booking.objects.filter(status='completed')
 
     services = (
         queryset.values('service__name')
@@ -211,8 +208,15 @@ def dashboard_stats_view(request):
         .first()
     )
 
+    is_barber_only = bool(profile and profile.is_barber and not profile.is_admin)
+    if is_barber_only:
+        # El barbero solo ve lo que gana (lo calcula su dashboard con
+        # compute_barber_stats); ni lo vendido ni el precio de cada cita.
+        for items in kanban.values():
+            for item in items:
+                item.pop('price', None)
     return Response({
-        'revenue': {
+        'revenue': None if is_barber_only else {
             'day': day_revenue,
             'week': week_revenue,
             'month': month_revenue,
@@ -262,7 +266,10 @@ def barber_stats_view(request):
     except ValueError:
         prev_start = prev_end = None
 
-    data = compute_barber_stats(barber, start, end, prev_start=prev_start, prev_end=prev_end)
+    # El barbero solo ve lo que él gana; lo vendido es para admin/operativo/socios.
+    data = compute_barber_stats(barber, start, end, prev_start=prev_start, prev_end=prev_end,
+                                include_sales_amounts=is_admin)
+    data['show_sold'] = is_admin
     data['can_pick_barber'] = is_admin
     data['barbers'] = barbers
     return Response(data)

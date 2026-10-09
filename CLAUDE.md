@@ -151,7 +151,7 @@ Bloqueos de inactividad (`BarberUnavailability`, una fila por día): toda creaci
 
 Además del bloqueo existe el **horario de trabajo** (`BarberWorkHours`): "del X al Y trabaja de H1 a H2". Recorta la ventana en `Barber.day_window` (source=`custom`), así que la web, la validación y la agenda lo respetan solas. Nunca amplía el horario semanal.
 
-**Estadísticas del barbero** ([apps/analytics/barber_stats.py](apps/analytics/barber_stats.py), página `/admin-panel/mis-estadisticas/`, API `/api/admin/stats/barber/`): una venta cuenta el **día del servicio** (`Booking.date`), no el del cobro (`Sale.created_at`); "Vendido" = `final_price`, "Ganado" = `Commission.total_earnings`. El dashboard del barbero usa la misma función. Caja/Cierre siguen por fecha de cobro — no mezclar las dos vistas.
+**Estadísticas del barbero** ([apps/analytics/barber_stats.py](apps/analytics/barber_stats.py), página `/admin-panel/mis-estadisticas/`, API `/api/admin/stats/barber/`): una venta cuenta el **día del servicio** (`Booking.date`), no el del cobro (`Sale.created_at`); "Vendido" = `final_price`, "Ganado" = `Commission.total_earnings`. El dashboard del barbero usa la misma función. Caja/Cierre siguen por fecha de cobro — no mezclar las dos vistas. **El barbero solo ve lo que gana**: para él el servidor quita todo monto de venta (`include_sales_amounts=False`, `show_sold`), la agenda le muestra "Ganas" en vez del precio y `/stats/revenue/` y `/stats/services/` le responden 403. Admin, operativo y socios sí ven lo vendido.
 
 El teléfono del cliente lo ve **todo** el personal del panel (barberos incluidos, decisión del dueño oct-2026). En JS usa `window.phoneLinks()` de `base_admin.html`; en plantillas server-side, `Booking.phone_digits`.
 

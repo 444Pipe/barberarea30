@@ -104,15 +104,17 @@ def admin_dashboard_view(request):
     if is_barber_only and barber_profile:
         from apps.analytics.barber_stats import compute_barber_stats
         same_day_last_week = today - datetime.timedelta(days=7)
+        # Solo lo que gana el barbero: lo vendido no se le muestra.
         stats = compute_barber_stats(
             barber_profile, today, today, include_detail=False,
             prev_start=same_day_last_week, prev_end=same_day_last_week,
+            include_sales_amounts=False,
         )
         fmt = lambda v: f'{v:,.0f}'.replace(',', '.')
         t = stats['totals']
         barber_day = {
-            'sold': fmt(t['sold']),
             'earned': fmt(t['earned']),
+            'avg_earned': fmt(t['avg_earned']),
             'commission': fmt(t['commission']),
             'tips': fmt(t['tips']),
             'services': t['services'],

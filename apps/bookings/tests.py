@@ -194,6 +194,10 @@ class BookingBlockTests(TestCase):
         self.assertEqual(day['window']['start'], '10:00')
         self.assertEqual(len(day['blocks']), 1)
         self.assertEqual(day['totals']['active'], 1)
+        # El barbero ve lo que ganaría (comisión por defecto 40%), no el precio.
+        self.assertNotIn('price', bk)
+        self.assertNotIn('value', day['totals'])
+        self.assertEqual(bk['earn_estimate'], 12000)
 
         # Un barbero no puede ver la agenda de otro.
         r = self.client.get(f'/api/admin/my-agenda/?barber={self.frank.id}')
