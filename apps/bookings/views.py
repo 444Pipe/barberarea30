@@ -420,33 +420,14 @@ def admin_my_agenda_view(request):
     El barbero ve su propia agenda. Admin, operativo y superadmin pueden pedir
     la de cualquiera con ?barber=ID (y reciben la lista para elegir).
     """
-    from datetime import date as _date, datetime as _dt, timedelta as _td
+    from datetime import datetime as _dt, timedelta as _td
+    from apps.barbers.access import BarberAccessError, resolve_target_barber
     from .holidays import holiday_name
 
-    profile = getattr(request.user, 'profile', None)
-    is_admin = bool(profile and profile.is_admin)
-    own_barber = getattr(request.user, 'barber_profile', None)
-
-    barber = own_barber
-    requested = request.query_params.get('barber')
-    if requested and is_admin:
-        barber = Barber.objects.filter(pk=requested).first()
-    elif requested and own_barber is not None and str(own_barber.pk) != str(requested):
-        return Response({'error': 'Solo puedes ver tu propia agenda.'}, status=403)
-
-    barbers = []
-    if is_admin:
-        barbers = [
-            {'id': b.id, 'name': b.display_name, 'color': b.color_tag}
-            for b in Barber.objects.order_by('display_order', 'id')
-        ]
-    if barber is None:
-        if is_admin and barbers:
-            barber = Barber.objects.get(pk=barbers[0]['id'])
-        else:
-            return Response({
-                'error': 'Tu usuario no tiene un perfil de barbero asociado.',
-            }, status=400)
+    try:
+        barber, is_admin, barbers = resolve_target_barber(request)
+    except BarberAccessError as exc:
+        return Response({'error': exc.message}, status=exc.status)
 
     today = timezone.localdate()
     try:

@@ -53,27 +53,60 @@
 
   <!-- KPI Cards -->
   {% if user_role == 'barber' %}
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="kpi-cards">
+  {% if barber_day %}
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" id="kpi-cards">
+    <!-- Ganaste: lo que le toca al barbero (comisión + propinas) -->
+    <div class="kpi-card col-span-2 lg:col-span-1 relative overflow-hidden">
+      <div class="absolute inset-y-0 left-0 w-1" style="background:#3B82F6" aria-hidden="true"></div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-sm" style="background:#3B82F6" aria-hidden="true"></span>
+        <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Ganaste {% if is_today %}hoy{% else %}este día{% endif %}</div>
+      </div>
+      <div class="text-3xl font-bold text-white mt-2 tabular-nums">${{ barber_day.earned }}</div>
+      <div class="text-[0.7rem] text-smoke/55 mt-1">Comisión ${{ barber_day.commission }} ({{ barber_day.commission_pct }}%) + propinas ${{ barber_day.tips }}</div>
+      {% if barber_day.delta_earned is not None %}
+      <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-semibold {% if barber_day.delta_up %}bg-emerald-500/15 text-emerald-300{% elif barber_day.delta_earned == 0 %}bg-white/5 text-smoke/60{% else %}bg-red-500/15 text-red-300{% endif %}">
+        {% if barber_day.delta_up %}+{% endif %}{{ barber_day.delta_earned }}% <span class="font-normal opacity-80">vs {{ barber_day.prev_label }}</span>
+      </div>
+      {% endif %}
+    </div>
+    <!-- Vendiste: lo que pagaron los clientes -->
     <div class="kpi-card">
-      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Mis Ingresos Hoy</div>
-      <div class="text-xl font-bold text-gold" id="kpi-revenue-day">${{ today_revenue|floatformat:0 }}</div>
-      <div class="flex gap-1 mt-2">
-        <button class="kpi-toggle active" data-period="day">Día</button>
-        <button class="kpi-toggle" data-period="week">Sem</button>
-        <button class="kpi-toggle" data-period="month">Mes</button>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-sm" style="background:#A68A2B" aria-hidden="true"></span>
+        <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Vendiste</div>
+      </div>
+      <div class="text-xl font-bold text-white mt-2 tabular-nums">${{ barber_day.sold }}</div>
+      <div class="text-[0.65rem] text-smoke/45 mt-1">
+        {% if barber_day.paid_later %}incluye {{ barber_day.paid_later }} cobrado(s) después{% else %}lo que pagaron tus clientes{% endif %}
       </div>
     </div>
+    <!-- Servicios del día -->
     <div class="kpi-card">
-      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Mis Citas Hoy</div>
-      <div class="text-xl font-bold text-emerald-400">{{ today_completed }}<span class="text-smoke/40 text-sm"> / {{ today_completed|add:today_pending }}</span></div>
-      <div class="text-[0.55rem] text-smoke/30 mt-2">{{ today_pending }} pendiente(s) por completar</div>
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Servicios</div>
+      <div class="text-xl font-bold text-white mt-2 tabular-nums">{{ today_completed }}<span class="text-smoke/40 text-sm"> / {{ today_completed|add:today_pending }}</span></div>
+      <div class="text-[0.65rem] text-smoke/45 mt-1">{% if today_pending %}{{ today_pending }} por atender{% else %}todos atendidos{% endif %}</div>
     </div>
+    <!-- Propinas -->
     <div class="kpi-card">
-      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/40 mb-2 font-semibold">Mis Propinas Hoy</div>
-      <div class="text-xl font-bold text-amber-400">${{ today_tips|floatformat:0 }}</div>
-      <div class="text-[0.55rem] text-smoke/30 mt-2">recibidas en tus servicios</div>
+      <div class="text-[0.65rem] tracking-widest uppercase text-smoke/45 font-semibold">Propinas</div>
+      <div class="text-xl font-bold text-white mt-2 tabular-nums">${{ barber_day.tips }}</div>
+      <div class="text-[0.65rem] text-smoke/45 mt-1">{% if barber_day.pending_count %}{{ barber_day.pending_count }} venta(s) por aprobar{% else %}en tus servicios{% endif %}</div>
     </div>
   </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin-panel/mis-estadisticas/?period=week&date={{ today_str }}" class="inline-flex items-center gap-2 h-11 px-4 rounded-lg bg-gold/10 border border-gold/30 text-gold text-xs font-semibold uppercase tracking-widest hover:bg-gold hover:text-jet transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
+      Ver mi semana y mi mes
+    </a>
+    <a href="/admin-panel/barbers/my-agenda/?date={{ today_str }}" class="inline-flex items-center gap-2 h-11 px-4 rounded-lg border border-white/10 text-smoke/70 text-xs font-semibold uppercase tracking-widest hover:text-gold hover:border-gold/30 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Mi agenda
+    </a>
+  </div>
+  {% else %}
+  <div class="kpi-card text-sm text-smoke/60">Tu usuario no tiene un perfil de barbero asociado.</div>
+  {% endif %}
   {% else %}
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-cards">
     <div class="kpi-card">
@@ -221,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
   function updateRevenue(period) {
-    if (!dashData) return;
+    if (!dashData || !document.getElementById('kpi-revenue-day')) return;
     const val = dashData.revenue[period] || 0;
     document.getElementById('kpi-revenue-day').textContent = '$' + val.toLocaleString('es-CO');
   }
@@ -413,9 +446,35 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderKanban(kanban) {
     const container = document.getElementById('kanban-container');
     if (!kanban || Object.keys(kanban).length === 0) {
-      container.innerHTML = '<div class="text-center text-smoke/30 text-sm py-8 col-span-full">No hay citas programadas para hoy</div>';
+      container.innerHTML = '<div class="text-center text-smoke/30 text-sm py-8 col-span-full">No hay citas programadas para este día</div>';
       return;
     }
+    {% if user_role == 'barber' %}
+    // Barbero: sus citas como tarjetas legibles (hora, cliente, servicio,
+    // estado en texto, precio y teléfono), no un kanban de una sola columna.
+    const STATUS = {
+      pending:   ['Pendiente',  'bg-amber-500/15 text-amber-300',     '#f59e0b'],
+      confirmed: ['Confirmada', 'bg-blue-500/15 text-blue-300',       '#3b82f6'],
+      completed: ['Atendida',   'bg-emerald-500/15 text-emerald-300', '#10b981'],
+      cancelled: ['Cancelada',  'bg-red-500/15 text-red-300',         '#ef4444'],
+    };
+    const mine = Object.values(kanban).flat();
+    container.innerHTML = mine.map(b => {
+      const [label, chip, bar] = STATUS[b.status] || STATUS.pending;
+      return `<div class="rounded-xl bg-jet border border-white/5 p-4 ${b.status === 'cancelled' ? 'opacity-50' : ''}" style="border-left:3px solid ${bar}">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-base font-bold text-white tabular-nums">${esc(b.time)}</p>
+            <p class="text-sm text-white truncate mt-0.5">${esc(b.client)}</p>
+            <p class="text-xs text-gold/80 flex gap-1 min-w-0"><span class="truncate">${esc(b.service || 'Servicio')}</span><span class="flex-shrink-0">· $${Number(b.price || 0).toLocaleString('es-CO')}</span></p>
+          </div>
+          <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[0.6rem] font-bold uppercase tracking-wider ${chip}">${label}</span>
+        </div>
+        ${b.phone ? `<div class="mt-3">${window.phoneLinks(b.phone)}</div>` : ''}
+      </div>`;
+    }).join('');
+    return;
+    {% endif %}
     container.innerHTML = '';
     for (const [barberName, bookings] of Object.entries(kanban)) {
       const col = document.createElement('div');

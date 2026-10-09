@@ -224,6 +224,50 @@ def dashboard_stats_view(request):
     })
 
 
+@api_view(['GET'])
+@permission_classes([IsBarberOrAbove])
+def barber_stats_view(request):
+    """GET /api/admin/stats/barber/?start=YYYY-MM-DD&end=YYYY-MM-DD[&barber=ID]
+
+    Estadísticas del panel "Mis Estadísticas": vendido, ganado, servicios,
+    comparación con el periodo anterior, serie por día/mes, top servicios,
+    mejores días y detalle de ventas. Ver apps/analytics/barber_stats.py.
+    """
+    from datetime import datetime, timedelta
+    from apps.barbers.access import BarberAccessError, resolve_target_barber
+    from .barber_stats import compute_barber_stats
+
+    try:
+        barber, is_admin, barbers = resolve_target_barber(request)
+    except BarberAccessError as exc:
+        return Response({'error': exc.message}, status=exc.status)
+
+    today = tz.localdate()
+    try:
+        start = datetime.strptime(request.query_params.get('start', ''), '%Y-%m-%d').date()
+    except ValueError:
+        start = today.replace(day=1)
+    try:
+        end = datetime.strptime(request.query_params.get('end', ''), '%Y-%m-%d').date()
+    except ValueError:
+        end = today
+    if end < start:
+        start, end = end, start
+    if (end - start).days > 366:
+        start = end - timedelta(days=366)
+
+    try:
+        prev_start = datetime.strptime(request.query_params.get('prev_start', ''), '%Y-%m-%d').date()
+        prev_end = datetime.strptime(request.query_params.get('prev_end', ''), '%Y-%m-%d').date()
+    except ValueError:
+        prev_start = prev_end = None
+
+    data = compute_barber_stats(barber, start, end, prev_start=prev_start, prev_end=prev_end)
+    data['can_pick_barber'] = is_admin
+    data['barbers'] = barbers
+    return Response(data)
+
+
 from apps.analytics.models import AuditLog
 
 @api_view(['GET'])

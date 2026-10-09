@@ -188,7 +188,8 @@ function renderBarberCards(barbers) {
         <span>★ ${b.rating}</span>
       </div>
       <div class="flex gap-2">
-        <a href="/admin-panel/barbers/my-agenda/?barber=${b.id}" class="flex-1 py-2 rounded-md bg-jet-lighter border border-white/10 text-center text-[0.65rem] tracking-wider uppercase text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">Ver Agenda</a>
+        <a href="/admin-panel/barbers/my-agenda/?barber=${b.id}" class="flex-1 py-2 rounded-md bg-jet-lighter border border-white/10 text-center text-[0.65rem] tracking-wider uppercase text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">Agenda</a>
+        <a href="/admin-panel/mis-estadisticas/?barber=${b.id}" title="Estadísticas de ventas" class="flex-1 py-2 rounded-md bg-jet-lighter border border-white/10 text-center text-[0.65rem] tracking-wider uppercase text-smoke/60 hover:text-gold hover:border-gold/30 transition-all">Ventas</a>
         ${['operational_admin', 'admin', 'superadmin'].includes(userRole) ? `
         <button onclick="openUnavailability(${b.id}, '${b.display_name.replace(/'/g, "\\'")}')" title="Bloqueos y horario de trabajo" class="px-3 py-2 rounded-md bg-jet-lighter border border-white/10 text-smoke/60 hover:text-amber-400 hover:border-amber-400/30 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

@@ -19,6 +19,7 @@ urlpatterns = [
     path('mis-reservas/', views.admin_mis_reservas_view, name='admin_mis_reservas'),
     path('barbers/', views.admin_barbers_view, name='admin_barbers'),
     path('barbers/my-agenda/', views.admin_barber_agenda_view, name='admin_barber_agenda'),
+    path('mis-estadisticas/', views.admin_barber_stats_view, name='admin_barber_stats'),
     path('clients/', views.admin_clients_view, name='admin_clients'),
     path('charts/', views.admin_charts_view, name='admin_charts'),
     path('settings/', views.admin_settings_view, name='admin_settings'),

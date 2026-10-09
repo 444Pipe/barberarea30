@@ -96,6 +96,34 @@ def admin_dashboard_view(request):
         .first()
     )
 
+    # Barbero: sus cifras salen de compute_barber_stats (día del SERVICIO, no
+    # del cobro; vendido vs ganado), igual que en "Mis Estadísticas". Antes este
+    # tablero sumaba las ventas por fecha de cobro y una cita cobrada al día
+    # siguiente desaparecía de su día.
+    barber_day = None
+    if is_barber_only and barber_profile:
+        from apps.analytics.barber_stats import compute_barber_stats
+        same_day_last_week = today - datetime.timedelta(days=7)
+        stats = compute_barber_stats(
+            barber_profile, today, today, include_detail=False,
+            prev_start=same_day_last_week, prev_end=same_day_last_week,
+        )
+        fmt = lambda v: f'{v:,.0f}'.replace(',', '.')
+        t = stats['totals']
+        barber_day = {
+            'sold': fmt(t['sold']),
+            'earned': fmt(t['earned']),
+            'commission': fmt(t['commission']),
+            'tips': fmt(t['tips']),
+            'services': t['services'],
+            'paid_later': t['paid_later'],
+            'pending_count': t['pending_count'],
+            'commission_pct': f"{stats['barber']['commission_percentage']:g}",
+            'delta_earned': stats['previous']['delta']['earned'],
+            'delta_up': (stats['previous']['delta']['earned'] or 0) > 0,
+            'prev_label': same_day_last_week.strftime('%d/%m'),
+        }
+
     pending_approvals_count = 0
     # Solo quienes pueden confirmar ventas (operational_admin/superadmin) ven el
     # panel de aprobaciones; el rol 'admin' recibía 403 del backend y el panel
@@ -118,6 +146,7 @@ def admin_dashboard_view(request):
         'today_tips': today_tips,
         'top_barber_today': top_today['barber__display_name'] if top_today else '—',
         'pending_approvals_count': pending_approvals_count,
+        'barber_day': barber_day,
     }
     return render(request, 'admin/dashboard.html', context)
 
@@ -187,6 +216,17 @@ def admin_barber_agenda_view(request):
         'active_section': 'my_agenda',
     }
     return render(request, 'admin/barber_agenda.html', context)
+
+
+@staff_required
+def admin_barber_stats_view(request):
+    """Mis Estadísticas — cuánto vende y cuánto gana el barbero (o el que elija un admin)."""
+    context = {
+        'user_role': getattr(request.user, 'profile', None) and request.user.profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'my_stats',
+    }
+    return render(request, 'admin/barber_stats.html', context)
 
 
 @admin_required

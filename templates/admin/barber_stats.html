@@ -1,0 +1,619 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Mis Estadísticas{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  /* Mis Estadísticas — mobile-first. Datos: /api/admin/stats/barber/
+     Paleta de series validada (dataviz, modo oscuro sobre #111111):
+     Vendido #A68A2B · Ganado #3B82F6. El texto nunca usa el color de la serie. */
+  :root { --st-sold: #A68A2B; --st-earned: #3B82F6; --st-card: #111111; }
+  .st-seg { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .st-seg button {
+    min-height: 44px; border-radius: 0.6rem; font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: rgba(245,245,245,0.55);
+    transition: background .15s, color .15s; touch-action: manipulation;
+  }
+  .st-seg button:hover { color: #fff; }
+  .st-seg button[aria-pressed="true"] { background: #D4AF37; color: #0a0a0a; }
+  .st-card { background: var(--st-card); border: 1px solid rgba(255,255,255,0.06); border-radius: 1rem; }
+  .st-label { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245,245,245,0.45); font-weight: 600; }
+  .st-num { font-variant-numeric: tabular-nums; }
+  .st-mark { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+  .st-bar-track { height: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); overflow: hidden; }
+  .st-bar { height: 100%; border-radius: 6px; background: var(--st-sold); transition: width .5s ease; }
+  .st-skel { background: linear-gradient(90deg, #151515 25%, #1d1d1d 50%, #151515 75%); background-size: 200% 100%; animation: st-shimmer 1.2s infinite; border-radius: 1rem; }
+  @keyframes st-shimmer { to { background-position: -200% 0; } }
+  .st-fade { animation: st-in .35s ease both; }
+  @keyframes st-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .st-skel, .st-fade { animation: none; }
+    .st-bar { transition: none; }
+  }
+  .st-scroll-x { overflow-x: auto; scrollbar-width: none; }
+  .st-scroll-x::-webkit-scrollbar { display: none; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #D4AF37; outline-offset: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-4 -mt-1">
+
+  <!-- Encabezado -->
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Mis Estadísticas</h1>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase truncate" id="st-subtitle">Cargando…</p>
+    </div>
+    <a href="/admin-panel/barbers/my-agenda/" class="hidden sm:inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-white/10 text-xs text-smoke/60 uppercase tracking-widest hover:text-gold hover:border-gold/30">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Mi Agenda
+    </a>
+  </div>
+
+  <!-- Selector de barbero (solo admins) -->
+  <div id="st-barbers" class="st-scroll-x flex gap-2 hidden"></div>
+
+  <!-- Periodo -->
+  <div class="st-card p-2 sm:p-3 space-y-2">
+    <div class="st-seg" role="group" aria-label="Periodo">
+      <button type="button" data-period="day">Día</button>
+      <button type="button" data-period="week">Semana</button>
+      <button type="button" data-period="month">Mes</button>
+      <button type="button" data-period="year">Año</button>
+      <button type="button" data-period="range">Rango</button>
+    </div>
+    <div id="st-nav" class="flex items-center justify-between gap-2">
+      <button type="button" id="st-prev" aria-label="Periodo anterior" class="w-11 h-11 rounded-lg bg-jet border border-white/5 text-smoke/60 hover:text-gold flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="flex items-center gap-2 min-w-0">
+        <span id="st-period-label" class="text-sm font-semibold text-white truncate"></span>
+        <button type="button" id="st-today" class="h-8 px-3 rounded-md border border-gold/30 text-gold text-[0.6rem] font-bold uppercase tracking-widest hover:bg-gold/10">Hoy</button>
+      </div>
+      <button type="button" id="st-next" aria-label="Periodo siguiente" class="w-11 h-11 rounded-lg bg-jet border border-white/5 text-smoke/60 hover:text-gold flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <form id="st-range" class="hidden grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+      <label class="block">
+        <span class="admin-label">Desde</span>
+        <input type="date" id="st-from" class="admin-input" required>
+      </label>
+      <label class="block">
+        <span class="admin-label">Hasta</span>
+        <input type="date" id="st-to" class="admin-input" required>
+      </label>
+      <button type="submit" class="col-span-2 sm:col-span-1 h-11 px-5 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest">Ver</button>
+    </form>
+  </div>
+
+  <div id="st-body" aria-live="polite"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const esc = window.esc;
+  const params = new URLSearchParams(location.search);
+  const COLORS = { sold: '#A68A2B', earned: '#3B82F6' };
+  const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const MON3 = MONTHS.map(m => m.slice(0, 3));
+  const DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const state = {
+    period: params.get('period') || 'month',
+    date: params.get('date') || iso(new Date()),
+    from: params.get('from') || '',
+    to: params.get('to') || '',
+    barberId: params.get('barber') || '',
+    data: null,
+    error: '',
+    loading: false,
+    view: 'chart',       // chart | table
+    salesShown: 20,
+    salesQuery: '',
+  };
+  let chart = null;
+
+  // ── Fechas locales (nunca new Date('YYYY-MM-DD'): es UTC) ──
+  function iso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  function parse(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+  function addDays(s, n) { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); }
+  function addMonths(s, n) { const d = parse(s); d.setDate(1); d.setMonth(d.getMonth() + n); return iso(d); }
+  function mondayOf(s) { const d = parse(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); }
+  function minIso(a, b) { return a < b ? a : b; }
+  function money(n) { return '$' + Math.round(n || 0).toLocaleString('es-CO'); }
+  function moneyShort(n) {
+    const v = Math.abs(n);
+    if (v >= 1e6) return '$' + (n / 1e6).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' M';
+    if (v >= 1e3) return '$' + Math.round(n / 1e3).toLocaleString('es-CO') + ' mil';
+    return '$' + n;
+  }
+  function shortDate(s) { const d = parse(s); return `${d.getDate()} ${MON3[d.getMonth()]}`; }
+  function hour12(h) { return `${h % 12 || 12} ${h >= 12 ? 'p. m.' : 'a. m.'}`; }
+  function time12(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'p. m.' : 'a. m.'}`; }
+
+  // Rango del periodo + rango de comparación ("mismo tramo" del periodo anterior).
+  function ranges() {
+    const today = iso(new Date());
+    const p = state.period, d = state.date;
+    let start, end, prevStart, prevEnd, label;
+    if (p === 'day') {
+      start = end = d;
+      prevStart = prevEnd = addDays(d, -7);   // mismo día de la semana pasada
+      const dd = parse(d);
+      label = d === today ? `Hoy, ${dd.getDate()} de ${MONTHS[dd.getMonth()]}` : `${DAYS[dd.getDay()]} ${dd.getDate()} de ${MONTHS[dd.getMonth()]}`;
+    } else if (p === 'week') {
+      start = mondayOf(d); end = addDays(start, 6);
+      prevStart = addDays(start, -7);
+      label = `Semana ${shortDate(start)} – ${shortDate(end)}`;
+    } else if (p === 'month') {
+      const first = parse(d); first.setDate(1);
+      start = iso(first);
+      const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+      end = iso(last);
+      prevStart = addMonths(start, -1);
+      label = `${MONTHS[first.getMonth()]} ${first.getFullYear()}`;
+    } else if (p === 'year') {
+      const y = parse(d).getFullYear();
+      start = `${y}-01-01`; end = `${y}-12-31`;
+      prevStart = `${y - 1}-01-01`;
+      label = `Año ${y}`;
+    } else {
+      start = state.from || addDays(today, -29);
+      end = state.to || today;
+      if (end < start) [start, end] = [end, start];
+      const len = Math.round((parse(end) - parse(start)) / 86400000);
+      prevEnd = addDays(start, -1);
+      prevStart = addDays(prevEnd, -len);
+      label = `${shortDate(start)} – ${shortDate(end)}`;
+    }
+    // Un periodo en curso se corta hoy, y se compara contra el mismo tramo del anterior.
+    if (p !== 'day' && p !== 'range' && end > today && start <= today) {
+      end = today;
+    }
+    if (p !== 'day' && p !== 'range') {
+      const len = Math.round((parse(end) - parse(start)) / 86400000);
+      prevEnd = addDays(prevStart, len);
+    }
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+    return { start, end, prevStart, prevEnd, label };
+  }
+
+  function compareLabel(r) {
+    if (state.period === 'day') return `vs ${DAYS[parse(r.prevStart).getDay()]} ${shortDate(r.prevStart)}`;
+    return `vs ${shortDate(r.prevStart)} – ${shortDate(r.prevEnd)}`;
+  }
+
+  async function load() {
+    const r = ranges();
+    const q = new URLSearchParams({ start: r.start, end: r.end, prev_start: r.prevStart, prev_end: r.prevEnd });
+    if (state.barberId) q.set('barber', state.barberId);
+    state.loading = true; state.error = '';
+    syncUrl(); renderControls(r); render();
+    try {
+      const res = await fetch(`/api/admin/stats/barber/?${q}`, { headers: { Accept: 'application/json' } });
+      if (res.status === 401) { location.href = '/admin-panel/login/'; return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'No se pudieron cargar las estadísticas.');
+      state.data = data;
+      state.barberId = String(data.barber.id);
+      state.salesShown = 20;
+    } catch (e) {
+      state.error = e.message || 'Error de conexión.';
+    } finally {
+      state.loading = false;
+      syncUrl(); renderControls(r); render();
+    }
+  }
+
+  function syncUrl() {
+    const q = new URLSearchParams({ period: state.period, date: state.date });
+    if (state.period === 'range') { q.set('from', state.from); q.set('to', state.to); }
+    if (state.barberId && state.data && state.data.can_pick_barber) q.set('barber', state.barberId);
+    history.replaceState(null, '', `${location.pathname}?${q}`);
+  }
+
+  // ── Controles ──
+  function renderControls(r) {
+    document.querySelectorAll('.st-seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.period === state.period)));
+    document.getElementById('st-period-label').textContent = r.label;
+    const isRange = state.period === 'range';
+    document.getElementById('st-range').classList.toggle('hidden', !isRange);
+    document.getElementById('st-nav').classList.toggle('hidden', isRange);
+    if (isRange) {
+      document.getElementById('st-from').value = r.start;
+      document.getElementById('st-to').value = r.end;
+    }
+    const d = state.data;
+    document.getElementById('st-subtitle').textContent = d
+      ? `${d.barber.name} · comisión ${Number(d.barber.commission_percentage).toLocaleString('es-CO')}%`
+      : 'Cargando…';
+    const picker = document.getElementById('st-barbers');
+    if (d && d.can_pick_barber && d.barbers.length) {
+      picker.classList.remove('hidden');
+      picker.innerHTML = d.barbers.map(b => `
+        <button type="button" data-barber="${b.id}" aria-pressed="${String(b.id) === state.barberId}"
+          class="barber-filter-chip flex-shrink-0 h-10 gap-2 ${String(b.id) === state.barberId ? 'active' : ''}">
+          <span class="w-2 h-2 rounded-full" style="background:${esc(b.color)}"></span>${esc(b.name)}
+        </button>`).join('');
+    } else {
+      picker.classList.add('hidden');
+    }
+  }
+
+  // ── Render principal ──
+  function render() {
+    const body = document.getElementById('st-body');
+    if (state.error) {
+      body.innerHTML = `<div class="st-card p-6 text-center">
+        <p class="text-red-300 text-sm">${esc(state.error)}</p>
+        <button type="button" id="st-retry" class="mt-4 h-11 px-5 rounded-lg bg-gold text-jet text-xs font-bold uppercase tracking-widest">Reintentar</button>
+      </div>`;
+      document.getElementById('st-retry').onclick = load;
+      return;
+    }
+    if (!state.data) {
+      body.innerHTML = `<div class="space-y-3">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3"><div class="st-skel h-40"></div><div class="st-skel h-40 lg:col-span-2"></div></div>
+        <div class="st-skel h-72"></div></div>`;
+      return;
+    }
+    const d = state.data, t = d.totals, r = ranges();
+    body.innerHTML = `
+      <div class="space-y-4 ${state.loading ? 'opacity-60 pointer-events-none' : 'st-fade'}">
+        ${heroAndKpis(d, t, r)}
+        ${insights(d, t)}
+        ${t.services ? `
+          ${trendCard(d)}
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            ${servicesCard(d)}
+            ${weekdaysCard(d)}
+          </div>
+          ${moneyFlowCard(d)}
+          ${salesCard(d)}` : emptyCard(r)}
+        ${howCard(d)}
+      </div>`;
+    if (t.services) drawChart(d);
+  }
+
+  function deltaBadge(pct, label) {
+    if (pct === null || pct === undefined) {
+      return `<span class="text-[0.65rem] text-smoke/40">Sin datos para comparar</span>`;
+    }
+    const up = pct > 0, flat = pct === 0;
+    const icon = flat ? '' : `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="${up ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}"/></svg>`;
+    const cls = flat ? 'bg-white/5 text-smoke/60' : up ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300';
+    const txt = `${up ? '+' : ''}${pct.toLocaleString('es-CO')}%`;
+    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.65rem] font-semibold ${cls}" title="${esc(label)}">
+      ${icon}<span>${flat ? 'Igual' : txt}</span><span class="sr-only"> ${esc(label)}</span></span>`;
+  }
+
+  function heroAndKpis(d, t, r) {
+    const cmp = compareLabel(r);
+    const kpi = (label, value, delta, mark, hint) => `
+      <div class="st-card p-4 min-w-0">
+        <div class="flex items-center gap-2">
+          ${mark ? `<span class="st-mark" style="background:${mark}" aria-hidden="true"></span>` : ''}
+          <p class="st-label truncate">${label}</p>
+        </div>
+        <p class="st-num text-xl sm:text-2xl font-bold text-white mt-2 truncate">${value}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-1.5">${delta}${hint ? `<span class="text-[0.65rem] text-smoke/40">${hint}</span>` : ''}</div>
+      </div>`;
+    return `
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <section class="st-card p-5 sm:p-6 relative overflow-hidden" aria-labelledby="st-earned-title">
+          <div class="absolute inset-y-0 left-0 w-1" style="background:${COLORS.earned}" aria-hidden="true"></div>
+          <div class="flex items-center gap-2">
+            <span class="st-mark" style="background:${COLORS.earned}" aria-hidden="true"></span>
+            <p id="st-earned-title" class="st-label">Ganaste</p>
+          </div>
+          <p class="st-num text-4xl sm:text-5xl font-bold text-white mt-3">${money(t.earned)}</p>
+          <p class="text-xs text-smoke/60 mt-2">Comisión <span class="st-num text-smoke/90">${money(t.commission)}</span> + propinas <span class="st-num text-smoke/90">${money(t.tips)}</span></p>
+          <div class="mt-3 flex flex-wrap items-center gap-2">${deltaBadge(d.previous.delta.earned, cmp)}<span class="text-[0.65rem] text-smoke/40">${esc(cmp)} (${money(d.previous.earned)})</span></div>
+          ${t.pending_count ? `<p class="mt-3 text-[0.7rem] text-amber-200/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+            Incluye ${t.pending_count} venta(s) por aprobar (${money(t.pending_sold)} vendidos). Caja todavía no las confirma.</p>` : ''}
+        </section>
+        <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 sm:gap-4">
+          ${kpi('Vendiste', money(t.sold), deltaBadge(d.previous.delta.sold, cmp), COLORS.sold)}
+          ${kpi('Servicios', t.services.toLocaleString('es-CO'), deltaBadge(d.previous.delta.services, cmp))}
+          ${kpi('Ticket promedio', money(t.avg_ticket), deltaBadge(d.previous.delta.avg_ticket, cmp), null, 'por servicio')}
+          ${kpi('Propinas', money(t.tips), deltaBadge(d.previous.delta.tips, cmp))}
+        </div>
+      </div>`;
+  }
+
+  function insights(d, t) {
+    const items = [];
+    if (d.best_day) items.push(['Tu mejor día', d.best_day]);
+    if (d.peak_hour !== null && d.peak_hour !== undefined) items.push(['Hora con más clientes', hour12(d.peak_hour)]);
+    if (t.clients) items.push(['Clientes atendidos', t.clients.toLocaleString('es-CO')]);
+    if (d.top_services.length) items.push(['Lo que más vendes', d.top_services[0].name]);
+    if (!items.length) return '';
+    return `<div class="st-scroll-x flex gap-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+      ${items.map(([k, v]) => `<div class="flex-shrink-0 st-card px-4 py-3">
+        <p class="st-label">${k}</p><p class="text-sm font-semibold text-white mt-1 whitespace-nowrap">${esc(v)}</p></div>`).join('')}
+    </div>`;
+  }
+
+  function emptyCard(r) {
+    return `<div class="st-card p-8 text-center">
+      <p class="text-smoke/60 text-sm">No hay servicios cobrados en este periodo.</p>
+      <p class="text-smoke/35 text-xs mt-1">${esc(r.label)}. Prueba otro periodo con las flechas o con "Mes".</p>
+    </div>`;
+  }
+
+  function trendCard(d) {
+    const many = d.series.length >= 2;
+    const title = d.granularity === 'month' ? 'Vendido y ganado por mes' : 'Vendido y ganado por día';
+    return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-trend-title">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div>
+          <h2 id="st-trend-title" class="text-sm font-semibold text-white">${title}</h2>
+          <div class="flex items-center gap-4 mt-1.5 text-xs text-smoke/70" aria-hidden="true">
+            <span class="inline-flex items-center gap-1.5"><span class="st-mark" style="background:${COLORS.sold}"></span>Vendido</span>
+            <span class="inline-flex items-center gap-1.5"><span class="st-mark" style="background:${COLORS.earned}"></span>Ganado</span>
+          </div>
+        </div>
+        ${many ? `<div class="flex bg-jet rounded-lg p-1 border border-white/5" role="group" aria-label="Ver como">
+          <button type="button" data-view="chart" aria-pressed="${state.view === 'chart'}" class="h-9 px-3 rounded-md text-[0.65rem] font-bold uppercase tracking-widest ${state.view === 'chart' ? 'bg-white/10 text-white' : 'text-smoke/50'}">Gráfica</button>
+          <button type="button" data-view="table" aria-pressed="${state.view === 'table'}" class="h-9 px-3 rounded-md text-[0.65rem] font-bold uppercase tracking-widest ${state.view === 'table' ? 'bg-white/10 text-white' : 'text-smoke/50'}">Tabla</button>
+        </div>` : ''}
+      </div>
+      ${!many ? `<p class="text-xs text-smoke/45 py-6 text-center">Con un solo día no hay tendencia que mostrar. Elige "Semana" o "Mes" para ver cómo vas día a día.</p>`
+        : state.view === 'table' ? trendTable(d) : `<div class="relative h-64 sm:h-72"><canvas id="st-chart" role="img" aria-label="${title}: barras de vendido y ganado"></canvas></div>`}
+    </section>`;
+  }
+
+  function trendTable(d) {
+    return `<div class="max-h-80 overflow-y-auto rounded-lg border border-white/5">
+      <table class="w-full text-xs">
+        <thead class="sticky top-0 bg-jet-lighter text-smoke/50 uppercase tracking-wider text-[0.6rem]">
+          <tr><th class="text-left px-3 py-2">${d.granularity === 'month' ? 'Mes' : 'Día'}</th><th class="text-right px-3 py-2">Servicios</th><th class="text-right px-3 py-2">Vendido</th><th class="text-right px-3 py-2">Ganado</th></tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          ${d.series.map(s => `<tr class="${s.services ? '' : 'text-smoke/30'}">
+            <td class="px-3 py-2 text-smoke/80">${esc(s.label)}</td>
+            <td class="px-3 py-2 text-right st-num">${s.services}</td>
+            <td class="px-3 py-2 text-right st-num">${money(s.sold)}</td>
+            <td class="px-3 py-2 text-right st-num text-white">${money(s.earned)}</td></tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  }
+
+  function drawChart(d) {
+    if (chart) { chart.destroy(); chart = null; }
+    const el = document.getElementById('st-chart');
+    if (!el || !window.Chart) return;
+    const bars = (label, key, color) => ({
+      label, data: d.series.map(s => s[key]), backgroundColor: color, hoverBackgroundColor: color,
+      borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom',
+      maxBarThickness: 22, categoryPercentage: 0.72, barPercentage: 0.9,
+    });
+    chart = new Chart(el, {
+      type: 'bar',
+      data: { labels: d.series.map(s => s.label), datasets: [bars('Vendido', 'sold', COLORS.sold), bars('Ganado', 'earned', COLORS.earned)] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: reduceMotion ? false : { duration: 450 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1a1a', borderColor: 'rgba(255,255,255,0.12)', borderWidth: 1,
+            titleColor: '#F5F5F5', bodyColor: 'rgba(245,245,245,0.85)', padding: 10, boxPadding: 4,
+            titleFont: { family: 'Montserrat', weight: '600' }, bodyFont: { family: 'Montserrat' },
+            callbacks: {
+              title: items => items[0].label,
+              label: ctx => ` ${ctx.dataset.label}: ${money(ctx.parsed.y)}`,
+              afterBody: items => { const s = d.series[items[0].dataIndex]; return s.services ? `${s.services} servicio(s)` : 'Sin servicios'; },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, border: { color: 'rgba(255,255,255,0.08)' },
+               ticks: { color: 'rgba(245,245,245,0.5)', font: { family: 'Montserrat', size: 10 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 8 } },
+          y: { beginAtZero: true, border: { display: false }, grid: { color: 'rgba(255,255,255,0.06)' },
+               ticks: { color: 'rgba(245,245,245,0.45)', font: { family: 'Montserrat', size: 10 }, maxTicksLimit: 5, callback: v => moneyShort(v) } },
+        },
+      },
+    });
+  }
+
+  function servicesCard(d) {
+    const max = Math.max(...d.top_services.map(s => s.sold), 1);
+    return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-svc-title">
+      <h2 id="st-svc-title" class="text-sm font-semibold text-white">Tus servicios más vendidos</h2>
+      <p class="text-[0.7rem] text-smoke/45 mt-0.5 mb-4">Ordenados por lo vendido en el periodo</p>
+      <ul class="space-y-3.5">
+        ${d.top_services.map((s, i) => `<li>
+          <div class="flex items-baseline justify-between gap-3 text-xs">
+            <span class="text-smoke/85 truncate"><span class="text-smoke/35 st-num mr-1">${i + 1}.</span>${esc(s.name)}</span>
+            <span class="st-num text-white font-semibold whitespace-nowrap">${money(s.sold)}</span>
+          </div>
+          <div class="flex items-center gap-2 mt-1.5">
+            <div class="st-bar-track flex-1" aria-hidden="true"><div class="st-bar" style="width:${Math.max(3, s.sold / max * 100)}%"></div></div>
+            <span class="text-[0.65rem] text-smoke/45 st-num whitespace-nowrap w-16 text-right">${s.count} ${s.count === 1 ? 'vez' : 'veces'}</span>
+          </div>
+        </li>`).join('')}
+      </ul>
+    </section>`;
+  }
+
+  function weekdaysCard(d) {
+    const max = Math.max(...d.weekdays.map(w => w.services), 1);
+    return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-wd-title">
+      <h2 id="st-wd-title" class="text-sm font-semibold text-white">¿Qué días atiendes más?</h2>
+      <p class="text-[0.7rem] text-smoke/45 mt-0.5 mb-4">Servicios por día de la semana${d.peak_hour !== null && d.peak_hour !== undefined ? ` · hora pico ${hour12(d.peak_hour)}` : ''}</p>
+      <ul class="space-y-2.5">
+        ${d.weekdays.map(w => {
+          const best = w.day === d.best_day;
+          return `<li class="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-xs">
+            <span class="${best ? 'text-white font-semibold' : 'text-smoke/70'}">${w.day}</span>
+            <div class="st-bar-track" aria-hidden="true"><div class="st-bar" style="width:${w.services ? Math.max(3, w.services / max * 100) : 0}%;${best ? '' : 'opacity:.55'}"></div></div>
+            <span class="st-num text-right whitespace-nowrap ${best ? 'text-white font-semibold' : 'text-smoke/55'}">${w.services}${best ? ' · mejor' : ''}</span>
+          </li>`;
+        }).join('')}
+      </ul>
+    </section>`;
+  }
+
+  function moneyFlowCard(d) {
+    return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-flow-title">
+      <h2 id="st-flow-title" class="text-sm font-semibold text-white">Vales y pagos en este periodo</h2>
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        <div class="rounded-xl bg-jet border border-white/5 p-3">
+          <p class="st-label">Vales recibidos</p>
+          <p class="st-num text-lg font-bold text-white mt-1">${money(d.advances.total)}</p>
+          <p class="text-[0.65rem] text-smoke/40">${d.advances.count} vale(s) · adelantos que se descuentan de tu pago</p>
+        </div>
+        <div class="rounded-xl bg-jet border border-white/5 p-3">
+          <p class="st-label">Pagos recibidos</p>
+          <p class="st-num text-lg font-bold text-white mt-1">${money(d.payments.total)}</p>
+          <p class="text-[0.65rem] text-smoke/40">${d.payments.count} liquidación(es) hechas por caja</p>
+        </div>
+      </div>
+      <p class="text-[0.65rem] text-smoke/35 mt-3">Tu saldo exacto lo lleva Caja: los pagos pueden cubrir servicios de otros periodos.</p>
+    </section>`;
+  }
+
+  function salesCard(d) {
+    const q = state.salesQuery.trim().toLowerCase();
+    const list = q ? d.sales.filter(s => `${s.client} ${s.service}`.toLowerCase().includes(q)) : d.sales;
+    const shown = list.slice(0, state.salesShown);
+    const statusChip = s => s.pending
+      ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-semibold bg-amber-500/15 text-amber-300"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Por aprobar</span>`
+      : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-semibold bg-emerald-500/15 text-emerald-300"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Aprobada</span>`;
+    const lateTag = s => s.paid_on !== s.date ? `<span class="text-[0.6rem] text-sky-300/80">cobrada el ${shortDate(s.paid_on)}</span>` : '';
+    return `<section class="st-card p-4 sm:p-5" aria-labelledby="st-sales-title">
+      <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+        <div>
+          <h2 id="st-sales-title" class="text-sm font-semibold text-white">Detalle de tus ventas</h2>
+          <p class="text-[0.7rem] text-smoke/45 mt-0.5">${d.sales_total_count} servicio(s) en el periodo</p>
+        </div>
+        <label class="w-full sm:w-64">
+          <span class="sr-only">Buscar cliente o servicio</span>
+          <input id="st-search" type="search" value="${esc(state.salesQuery)}" placeholder="Buscar cliente o servicio" class="admin-input !h-11" autocomplete="off">
+        </label>
+      </div>
+      ${!shown.length ? '<p class="text-xs text-smoke/40 py-6 text-center">No hay ventas que coincidan.</p>' : `
+      <!-- Móvil: tarjetas -->
+      <ul class="sm:hidden space-y-2">
+        ${shown.map(s => `<li class="rounded-xl bg-jet border border-white/5 p-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="text-sm text-white font-semibold truncate">${esc(s.client)}</p>
+              <p class="text-[0.7rem] text-gold/80 truncate">${esc(s.service)}</p>
+            </div>
+            ${statusChip(s)}
+          </div>
+          <div class="flex items-center justify-between gap-2 mt-2 text-[0.7rem] text-smoke/55">
+            <span>${shortDate(s.date)} · ${time12(s.time)} ${lateTag(s)}</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+            <div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Vendido</p><p class="st-num text-smoke/90">${money(s.sold)}</p></div>
+            <div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Ganaste</p><p class="st-num text-white font-semibold">${money(s.earned)}</p></div>
+            <div><p class="text-[0.6rem] text-smoke/40 uppercase tracking-wider">Propina</p><p class="st-num text-smoke/90">${money(s.tip)}</p></div>
+          </div>
+        </li>`).join('')}
+      </ul>
+      <!-- Escritorio: tabla -->
+      <div class="hidden sm:block overflow-x-auto rounded-lg border border-white/5">
+        <table class="w-full text-xs">
+          <thead class="bg-jet-lighter text-smoke/50 uppercase tracking-wider text-[0.6rem]">
+            <tr>
+              <th class="text-left px-3 py-2.5">Fecha</th><th class="text-left px-3 py-2.5">Cliente</th><th class="text-left px-3 py-2.5">Servicio</th>
+              <th class="text-right px-3 py-2.5">Vendido</th><th class="text-right px-3 py-2.5">% </th><th class="text-right px-3 py-2.5">Ganaste</th>
+              <th class="text-right px-3 py-2.5">Propina</th><th class="text-left px-3 py-2.5">Estado</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            ${shown.map(s => `<tr class="hover:bg-white/[0.02]">
+              <td class="px-3 py-2.5 whitespace-nowrap text-smoke/70">${shortDate(s.date)} · ${time12(s.time)}<div>${lateTag(s)}</div></td>
+              <td class="px-3 py-2.5 text-white">${esc(s.client)}</td>
+              <td class="px-3 py-2.5 text-smoke/70">${esc(s.service)}</td>
+              <td class="px-3 py-2.5 text-right st-num text-smoke/90">${money(s.sold)}</td>
+              <td class="px-3 py-2.5 text-right st-num text-smoke/50">${s.percentage === null ? '—' : Number(s.percentage).toLocaleString('es-CO') + '%'}</td>
+              <td class="px-3 py-2.5 text-right st-num text-white font-semibold">${money(s.earned)}</td>
+              <td class="px-3 py-2.5 text-right st-num text-smoke/90">${money(s.tip)}</td>
+              <td class="px-3 py-2.5">${statusChip(s)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${list.length > shown.length ? `<button type="button" id="st-more" class="mt-3 w-full h-11 rounded-lg border border-white/10 text-xs text-smoke/70 uppercase tracking-widest hover:text-gold hover:border-gold/30">Ver ${Math.min(20, list.length - shown.length)} más</button>` : ''}
+      ${d.sales_total_count > d.sales.length ? `<p class="text-[0.65rem] text-smoke/35 mt-2">Se muestran las ${d.sales.length} más recientes. Acota el periodo para ver el resto.</p>` : ''}`}
+    </section>`;
+  }
+
+  function howCard(d) {
+    return `<details class="st-card p-4 sm:p-5 group">
+      <summary class="cursor-pointer select-none text-sm font-semibold text-white flex items-center justify-between gap-2 list-none">
+        ¿Cómo se calculan estos números?
+        <svg class="w-4 h-4 text-smoke/50 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </summary>
+      <ul class="mt-3 space-y-2 text-xs text-smoke/65 leading-relaxed list-disc pl-4">
+        <li><strong class="text-smoke/90">Vendiste</strong>: lo que pagaron tus clientes por los servicios (sin propina, con descuentos aplicados).</li>
+        <li><strong class="text-smoke/90">Ganaste</strong>: tu comisión (${Number(d.barber.commission_percentage).toLocaleString('es-CO')}%) más las propinas. Es lo que te corresponde.</li>
+        <li>Cada servicio cuenta <strong class="text-smoke/90">el día que lo hiciste</strong>, aunque se haya cobrado en caja después.</li>
+        <li>Las ventas rechazadas no cuentan. Las "por aprobar" sí, y se marcan hasta que Caja las confirme.</li>
+        <li>La comparación es contra el mismo tramo del periodo anterior (por ejemplo, del 1 al 8 de este mes contra el 1 al 8 del mes pasado).</li>
+      </ul>
+    </details>`;
+  }
+
+  // ── Eventos ──
+  document.querySelector('.st-seg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-period]');
+    if (!b) return;
+    state.period = b.dataset.period;
+    if (state.period === 'range' && !state.from) {
+      state.to = iso(new Date());
+      state.from = addDays(state.to, -29);
+    }
+    load();
+  });
+  function shift(n) {
+    const p = state.period;
+    if (p === 'day') state.date = addDays(state.date, n);
+    else if (p === 'week') state.date = addDays(state.date, 7 * n);
+    else if (p === 'month') state.date = addMonths(state.date, n);
+    else if (p === 'year') { const d = parse(state.date); state.date = `${d.getFullYear() + n}-01-01`; }
+    load();
+  }
+  document.getElementById('st-prev').onclick = () => shift(-1);
+  document.getElementById('st-next').onclick = () => shift(1);
+  document.getElementById('st-today').onclick = () => { state.date = iso(new Date()); load(); };
+  document.getElementById('st-range').addEventListener('submit', e => {
+    e.preventDefault();
+    state.from = document.getElementById('st-from').value;
+    state.to = document.getElementById('st-to').value;
+    if (state.from && state.to) load();
+  });
+  document.addEventListener('click', e => {
+    const pick = e.target.closest('#st-barbers [data-barber]');
+    if (pick) { state.barberId = pick.dataset.barber; state.data = null; load(); return; }
+    const v = e.target.closest('[data-view]');
+    if (v && state.data) { state.view = v.dataset.view; render(); return; }
+    if (e.target.closest('#st-more')) { state.salesShown += 20; render(); }
+  });
+  let searchTimer = null;
+  document.addEventListener('input', e => {
+    if (e.target.id !== 'st-search') return;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.salesQuery = e.target.value;
+      state.salesShown = 20;
+      render();
+      const input = document.getElementById('st-search');
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    }, 200);
+  });
+
+  load();
+})();
+</script>
+{% endblock %}
