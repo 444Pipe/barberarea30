@@ -187,6 +187,25 @@ except Exception:
     except Exception as _e:
         print("⚠ No se pudo crear la columna manualmente:", _e)
 
+# --- Autocuración para barbers_barber.only_custom_hours (horario a elección) ---
+# Si falta la columna, se crea apagada: el barbero sigue con su horario y sus
+# bloqueos (nunca queda abierto de más). El paso de datos de Cristian vive en
+# la migración 0016.
+from apps.barbers.models import Barber as _BarberModel
+try:
+    _BarberModel.objects.filter(only_custom_hours=False).exists()
+except Exception:
+    print("⚠ Columna 'only_custom_hours' no encontrada en barbers_barber. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.BooleanField(default=False)
+            _f.set_attributes_from_name('only_custom_hours')
+            schema_editor.add_field(_BarberModel, _f)
+        print("✓ Columna 'only_custom_hours' creada exitosamente.")
+    except Exception as _e:
+        print("⚠ No se pudo crear la columna manualmente:", _e)
+
 # --- NUEVO: Autocuración para cashflow_sale.approval_status ---
 from apps.cashflow.models import Sale
 try:

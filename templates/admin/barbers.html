@@ -156,6 +156,13 @@ function loadBarbers() {
           warning.classList.add('hidden');
         }
       }
+      const wantHours = new URLSearchParams(location.search).get('horario');
+      const target = wantHours && barbers.find(x => String(x.id) === wantHours);
+      if (target && !window.__hoursAutoOpened && typeof openUnavailability === 'function') {
+        window.__hoursAutoOpened = true;
+        openUnavailability(target.id, target.display_name);
+        _setUnavailTab('hours');
+      }
     })
     .catch(() => {
       document.getElementById('barber-cards').innerHTML = '<div class="text-center text-smoke/30 text-sm py-12 col-span-full">Error al cargar barberos</div>';
@@ -180,6 +187,7 @@ function renderBarberCards(barbers) {
           <div class="flex items-center gap-2 mt-1">
             <span class="w-1.5 h-1.5 rounded-full ${b.is_available ? 'bg-emerald-400' : 'bg-red-400'}"></span>
             <span class="text-[0.6rem] ${b.is_available ? 'text-emerald-400' : 'text-red-400'}">${b.is_available ? 'Activo' : 'Inactivo'}</span>
+            ${b.only_custom_hours ? '<span class="text-[0.55rem] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 uppercase tracking-wider">Horario a elección</span>' : ''}
           </div>
         </div>
       </div>
@@ -610,6 +618,13 @@ function deleteBarber() {
     <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/5 unavail-pane hidden" data-pane="hours">
       <p class="text-[0.65rem] text-sky-300/80 uppercase tracking-widest font-semibold mb-1">Horario de trabajo</p>
       <p class="text-[0.7rem] text-smoke/50 leading-snug mb-3">En vez de bloquear, indica <strong class="text-smoke/80">de qué hora a qué hora trabaja</strong>. Fuera de esa franja la web no le ofrece citas. Se puede combinar con bloqueos.</p>
+      <label class="flex items-start gap-3 p-3 mb-4 rounded-lg border border-sky-500/30 bg-sky-500/5 cursor-pointer select-none">
+        <input type="checkbox" id="hours-only-custom" class="accent-sky-400 w-5 h-5 mt-0.5 flex-shrink-0">
+        <span>
+          <span class="block text-sm text-white font-semibold">Solo recibe reservas en los horarios que elija</span>
+          <span id="hours-mode-help" class="block text-[0.7rem] text-smoke/55 mt-1 leading-snug"></span>
+        </span>
+      </label>
       <form id="hours-form" class="space-y-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -730,6 +745,7 @@ function openUnavailability(barberId, barberName) {
   document.getElementById('unavailability-modal').classList.remove('hidden');
   loadUnavailabilities(barberId);
   loadWorkHours(barberId);
+  loadHoursMode(barberId);
 }
 
 function closeUnavailabilityModal() {
@@ -994,6 +1010,46 @@ function _refreshHoursPreview() {
   }
   el.innerHTML = html;
 }
+
+function _renderHoursMode(on) {
+  const box = document.getElementById('hours-only-custom');
+  const help = document.getElementById('hours-mode-help');
+  if (!box || !help) return;
+  box.checked = !!on;
+  help.textContent = on
+    ? 'Activado: si un día no tiene horario abierto abajo, no aparece en la web. Abre solo las franjas en que quiere trabajar.'
+    : 'Desactivado: atiende en su horario normal; los horarios de abajo solo lo recortan.';
+}
+
+function loadHoursMode(barberId) {
+  fetch(`/api/admin/barbers/${barberId}/work-hours/mode/`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(d => _renderHoursMode(d.only_custom_hours))
+    .catch(() => {});
+}
+
+document.addEventListener('change', e => {
+  if (!e.target || e.target.id !== 'hours-only-custom' || !currentUnavailBarberId) return;
+  const on = e.target.checked;
+  const msg = on
+    ? `¿Activar "solo en los horarios que elija" para ${currentUnavailBarberName}? Los días sin horario abierto dejarán de aparecer en la web.`
+    : `¿Volver al horario normal para ${currentUnavailBarberName}? Podrá recibir reservas en todo su horario semanal (menos los bloqueos).`;
+  if (!confirm(msg)) { e.target.checked = !on; return; }
+  fetch(`/api/admin/barbers/${currentUnavailBarberId}/work-hours/mode/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify({ only_custom_hours: on }),
+  })
+    .then(r => r.json().then(d => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (!ok) { alert('Error: ' + (d.error || 'No se pudo guardar.')); _renderHoursMode(!on); return; }
+      _renderHoursMode(d.only_custom_hours);
+      window.showToast(on ? 'Ahora solo recibe reservas en sus horarios' : 'Volvió a su horario normal', 'success');
+      if (typeof loadBarbers === 'function') loadBarbers();
+      loadUnavailConflicts(currentUnavailBarberId);
+    })
+    .catch(() => { alert('Error de conexión'); _renderHoursMode(!on); });
+});
 
 function loadWorkHours(barberId) {
   const wrap = document.getElementById('hours-list-wrap');

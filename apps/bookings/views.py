@@ -577,8 +577,12 @@ def admin_my_agenda_view(request):
             'id': barber.id,
             'name': barber.display_name,
             'color': barber.color_tag,
+            'only_custom_hours': barber.only_custom_hours,
+            'is_me': barber.user_id == request.user.id,
         },
         'can_pick_barber': is_admin,
+        # Quien puede abrir/cerrar horarios ve el botón "Horario" en la agenda.
+        'can_edit_hours': is_admin,
         'show_sold': show_sold,
         'barbers': barbers,
         'start': start.strftime('%Y-%m-%d'),

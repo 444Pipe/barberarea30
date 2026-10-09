@@ -32,7 +32,9 @@ class BarberAdminSerializer(serializers.ModelSerializer):
         fields = ['id', 'display_name', 'username', 'email', 'avatar', 'phone',
                   'bio', 'specialties', 'specialty_ids', 'is_available',
                   'schedule', 'color_tag', 'total_cuts', 'rating', 'commission_percentage', 'created_at',
-                  'new_username', 'new_password']
+                  'only_custom_hours', 'new_username', 'new_password']
+        # Se cambia desde el modal de horario (/work-hours/mode/), no desde la ficha.
+        read_only_fields = ['only_custom_hours']
 
     def validate(self, attrs):
         from .models import Barber

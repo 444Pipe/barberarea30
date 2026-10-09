@@ -40,6 +40,10 @@
     <div class="min-w-0">
       <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Mi Agenda</h1>
       <p class="text-xs text-smoke/40 mt-1 tracking-wider uppercase truncate" id="ag-subtitle">Cargando…</p>
+      <a id="ag-hours-link" href="#" class="hidden mt-2 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-sky-500/30 bg-sky-500/5 text-sky-300 text-[0.65rem] font-bold uppercase tracking-widest hover:bg-sky-500/15">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span id="ag-hours-label">Mi horario</span>
+      </a>
     </div>
     <div class="flex items-center gap-1 bg-jet-card border border-white/5 rounded-lg p-1 flex-shrink-0">
       <button type="button" data-view="day" class="ag-view-btn px-3 h-9 rounded-md text-[0.65rem] font-bold uppercase tracking-widest">Día</button>
@@ -128,6 +132,7 @@
   // El barbero solo ve lo que gana (sin precios ni "valor del día"); los
   // admins ven también lo vendido. Lo decide el servidor (show_sold).
   function showSold() { return !!(state.week && state.week.show_sold); }
+  function customOnly() { return !!(state.week && state.week.barber.only_custom_hours); }
   function earnText(b) {
     if (b.earned !== null && b.earned !== undefined) return `Ganaste ${money(b.earned)}`;
     if (b.earn_estimate) return `Ganas ~${money(b.earn_estimate)}`;
@@ -208,6 +213,14 @@
     const sub = document.getElementById('ag-subtitle');
     const w = state.week;
     sub.textContent = w ? w.barber.name : 'Cargando…';
+    const hoursLink = document.getElementById('ag-hours-link');
+    if (w && w.can_edit_hours) {
+      hoursLink.href = `/admin-panel/barbers/?horario=${w.barber.id}`;
+      document.getElementById('ag-hours-label').textContent = w.barber.is_me ? 'Mi horario' : `Horario de ${w.barber.name}`;
+      hoursLink.classList.remove('hidden');
+    } else {
+      hoursLink.classList.add('hidden');
+    }
     document.querySelectorAll('.ag-view-btn').forEach(b => {
       const on = b.dataset.view === state.view;
       b.classList.toggle('bg-gold', on);
@@ -263,7 +276,9 @@
     if (d.holiday) chips.push(`<span class="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300">Festivo · ${esc(d.holiday)}</span>`);
     if (d.window && d.window.source === 'custom') chips.push('<span class="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">Horario especial</span>');
     if (d.shop_block) chips.push(`<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">${d.shop_block.all_day ? 'Local cerrado' : `Local abre ${fmt12(d.shop_block.start)} – ${fmt12(d.shop_block.end)}`}${d.shop_block.description ? ' · ' + esc(d.shop_block.description) : ''}</span>`);
-    if (!d.window && !d.shop_block) chips.push('<span class="px-2 py-0.5 rounded-full bg-white/10 text-smoke/60">Descanso</span>');
+    if (!d.window && !d.shop_block) chips.push(customOnly()
+      ? '<span class="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">Sin horario abierto</span>'
+      : '<span class="px-2 py-0.5 rounded-full bg-white/10 text-smoke/60">Descanso</span>');
     if (d.blocks.some(b => b.all_day)) chips.push('<span class="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">Bloqueado todo el día</span>');
     return chips.join('');
   }
@@ -271,7 +286,7 @@
   function scheduleLine(d) {
     if (d.shop_block && d.shop_block.all_day) return 'El local no atiende este día';
     if (d.shop_block) return `Atención especial: ${fmt12(d.shop_block.start)} – ${fmt12(d.shop_block.end)}`;
-    if (!d.window) return 'Día de descanso';
+    if (!d.window) return customOnly() ? 'No hay horario abierto este día: no recibes reservas web' : 'Día de descanso';
     let s = `${d.window.source === 'custom' ? 'Horario especial' : 'Horario'}: ${fmt12(d.window.start)} – ${fmt12(d.window.end)}`;
     if (d.window.last_start) s += ` · última cita ${fmt12(d.window.last_start)}`;
     if (d.window.source === 'custom' && d.window.reason) s += ` · ${d.window.reason}`;
@@ -454,7 +469,7 @@
               };
             }),
           ].sort((a, b) => a.t - b.t);
-          const note = !d.window && !d.shop_block ? 'Descanso' : (d.shop_block && d.shop_block.all_day ? 'Local cerrado' : '');
+          const note = !d.window && !d.shop_block ? (customOnly() ? 'Sin horario' : 'Descanso') : (d.shop_block && d.shop_block.all_day ? 'Local cerrado' : '');
           return `<section class="bg-jet-card border ${d.is_today ? 'border-gold/40' : 'border-white/5'} rounded-xl p-2.5 min-w-0">
             <button type="button" data-goto="${d.date}" class="w-full flex items-center justify-between mb-2 text-left">
               <span class="text-xs font-semibold text-white">${DAY_LONG[d.weekday].slice(0, 3)} ${parseISO(d.date).getDate()}</span>

@@ -62,6 +62,13 @@ class Barber(models.Model):
     # comisiones, vales y pagos POSTERIORES a esta fecha. Sirve para "reiniciar"
     # el acumulado de un barbero (ej. Frank) dejando su historial intacto en BD.
     ledger_reset_at = models.DateTimeField(null=True, blank=True)
+    # Modo "horario a elección": el barbero NO recibe reservas salvo en las
+    # franjas que él mismo abre (BarberWorkHours). Pensado para Cristian
+    # (oct-2026), que vivía con un bloqueo de día completo y lo levantaba a mano.
+    only_custom_hours = models.BooleanField(
+        default=False,
+        help_text='Solo recibe reservas en los horarios de trabajo que él elija',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -120,7 +127,8 @@ class Barber(models.Model):
             return None
         custom = self.work_hours_for(target_date, work_hours)
         if custom is None:
-            return window
+            # En modo "horario a elección", sin franja abierta no hay atención.
+            return None if self.only_custom_hours else window
         start = max(window['start'], custom.start_time)
         end = min(window['end'], custom.end_time)
         if start >= end:
@@ -178,6 +186,11 @@ class Barber(models.Model):
         `end_time` es la hora a la que terminaría el servicio.
         """
         window = self.day_window(target_date)
+        if not window and self.only_custom_hours:
+            return (
+                f'{self.display_name} no tiene horario abierto el '
+                f'{target_date.strftime("%d/%m/%Y")}. Por favor elige otra fecha u otro barbero.'
+            )
         if not window:
             return (
                 f'{self.display_name} no atiende el {target_date.strftime("%d/%m/%Y")}. '

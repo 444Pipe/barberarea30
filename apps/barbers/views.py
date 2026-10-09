@@ -782,6 +782,25 @@ def barber_work_hours_list(request, barber_id):
     return Response(data, status=status.HTTP_201_CREATED)
 
 
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminOrAbove])
+def barber_work_hours_mode(request, barber_id):
+    """GET/POST /api/admin/barbers/{id}/work-hours/mode/  Body: {only_custom_hours: bool}
+
+    Modo "horario a elección": encendido, el barbero solo recibe reservas en
+    los horarios de trabajo que él abra; apagado, rige su horario semanal.
+    """
+    barber = get_object_or_404(Barber, pk=barber_id)
+    if request.method == 'POST':
+        value = request.data.get('only_custom_hours')
+        if not isinstance(value, bool):
+            return Response({'error': 'only_custom_hours debe ser true o false.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        barber.only_custom_hours = value
+        barber.save(update_fields=['only_custom_hours'])
+    return Response({'only_custom_hours': barber.only_custom_hours})
+
+
 @api_view(['DELETE'])
 @permission_classes([IsAdminOrAbove])
 def barber_work_hours_delete(request, barber_id, wh_id):
