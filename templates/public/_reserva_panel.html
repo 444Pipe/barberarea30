@@ -1,0 +1,71 @@
+{% load static %}
+{# Panel de reserva (nov-2026). Lo abre cualquier enlace a /reservar/ o /booking/ #}
+{# de la página, o la URL ?reservar=1 (enlace directo de Google / Instagram).    #}
+<link rel="stylesheet" href="{% static 'css/reserva.css' %}">
+<div class="rsv" id="rsv" aria-hidden="true">
+  <div class="rsv-backdrop" data-rsv-close></div>
+  <section class="rsv-sheet" id="rsv-sheet" role="dialog" aria-modal="true" aria-labelledby="rsv-title" tabindex="-1">
+    <div class="rsv-grip" aria-hidden="true"></div>
+    <header class="rsv-head" id="rsv-head">
+      <h2 id="rsv-title">Reserva tu <span>cita</span></h2>
+      <button type="button" class="rsv-x" data-rsv-close aria-label="Cerrar">×</button>
+    </header>
+
+    <div class="rsv-body" id="rsv-body">
+      <div class="rsv-again" id="rsv-again" hidden>
+        <p>Hola, <span id="rsv-again-name"></span>. ¿Lo de siempre?<strong id="rsv-again-what"></strong></p>
+        <div class="rsv-again-btns">
+          <button type="button" class="rsv-solid" id="rsv-again-yes">Sí, solo elijo la hora</button>
+          <button type="button" class="rsv-link" id="rsv-again-no">Quiero otra cosa</button>
+        </div>
+      </div>
+
+      <div class="rsv-blk" id="rsv-blk-svc">
+        <div class="rsv-t">Servicio</div>
+        <div id="rsv-svc-box"><p class="rsv-empty">Cargando servicios…</p></div>
+      </div>
+
+      <div class="rsv-blk" id="rsv-blk-day">
+        <div class="rsv-t">Día</div>
+        <div class="rsv-scroll" id="rsv-days"></div>
+      </div>
+
+      <div class="rsv-blk" id="rsv-blk-time">
+        <div class="rsv-t">Hora <small id="rsv-time-note"></small></div>
+        <div class="rsv-slots" id="rsv-slots"><p class="rsv-empty">Elige un servicio para ver las horas libres.</p></div>
+      </div>
+
+      <div class="rsv-blk" id="rsv-blk-barber">
+        <div class="rsv-t">Barbero <small>opcional</small></div>
+        <div class="rsv-scroll" id="rsv-barbers"></div>
+      </div>
+
+      <div class="rsv-blk" id="rsv-blk-data">
+        <div class="rsv-t">Tus datos <button type="button" class="rsv-link is-quiet" id="rsv-forget" hidden></button></div>
+        <label class="rsv-sr" for="rsv-name">Nombre</label>
+        <input class="rsv-field" id="rsv-name" type="text" autocomplete="name" placeholder="Nombre" maxlength="150">
+        <label class="rsv-sr" for="rsv-phone">WhatsApp</label>
+        <input class="rsv-field" id="rsv-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="WhatsApp" maxlength="20">
+        <button type="button" class="rsv-link" id="rsv-more" aria-expanded="false" aria-controls="rsv-extra">+ Agregar correo o una nota (opcional)</button>
+        <div class="rsv-blk" id="rsv-extra" hidden>
+          <label class="rsv-sr" for="rsv-email">Correo</label>
+          <input class="rsv-field" id="rsv-email" type="email" autocomplete="email" placeholder="Correo, para recibir la confirmación">
+          <label class="rsv-sr" for="rsv-notes">Nota para el barbero</label>
+          <textarea class="rsv-field" id="rsv-notes" rows="2" maxlength="500" placeholder="Nota para el barbero"></textarea>
+        </div>
+        <label class="rsv-optin"><input type="checkbox" id="rsv-optin">Quiero recibir promociones por WhatsApp</label>
+      </div>
+
+      <p class="rsv-err" id="rsv-err" role="alert" hidden></p>
+    </div>
+
+    <footer class="rsv-foot">
+      <div class="rsv-sum"><span id="rsv-sum-what">Elige servicio y hora</span><span id="rsv-sum-price"></span></div>
+      <button type="button" class="rsv-book is-pending" id="rsv-book">Elige un servicio</button>
+      <p class="rsv-legal">Al tocar Reservar aceptas la <a href="/politica-datos/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> (Ley 1581 de 2012).</p>
+    </footer>
+
+    <div class="rsv-done" id="rsv-done" hidden></div>
+  </section>
+</div>
+<script src="{% static 'js/reserva.js' %}" defer></script>

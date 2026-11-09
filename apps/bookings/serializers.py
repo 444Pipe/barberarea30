@@ -11,7 +11,8 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'client_name', 'client_phone', 'client_email',
                   'barber', 'service_id', 'date', 'time', 'notes',
-                  'status', 'created_at', 'is_walk_in', 'privacy_accepted']
+                  'status', 'created_at', 'is_walk_in', 'privacy_accepted',
+                  'marketing_opt_in']
         read_only_fields = ['id', 'status', 'created_at', 'barber']
         # 'price' se omite deliberadamente: el precio siempre lo fija el servidor
         # desde Service.price. Ajustes de precio se hacen en checkout/reagendado
@@ -35,6 +36,7 @@ class BookingAdminSerializer(serializers.ModelSerializer):
         fields = ['id', 'client_name', 'client_phone', 'client_email',
                   'barber', 'barber_name', 'barber_color',
                   'service', 'service_name', 'is_walk_in', 'privacy_accepted',
+                  'marketing_opt_in',
                   'date', 'time', 'duration_minutes', 'status',
                   'notes', 'price', 'manual_labor_cost', 'manual_materials_cost',
                   'created_at', 'updated_at', 'completed_at', 'can_cancel']

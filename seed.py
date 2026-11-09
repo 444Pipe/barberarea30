@@ -206,6 +206,24 @@ except Exception:
     except Exception as _e:
         print("⚠ No se pudo crear la columna manualmente:", _e)
 
+# --- Autocuración para bookings_booking.marketing_opt_in (casilla de promociones) ---
+# Si falta, la reserva pública falla al guardar. Se crea apagada: nadie queda
+# suscrito a promociones sin haberlo pedido.
+from apps.bookings.models import Booking as _BookingModel
+try:
+    _BookingModel.objects.filter(marketing_opt_in=False).exists()
+except Exception:
+    print("⚠ Columna 'marketing_opt_in' no encontrada en bookings_booking. Intentando crearla...")
+    try:
+        from django.db import models as _dj_models
+        with connection.schema_editor() as schema_editor:
+            _f = _dj_models.BooleanField(default=False)
+            _f.set_attributes_from_name('marketing_opt_in')
+            schema_editor.add_field(_BookingModel, _f)
+        print("✓ Columna 'marketing_opt_in' creada exitosamente.")
+    except Exception as _e:
+        print("⚠ No se pudo crear la columna manualmente:", _e)
+
 # --- NUEVO: Autocuración para cashflow_sale.approval_status ---
 from apps.cashflow.models import Sale
 try:

@@ -39,6 +39,18 @@ class HomeView(TemplateView):
         context['barbers'] = Barber.objects.filter(is_available=True).order_by('display_order', 'display_name')
         return context
 
+def reservar_redirect_view(request):
+    """/reservar/ y la vieja /booking/ → inicio con el panel de reserva abierto.
+
+    Conserva los parámetros (servicio, barbero) para que un enlace de Google o
+    de una historia llegue con el servicio ya elegido. El #ancla de los enlaces
+    viejos (/booking/#gold-exclusive) la conserva el navegador en la redirección.
+    """
+    params = request.GET.copy()
+    params['reservar'] = params.get('reservar') or '1'
+    return redirect(f'/?{params.urlencode()}')
+
+
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])

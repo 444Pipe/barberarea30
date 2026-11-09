@@ -268,3 +268,55 @@ class WorkHoursTests(TestCase):
         self.assertEqual(day['window']['source'], 'custom')
         self.assertEqual(day['window']['end'], '13:00')
         self.assertEqual(day['window']['reason'], 'Solo mañanas')
+
+
+@mock.patch('threading.Thread')
+class AgendaCortaTests(TestCase):
+    """Panel de reserva de nov-2026: solo nombre y WhatsApp, correo opcional,
+    promociones en casilla aparte y enlaces directos que abren el panel."""
+
+    def setUp(self):
+        shop = Barbershop.objects.create(name='Área 30 Test')
+        user = User.objects.create_user('jesus_t', password='x')
+        UserProfile.objects.create(user=user, role='barber', barbershop=shop)
+        self.barber = Barber.objects.create(user=user, barbershop=shop, display_name='Jesús')
+        self.service = Service.objects.create(
+            name='Silver', slug='silver-t', price=Decimal('30000'), duration_minutes=60,
+        )
+        self.day = _next_working_wednesday()
+
+    def _reservar(self, **extra):
+        payload = {
+            'client_name': 'Carlos', 'client_phone': '300 123 4567',
+            'service_id': self.service.id, 'barber_id': 'any',
+            'date': self.day.strftime('%Y-%m-%d'), 'time': '11:00',
+            'privacy_accepted': True,
+        }
+        payload.update(extra)
+        return self.client.post('/api/bookings/', payload, content_type='application/json')
+
+    def test_reserva_solo_con_nombre_y_whatsapp(self, _thread):
+        r = self._reservar()
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()['barber_name'], 'Jesús')
+        b = Booking.objects.get(pk=r.json()['id'])
+        self.assertEqual(b.client_email, '')
+        self.assertFalse(b.marketing_opt_in)  # nadie queda suscrito sin pedirlo
+
+    def test_casilla_de_promociones_se_guarda(self, _thread):
+        r = self._reservar(marketing_opt_in=True, client_email='carlos@example.com')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(Booking.objects.get(pk=r.json()['id']).marketing_opt_in)
+
+    def test_sin_aceptar_datos_no_reserva(self, _thread):
+        self.assertEqual(self._reservar(privacy_accepted=False).status_code, 400)
+
+    def test_enlace_directo_abre_el_panel_con_el_servicio(self, _thread):
+        r = self.client.get('/reservar/?servicio=7')
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r['Location'], '/?servicio=7&reservar=1')
+
+    def test_enlaces_viejos_de_booking_llegan_al_panel(self, _thread):
+        for url in ('/booking/', '/booking', '/booking.html', '/reservar'):
+            r = self.client.get(url)
+            self.assertEqual((r.status_code, r['Location']), (302, '/?reservar=1'), url)

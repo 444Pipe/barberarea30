@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Italianno&family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Marcellus&display=swap"
     rel="stylesheet">
 
   <!-- Tailwind CSS -->
@@ -26,20 +26,20 @@
         extend: {
           colors: {
             gold: {
-              DEFAULT: '#D4AF37',
-              dark: '#b39129',
-              light: '#f3d97f'
+              DEFAULT: '#C9A24A',
+              dark: '#A8802F',
+              light: '#ECD48E'
             },
             jet: {
-              DEFAULT: '#0A0A0A',
-              card: '#111111',
-              lighter: '#1a1a1a'
+              DEFAULT: '#0C0A07',
+              card: '#14110C',
+              lighter: '#1D1912'
             },
-            smoke: '#F5F5F5'
+            smoke: '#EFE7D6'
           },
           fontFamily: {
-            sans: ['Montserrat', 'sans-serif'],
-            serif: ['Playfair Display', 'serif'],
+            sans: ['Jost', 'sans-serif'],
+            serif: ['Marcellus', 'serif'],
           }
         }
       }
@@ -81,23 +81,23 @@
       width: clamp(170px, 32vw, 280px);
       height: auto;
       animation: splashPulse 1.8s ease-in-out infinite;
-      filter: drop-shadow(0 0 24px rgba(212, 175, 55, 0.45));
+      filter: drop-shadow(0 0 24px rgba(201, 162, 74, 0.45));
     }
 
     #splash-screen .splash-fallback {
       display: none;
-      font-family: 'Playfair Display', serif;
+      font-family: 'Marcellus', serif;
       font-weight: 700;
       font-size: clamp(2.4rem, 9vw, 3.8rem);
       letter-spacing: 0.08em;
-      color: #D4AF37;
-      text-shadow: 0 0 24px rgba(212, 175, 55, 0.45);
+      color: #C9A24A;
+      text-shadow: 0 0 24px rgba(201, 162, 74, 0.45);
       animation: splashPulse 1.8s ease-in-out infinite;
     }
 
     #splash-screen .splash-fallback span {
       display: block;
-      font-family: 'Montserrat', sans-serif;
+      font-family: 'Jost', sans-serif;
       font-weight: 400;
       font-size: 0.55em;
       letter-spacing: 0.35em;
@@ -113,13 +113,13 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      border: 2px solid rgba(212, 175, 55, 0.18);
-      border-top-color: #D4AF37;
+      border: 2px solid rgba(201, 162, 74, 0.18);
+      border-top-color: #C9A24A;
       animation: splashSpin 0.9s linear infinite;
     }
 
     #splash-screen .splash-label {
-      font-family: 'Montserrat', sans-serif;
+      font-family: 'Jost', sans-serif;
       font-size: 0.65rem;
       letter-spacing: 0.5em;
       text-transform: uppercase;
@@ -143,8 +143,8 @@
     .marquee {
       overflow: hidden;
       background: #111;
-      border-top: 1px solid rgba(212, 175, 55, 0.15);
-      border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+      border-top: 1px solid rgba(201, 162, 74, 0.15);
+      border-bottom: 1px solid rgba(201, 162, 74, 0.15);
       padding: 1rem 0;
       position: relative;
     }
@@ -173,7 +173,7 @@
       white-space: nowrap;
     }
     .marquee-track span.word {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Marcellus', serif;
       font-style: italic;
       font-size: 1.4rem;
       color: #F5F5F5;
@@ -182,7 +182,7 @@
     .marquee-track span.dot {
       width: 5px;
       height: 5px;
-      background: #D4AF37;
+      background: #C9A24A;
       border-radius: 50%;
       display: inline-block;
     }
@@ -220,24 +220,24 @@
       top: 50%;
       width: 2px;
       height: 0%;
-      background: #D4AF37;
+      background: #C9A24A;
       transform: translateY(-50%);
       transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .menu-row:hover {
       padding-left: 0.75rem;
-      background: linear-gradient(90deg, rgba(212, 175, 55, 0.04), transparent 70%);
+      background: linear-gradient(90deg, rgba(201, 162, 74, 0.04), transparent 70%);
     }
     .menu-row:hover::before { height: 65%; }
     .menu-num {
-      font-family: 'Montserrat', sans-serif;
+      font-family: 'Jost', sans-serif;
       font-size: 0.65rem;
       letter-spacing: 0.2em;
-      color: #D4AF37;
+      color: #C9A24A;
       min-width: 2.2rem;
     }
     .menu-name {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Marcellus', serif;
       font-weight: 500;
       font-size: 1.25rem;
       color: #F5F5F5;
@@ -245,7 +245,7 @@
       line-height: 1.2;
       transition: color 0.3s;
     }
-    .menu-row:hover .menu-name { color: #D4AF37; }
+    .menu-row:hover .menu-name { color: #C9A24A; }
     .menu-dots {
       flex: 1;
       align-self: end;
@@ -254,18 +254,18 @@
       min-width: 30px;
     }
     .menu-duration {
-      font-family: 'Montserrat', sans-serif;
+      font-family: 'Jost', sans-serif;
       font-size: 0.68rem;
       letter-spacing: 0.15em;
       text-transform: uppercase;
       color: rgba(245, 245, 245, 0.45);
     }
     .menu-price {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Marcellus', serif;
       font-style: italic;
       font-size: 1.15rem;
       font-weight: 500;
-      color: #D4AF37;
+      color: #C9A24A;
       min-width: 70px;
       text-align: right;
     }
@@ -286,10 +286,10 @@
       left: 0;
       height: 2px;
       width: 0%;
-      background: linear-gradient(90deg, #b39129 0%, #D4AF37 30%, #f3d97f 50%, #D4AF37 70%, #b39129 100%);
+      background: linear-gradient(90deg, #A8802F 0%, #C9A24A 30%, #ECD48E 50%, #C9A24A 70%, #A8802F 100%);
       background-size: 200% 100%;
       z-index: 9998;
-      box-shadow: 0 0 12px rgba(212, 175, 55, 0.55), 0 0 2px rgba(212, 175, 55, 0.85);
+      box-shadow: 0 0 12px rgba(201, 162, 74, 0.55), 0 0 2px rgba(201, 162, 74, 0.85);
       animation: progressShimmer 3.5s linear infinite;
       pointer-events: none;
       transform-origin: left center;
@@ -312,7 +312,7 @@
 
     /* ───── Hero: pareja tipográfica (serif premium + script caligráfico) ───── */
     .hero-title {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Marcellus', serif;
       font-weight: 400;
       font-size: clamp(2.3rem, 6.2vw, 6rem);
       line-height: 1.02;
@@ -321,13 +321,13 @@
     }
     .hero-title .script {
       display: block;
-      font-family: 'Italianno', 'Playfair Display', cursive;
+      font-family: 'Italianno', 'Marcellus', cursive;
       font-weight: 400;
       font-size: clamp(3.7rem, 10.5vw, 10rem);
       line-height: 0.82;
       letter-spacing: 0.01em;
       margin-top: 0.06em;
-      background: linear-gradient(135deg, #f3d97f 0%, #D4AF37 48%, #b39129 100%);
+      background: linear-gradient(135deg, #ECD48E 0%, #C9A24A 48%, #A8802F 100%);
       -webkit-background-clip: text;
               background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -337,8 +337,8 @@
     /* ───── Hero móvil: letrero apilado sobre fondo negro/oro ───── */
     .hero-mobile-bg {
       background:
-        radial-gradient(115% 65% at 50% 42%, rgba(212, 175, 55, 0.13) 0%, rgba(212, 175, 55, 0.04) 42%, transparent 72%),
-        radial-gradient(90% 55% at 50% 108%, rgba(212, 175, 55, 0.16) 0%, transparent 68%),
+        radial-gradient(115% 65% at 50% 42%, rgba(201, 162, 74, 0.13) 0%, rgba(201, 162, 74, 0.04) 42%, transparent 72%),
+        radial-gradient(90% 55% at 50% 108%, rgba(201, 162, 74, 0.16) 0%, transparent 68%),
         #0A0A0A;
     }
     .hero-plate {
@@ -374,7 +374,7 @@
     /* ───── Líneas verticales de scroll ───── */
     .scroll-rule {
       width: 1px;
-      background: linear-gradient(to bottom, transparent, rgba(212, 175, 55, 0.75), transparent);
+      background: linear-gradient(to bottom, transparent, rgba(201, 162, 74, 0.75), transparent);
     }
 
     /* ───── Animated section title underline (revealed on scroll) ───── */
@@ -389,7 +389,7 @@
       bottom: -22px;
       width: 0;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #D4AF37 50%, transparent);
+      background: linear-gradient(90deg, transparent, #C9A24A 50%, transparent);
       transform: translateX(-50%);
       transition: width 1.3s cubic-bezier(0.22, 1, 0.36, 1) 200ms;
     }
@@ -401,30 +401,30 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 1.5rem;
-      border-top: 1px solid rgba(212, 175, 55, 0.2);
+      border-top: 1px solid rgba(201, 162, 74, 0.2);
       padding-top: 2.5rem;
       margin-top: 2.5rem;
     }
     .stat-block { text-align: left; }
     .stat-num {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Marcellus', serif;
       font-weight: 700;
       font-size: clamp(2rem, 4.2vw, 3.4rem);
       line-height: 1;
-      background: linear-gradient(135deg, #f3d97f 0%, #D4AF37 50%, #b39129 100%);
+      background: linear-gradient(135deg, #ECD48E 0%, #C9A24A 50%, #A8802F 100%);
       -webkit-background-clip: text;
               background-clip: text;
       -webkit-text-fill-color: transparent;
       display: block;
     }
     .stat-num .stat-suffix {
-      -webkit-text-fill-color: #D4AF37;
-      color: #D4AF37;
+      -webkit-text-fill-color: #C9A24A;
+      color: #C9A24A;
       font-size: 0.65em;
       margin-left: 0.05em;
     }
     .stat-label {
-      font-family: 'Montserrat', sans-serif;
+      font-family: 'Jost', sans-serif;
       font-size: 0.6rem;
       letter-spacing: 0.3em;
       text-transform: uppercase;
@@ -445,8 +445,8 @@
       display: inline-block;
       width: 12px;
       height: 12px;
-      border-right: 1px solid #D4AF37;
-      border-bottom: 1px solid #D4AF37;
+      border-right: 1px solid #C9A24A;
+      border-bottom: 1px solid #C9A24A;
       animation: scrollCueBounce 2.2s ease-in-out infinite;
     }
 
@@ -462,21 +462,21 @@
     .section-ornament .line {
       height: 1px;
       width: 120px;
-      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.45), transparent);
+      background: linear-gradient(90deg, transparent, rgba(201, 162, 74, 0.45), transparent);
     }
     .section-ornament .diamond {
       width: 7px;
       height: 7px;
-      background: #D4AF37;
+      background: #C9A24A;
       transform: rotate(45deg);
-      box-shadow: 0 0 14px rgba(212, 175, 55, 0.6);
+      box-shadow: 0 0 14px rgba(201, 162, 74, 0.6);
     }
 
     /* ───── Atmosphere orbs (subtle gold glow) ───── */
     .atm-orb {
       position: absolute;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(212, 175, 55, 0.14) 0%, rgba(212, 175, 55, 0) 70%);
+      background: radial-gradient(circle, rgba(201, 162, 74, 0.14) 0%, rgba(201, 162, 74, 0) 70%);
       filter: blur(50px);
       pointer-events: none;
       z-index: 0;
@@ -502,7 +502,7 @@
       padding-top: 0.45rem;
       padding-bottom: 0.45rem;
       background: rgba(10, 10, 10, 0.92);
-      border-bottom-color: rgba(212, 175, 55, 0.28);
+      border-bottom-color: rgba(201, 162, 74, 0.28);
       box-shadow: 0 14px 40px -20px rgba(0, 0, 0, 0.7);
     }
 
@@ -512,6 +512,7 @@
       transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
     }
   </style>
+  <link rel="stylesheet" href="{% static 'css/letrero.css' %}">
 </head>
 
 <body class="bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet splash-active">
@@ -591,7 +592,7 @@
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Reels</a>
         <a href="/profesionales/"
           class="text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">Profesionales</a>
-        <a href="/booking/"
+        <a href="/reservar/"
           class="px-6 py-2.5 gold-btn text-xs tracking-widest uppercase font-semibold rounded-sm">Reserva tu Cita</a>
       </div>
 
@@ -616,7 +617,7 @@
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Reels</a>
       <a href="/profesionales/"
         class="block py-3 text-center tracking-widest uppercase text-smoke/80 hover:text-gold text-sm border-b border-white/5">Profesionales</a>
-      <a href="/booking/"
+      <a href="/reservar/"
         class="block mt-6 px-4 py-3 gold-btn text-xs tracking-widest uppercase font-semibold text-center rounded-sm mx-8">Reserva
         tu Cita</a>
     </div>
@@ -656,7 +657,7 @@
             class="hero-plate lg:hidden mb-7" width="630" height="480" loading="eager">
 
           <div class="flex flex-col sm:flex-row gap-3 sm:gap-8 items-center lg:items-start w-full sm:w-auto">
-            <a href="/booking/" class="group relative w-full sm:w-auto px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
+            <a href="/reservar/" class="group relative w-full sm:w-auto px-12 py-5 overflow-hidden rounded-sm gold-btn magnetic-btn icon-slide">
               <span class="relative z-10 text-xs tracking-[0.3em] uppercase font-bold flex items-center justify-center gap-3">
                 <span class="lg:hidden">Reserva Tu Cita</span>
                 <span class="hidden lg:inline">Reserva Tu Lugar</span>
@@ -815,7 +816,7 @@
         <p class="text-smoke/40 text-sm py-8 text-center">Cargando servicios...</p>
       </div>
       <div class="mt-16 reveal-up">
-        <a href="/booking/"
+        <a href="/reservar/"
           class="group inline-flex items-center gap-4 px-10 py-4 border border-gold/40 text-gold font-bold text-xs tracking-[0.3em] uppercase rounded-sm hover:bg-gold hover:text-jet transition-all duration-300 ripple-btn icon-slide">
           Ver todos los servicios
           <span class="btn-icon w-8 h-[1px] bg-gold group-hover:bg-jet/40 transition-all duration-300"></span>
@@ -916,7 +917,7 @@
 
       <!-- Contenedor del Mapa con borde dinámico y amigable -->
       <div
-        class="reveal-scale relative group p-1 sm:p-2 bg-gradient-to-br from-gold/30 via-transparent to-gold/30 rounded-[2.5rem] transition-all duration-700 hover:shadow-[0_0_50px_rgba(212,175,55,0.15)]">
+        class="reveal-scale relative group p-1 sm:p-2 bg-gradient-to-br from-gold/30 via-transparent to-gold/30 rounded-[2.5rem] transition-all duration-700 hover:shadow-[0_0_50px_rgba(201, 162, 74,0.15)]">
         <div
           class="w-full h-[500px] rounded-[2rem] overflow-hidden border border-white/10 relative shadow-2xl transition-transform duration-700 group-hover:scale-[1.01]">
           <div
@@ -1200,7 +1201,7 @@
           const num = String(i + 1).padStart(3, '0');
 
           return `
-            <a href="/booking" class="menu-row">
+            <a href="/reservar/?servicio=${s.id}" class="menu-row">
               <span class="menu-num">${num}</span>
               <h3 class="menu-name">${s.name}</h3>
               <span class="menu-dots"></span>
@@ -1302,7 +1303,7 @@
             : `<p class="text-smoke/25 text-xs italic flex-1">Sin comentario adicional.</p>`;
 
           return `
-            <div class="group card-lift bg-jet border border-white/5 hover:border-gold/20 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-500 hover:shadow-[0_8px_40px_-10px_rgba(212,175,55,0.12)]" style="animation-delay:${i * 80}ms">
+            <div class="group card-lift bg-jet border border-white/5 hover:border-gold/20 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-500 hover:shadow-[0_8px_40px_-10px_rgba(201, 162, 74,0.12)]" style="animation-delay:${i * 80}ms">
               <div class="flex items-center gap-1">${stars}</div>
               ${commentHtml}
               <div class="h-[1px] bg-white/5"></div>
@@ -1324,6 +1325,7 @@
       });
   </script>
   <script src="{% static 'js/animations.js' %}"></script>
+{% include "public/_reserva_panel.html" %}
 {% include "public/_credito_af.html" %}
 </body>
 

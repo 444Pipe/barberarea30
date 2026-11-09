@@ -13,7 +13,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Marcellus&display=swap" rel="stylesheet">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -21,13 +21,13 @@
       theme: {
         extend: {
           colors: {
-            gold: { DEFAULT: '#D4AF37', dark: '#b39129', light: '#f3d97f' },
-            jet: { DEFAULT: '#0A0A0A', card: '#111111', lighter: '#1a1a1a' },
-            smoke: '#F5F5F5'
+            gold: { DEFAULT: '#C9A24A', dark: '#A8802F', light: '#ECD48E' },
+            jet: { DEFAULT: '#0C0A07', card: '#14110C', lighter: '#1D1912' },
+            smoke: '#EFE7D6'
           },
           fontFamily: {
-            sans: ['Montserrat', 'sans-serif'],
-            serif: ['Playfair Display', 'serif'],
+            sans: ['Jost', 'sans-serif'],
+            serif: ['Marcellus', 'serif'],
           }
         }
       }
@@ -91,8 +91,9 @@
 
     /* Progress indicator */
     .progress-dot { transition: all 0.3s; }
-    .progress-dot.active { background: #D4AF37; transform: scale(1.4); }
+    .progress-dot.active { background: #C9A24A; transform: scale(1.4); }
   </style>
+  <link rel="stylesheet" href="{% static 'css/letrero.css' %}">
 </head>
 <body class="bg-jet font-sans">
 
@@ -103,7 +104,7 @@
     </a>
     <div class="flex items-center gap-3 pointer-events-auto">
       <a href="/gallery/" class="text-smoke/70 text-xs tracking-widest uppercase hover:text-gold transition-colors">Galería</a>
-      <a href="/booking/" class="px-4 py-1.5 bg-gold text-jet text-xs tracking-widest uppercase font-bold rounded-sm hover:bg-white transition-colors">Reservar</a>
+      <a href="/reservar/" class="px-4 py-1.5 bg-gold text-jet text-xs tracking-widest uppercase font-bold rounded-sm hover:bg-white transition-colors">Reservar</a>
     </div>
   </nav>
 
@@ -189,7 +190,7 @@
             </button>
 
             <!-- Compartir / Reservar -->
-            <a href="/booking/" class="flex flex-col items-center gap-1">
+            <a href="/reservar/" class="flex flex-col items-center gap-1">
               <div class="w-10 h-10 rounded-full bg-gold/90 backdrop-blur-sm flex items-center justify-center hover:bg-gold transition-colors">
                 <svg class="w-4 h-4 text-jet" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -318,7 +319,7 @@
         if (globalMuted) {
           bg.className = "w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center transition-colors";
         } else {
-          bg.className = "w-10 h-10 rounded-full bg-gold shadow-[0_0_15px_rgba(212,175,55,0.4)] backdrop-blur-sm flex items-center justify-center transition-colors";
+          bg.className = "w-10 h-10 rounded-full bg-gold shadow-[0_0_15px_rgba(201, 162, 74,0.4)] backdrop-blur-sm flex items-center justify-center transition-colors";
         }
       });
     }
@@ -373,6 +374,7 @@
     loadReels();
   </script>
   <script src="{% static 'js/animations.js' %}"></script>
+{% include "public/_reserva_panel.html" %}
 {% include "public/_credito_af.html" %}
 </body>
 </html>

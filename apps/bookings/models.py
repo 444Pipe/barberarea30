@@ -23,7 +23,12 @@ class Booking(models.Model):
         help_text='Cliente presencial sin reserva previa (ej. Cliente General)')
     privacy_accepted = models.BooleanField(default=False,
         help_text='Aceptación obligatoria de políticas de privacidad y tratamiento de datos')
-    
+    # Casilla aparte y opcional del panel de reserva (nov-2026). Antes las
+    # promociones iban dentro del texto de privacy_accepted; ahora son un sí
+    # explícito, y reservar no obliga a recibirlas.
+    marketing_opt_in = models.BooleanField(default=False,
+        help_text='El cliente pidió recibir promociones por WhatsApp')
+
     barber = models.ForeignKey(
         Barber, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='bookings',

@@ -46,7 +46,7 @@ python manage.py merge_user_accounts --keep A --remove B [--apply]  # apps/users
 python seed.py
 ```
 
-There is **no test suite**. `apps/*/tests.py` are empty stubs and the `test_*.py` files at the repo root are one-off REPL-style smoke scripts (`test_api.py`, `test_adjust.py`, `test_err.py`, `test_upload.py`) — do not treat them as a regression suite. If you add tests, use Django's `python manage.py test` and write them inside the relevant app.
+Tests live inside the apps (e.g. `apps/bookings/tests.py`, `ConciliacionCajaTests` in cashflow). Run them with **`python manage.py test apps`** — always with the `apps` label: a bare `manage.py test` also discovers the `test_*.py` files at the repo root, which are one-off REPL-style smoke scripts (`test_api.py`, `test_adjust.py`, `test_err.py`, `test_upload.py`) that hit a live server, overwrite `t.html` and drop files in `media/inventory/`. Do not treat those as a regression suite. New tests go inside the relevant app.
 
 There is no linter or formatter configured.
 
@@ -158,6 +158,16 @@ Para dejar a un barbero sin reservas web en un rango: `python manage.py block_ba
 El teléfono del cliente lo ve **todo** el personal del panel (barberos incluidos, decisión del dueño oct-2026). En JS usa `window.phoneLinks()` de `base_admin.html`; en plantillas server-side, `Booking.phone_digits`.
 
 Statuses recently changed: manual-service bookings are now created as **`confirmed`** (not `completed`) so they remain manageable. See commit `6770249`.
+
+### Reserva pública: panel en la misma página (nov-2026)
+
+El asistente de 4 pasos de `/booking/` ya no existe. La reserva es un panel que se abre encima de la página: [_reserva_panel.html](templates/public/_reserva_panel.html) + [reserva.js](static/js/reserva.js) + [reserva.css](static/css/reserva.css), incluido en inicio, servicios, galería, reels y profesionales. Cualquier enlace a `/reservar/` o `/booking/` lo abre sin cambiar de página; `/reservar/?servicio=<id|slug>&barbero=<id>` es el enlace directo para Google / Instagram / WhatsApp (redirige a `/?reservar=1&...`).
+
+- Usa las mismas APIs públicas y el mismo `POST /api/bookings/`; `barber_id: "any"` = "El primero libre" (el servidor asigna).
+- Solo nombre y WhatsApp; correo y nota opcionales. Tocar Reservar = aceptar datos (texto bajo el botón → `privacy_accepted=true`); las promociones son una casilla aparte → `Booking.marketing_opt_in`.
+- "¿Lo de siempre?": el cliente se recuerda **solo en su navegador** (`localStorage` `a30.cliente`), nunca en el servidor.
+
+Estilo "letrero dorado" del sitio público: [letrero.css](static/css/letrero.css) se carga al **final** del `<head>` de las páginas públicas (el admin no la carga). Marcellus (títulos) + Jost (texto y **cifras**: en Marcellus el 0 parece una O), latón `#C9A24A`.
 
 ### Sale / Commission auto-calculation
 
