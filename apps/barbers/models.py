@@ -148,6 +148,42 @@ class Barber(models.Model):
             'reason': custom.reason,
         }
 
+    def booking_window(self, target_date, work_hours=None):
+        """Ventana en la que se le puede RESERVAR a este barbero en `target_date`.
+
+        Es su `day_window` recortada por el horario especial del local
+        (`BlockedDate` con horas, ej. "el 24-dic solo de 9 a 2"). El horario del
+        local nunca amplía el del barbero: si ese día él descansa o está en
+        "horario a elección" sin franja abierta, sigue sin atender. Antes la
+        disponibilidad y la validación usaban SOLO el horario del local esos
+        días y podían ofrecer (o asignar con "El primero libre") a quien no
+        trabaja. Local cerrado todo el día → None.
+        """
+        from apps.bookings.models import BlockedDate
+
+        window = self.day_window(target_date, work_hours)
+        shop = BlockedDate.objects.filter(date=target_date).first()
+        if shop is None:
+            return window
+        if not (shop.start_time and shop.end_time) or window is None:
+            return None
+        start = max(window['start'], shop.start_time)
+        end = min(window['end'], shop.end_time)
+        if start >= end:
+            return None
+        # La "última cita" del barbero solo vale si el local no cierra antes que él.
+        last_start = window['last_start'] if shop.end_time >= window['end'] else None
+        if last_start is not None and not (start <= last_start):
+            last_start = None
+        return {
+            'start': start,
+            'end': end,
+            'last_start': last_start,
+            'source': 'shop',
+            'base_source': window['source'],
+            'reason': shop.description,
+        }
+
     def _base_day_window(self, target_date):
         """Ventana según el horario semanal (con festivo → horario dominical)."""
         from apps.bookings.holidays import is_holiday
@@ -176,16 +212,19 @@ class Barber(models.Model):
             return None
         return window
 
-    def window_violation(self, target_date, start_time, end_time):
+    def window_violation(self, target_date, start_time, end_time, window=False):
         """Mensaje de error si una cita cae fuera del horario, o None si cabe.
 
         La disponibilidad del front ya oculta estas horas, pero un POST directo
         (o una página cacheada con el horario viejo) las colaba: esta es la
         validación del lado del servidor.
 
-        `end_time` es la hora a la que terminaría el servicio.
+        `end_time` es la hora a la que terminaría el servicio. `window` permite
+        pasar otra ventana (la de reserva, `booking_window`); por defecto se usa
+        el horario propio del barbero (`day_window`).
         """
-        window = self.day_window(target_date)
+        if window is False:
+            window = self.day_window(target_date)
         if not window and self.only_custom_hours:
             return (
                 f'{self.display_name} no tiene horario abierto el '
@@ -197,7 +236,7 @@ class Barber(models.Model):
                 f'Por favor elige otra fecha.'
             )
 
-        if window['source'] == 'custom':
+        if window['source'] in ('custom', 'shop'):
             etiqueta = f'Ese día {self.display_name} trabaja solo de'
             limite = window['last_start'] or window['end']
             franja = f'{window["start"].strftime("%I:%M %p")} a {limite.strftime("%I:%M %p")}'

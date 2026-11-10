@@ -13,7 +13,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.http import JsonResponse
 from apps.users.permissions import IsAdminOrAbove, IsBarberOrAbove, IsBatmanOrSuperadmin, IsAdminOrAboveWithWriteBatman
-from apps.bookings.models import Booking, BlockedDate
+from apps.bookings.models import Booking
 from apps.services.models import Service
 from .models import Barber, GalleryImage, Reel, BarberUnavailability, BarberWorkHours
 from .serializers import BarberListSerializer, BarberAdminSerializer, GalleryImageSerializer, ReelSerializer
@@ -108,37 +108,23 @@ def barber_availability_view(request, barber_id):
     slots_needed = max(1, -(-service_duration // SLOT_SIZE))  # ceil division
 
     # ── Ventana de atención del día ─────────────────────────────────────────
-    # Prioridad: BlockedDate (override manual de los socios) > horario del
-    # barbero, que a su vez ya resuelve festivo → horario dominical.
+    # El horario del barbero (festivo → dominical, horario de trabajo, "a
+    # elección") recortado por el horario especial del local si lo hay
+    # (BlockedDate). Local cerrado, o barbero que no atiende ese día → day_off.
     # `last_start` (si viene) es la hora de la ÚLTIMA cita agendable: el
     # servicio puede terminar después del cierre.
-    last_start = None
-    try:
-        blocked = BlockedDate.objects.get(date=target_date)
-        if blocked.start_time and blocked.end_time:
-            start_time = blocked.start_time
-            end_time = blocked.end_time
-        else:
-            return Response({
-                'barber_id': barber.id,
-                'barber_name': barber.display_name,
-                'date': date_str,
-                'day_off': True,
-                'slots': [],
-            })
-    except BlockedDate.DoesNotExist:
-        window = barber.day_window(target_date)
-        if not window:
-            return Response({
-                'barber_id': barber.id,
-                'barber_name': barber.display_name,
-                'date': date_str,
-                'day_off': True,
-                'slots': [],
-            })
-        start_time = window['start']
-        end_time = window['end']
-        last_start = window['last_start']
+    window = barber.booking_window(target_date)
+    if not window:
+        return Response({
+            'barber_id': barber.id,
+            'barber_name': barber.display_name,
+            'date': date_str,
+            'day_off': True,
+            'slots': [],
+        })
+    start_time = window['start']
+    end_time = window['end']
+    last_start = window['last_start']
 
     # Get existing bookings for this barber on this date
     # Solo las reservas 'pending'/'confirmed' ocupan el slot, igual que en la

@@ -331,3 +331,94 @@ class AgendaCortaTests(TestCase):
         for url in ('/booking/', '/booking', '/booking.html', '/reservar'):
             r = self.client.get(url)
             self.assertEqual((r.status_code, r['Location']), (302, '/reservar/'), url)
+
+
+@mock.patch('threading.Thread')
+class PrimeroLibreTests(TestCase):
+    """"El primero libre" (nov-2026): reparte al barbero libre con MENOS citas
+    ese día y respeta bloqueos, descansos y "horario a elección" también los
+    días en que el local tiene horario especial (BlockedDate con horas)."""
+
+    def setUp(self):
+        shop = Barbershop.objects.create(name='Área 30 Test')
+        self.barbers = []
+        for order, name in enumerate(('Franko', 'Jesús', 'Santiago')):
+            user = User.objects.create_user(f'b{order}_t', password='x')
+            UserProfile.objects.create(user=user, role='barber', barbershop=shop)
+            self.barbers.append(Barber.objects.create(
+                user=user, barbershop=shop, display_name=name, display_order=order,
+            ))
+        self.franko, self.jesus, self.santiago = self.barbers
+        self.service = Service.objects.create(
+            name='Silver', slug='silver-pl', price=Decimal('30000'), duration_minutes=60,
+        )
+        self.day = _next_working_wednesday()
+
+    def _book(self, barber, t, status='confirmed'):
+        return Booking.objects.create(
+            client_name='Otro', client_phone='3000000000', barber=barber, service=self.service,
+            date=self.day, time=t, price=self.service.price, status=status,
+            duration_minutes=barber.effective_duration_minutes(self.service),
+        )
+
+    def _any(self, t='11:00', barber_id='any'):
+        return self.client.post('/api/bookings/', {
+            'client_name': 'Carlos', 'client_phone': '300 123 4567',
+            'service_id': self.service.id, 'barber_id': barber_id,
+            'date': self.day.strftime('%Y-%m-%d'), 'time': t, 'privacy_accepted': True,
+        }, content_type='application/json')
+
+    def _availability(self, barber):
+        return self.client.get(
+            f'/api/barbers/{barber.id}/availability/?date={self.day:%Y-%m-%d}&service_id={self.service.id}'
+        ).json()
+
+    def test_asigna_al_que_tiene_menos_citas_ese_dia(self, _thread):
+        self._book(self.franko, time(15, 0))
+        self._book(self.franko, time(18, 0))
+        self._book(self.jesus, time(16, 0))
+        r = self._any()
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()['barber_name'], 'Santiago')
+
+    def test_empate_va_por_el_orden_de_siempre(self, _thread):
+        self.assertEqual(self._any().json()['barber_name'], 'Franko')
+
+    def test_citas_canceladas_no_cuentan(self, _thread):
+        self._book(self.franko, time(15, 0), status='cancelled')
+        self._book(self.jesus, time(16, 0), status='completed')
+        self._book(self.santiago, time(17, 0))
+        self.assertEqual(self._any().json()['barber_name'], 'Franko')
+
+    def test_nunca_asigna_al_bloqueado_aunque_tenga_menos_citas(self, _thread):
+        self._book(self.jesus, time(15, 0))
+        self._book(self.santiago, time(16, 0))
+        BarberUnavailability.objects.create(
+            barber=self.franko, date=self.day, start_time=time(0, 0), end_time=time(23, 59, 59),
+        )
+        self.assertEqual(self._any().json()['barber_name'], 'Jesús')
+
+    def test_horario_especial_del_local_no_abre_a_quien_descansa(self, _thread):
+        from apps.bookings.models import BlockedDate
+        BlockedDate.objects.create(date=self.day, start_time=time(9, 0), end_time=time(14, 0))
+        # Franko descansa los miércoles; Jesús está en "horario a elección" sin franja.
+        self.franko.schedule = {k: v for k, v in self.franko.schedule.items() if k != 'wednesday'}
+        self.franko.save()
+        self.jesus.only_custom_hours = True
+        self.jesus.save()
+
+        self.assertTrue(self._availability(self.franko)['day_off'])
+        self.assertTrue(self._availability(self.jesus)['day_off'])
+        self.assertEqual(self._any().json()['barber_name'], 'Santiago')
+        self.assertEqual(self._any(t='12:00', barber_id=self.franko.id).status_code, 409)
+        self.assertEqual(self._any(t='12:00', barber_id=self.jesus.id).status_code, 409)
+
+    def test_horario_especial_recorta_pero_no_amplia(self, _thread):
+        from apps.bookings.models import BlockedDate
+        BlockedDate.objects.create(date=self.day, start_time=time(9, 0), end_time=time(14, 0))
+        slots = [s['time'] for s in self._availability(self.santiago)['slots'] if s['available']]
+        # Su horario empieza a las 10:00 (el local abre a las 9 ese día) y el
+        # servicio de 1h tiene que terminar antes de las 2:00 PM.
+        self.assertEqual(slots[0], '10:00')
+        self.assertEqual(slots[-1], '13:00')
+        self.assertEqual(self._any(t='09:00').status_code, 400)

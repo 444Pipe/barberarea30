@@ -5,6 +5,7 @@ from datetime import datetime
 
 from django.http import HttpResponse, Http404
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 from django.core.signing import Signer, BadSignature
 from django.shortcuts import render, get_object_or_404, redirect
@@ -93,13 +94,15 @@ def _slot_problem(barber, service, req_d, req_t, *, is_walk_in):
     if err:
         return ('conflict', err)
 
-    # Sin BlockedDate manda el horario semanal, que ya resuelve festivo →
-    # ventana dominical (Barber.day_window). Con BlockedDate parcial, su franja
-    # ya se validó arriba. Los walk-in (presenciales) quedan exentos: registran
-    # algo que está pasando en el local.
-    if not is_walk_in and not BlockedDate.objects.filter(date=req_d).exists():
+    # Horario del barbero (festivo → dominical, horario de trabajo, "a
+    # elección"), recortado por el horario especial del local si lo hay: un día
+    # con horario especial ya no deja reservar a quien descansa. Los walk-in
+    # (presenciales) quedan exentos: registran algo que está pasando en el local.
+    if not is_walk_in:
         req_end = _dt.combine(req_d, req_t) + _td(minutes=barber.occupied_minutes(dur))
-        violation = barber.window_violation(req_d, req_t, req_end.time())
+        violation = barber.window_violation(
+            req_d, req_t, req_end.time(), window=barber.booking_window(req_d),
+        )
         if violation:
             return ('schedule', violation)
 
@@ -166,15 +169,21 @@ def _create_booking(request, data, *, is_walk_in, force=False):
             candidates = candidates.filter(id=service.exclusive_barber.id)
             if not candidates.exists():
                 return Response({'error': 'El barbero asignado para este servicio exclusivo no está disponible.'}, status=400)
-        # Se asigna solo un barbero SIN cruces, dentro de su horario y SIN
-        # bloqueo. "Cualquiera" nunca fuerza sobre un bloqueo.
-        barber = next(
-            (b for b in candidates
-             if _slot_problem(b, service, req_d, req_t, is_walk_in=is_walk_in) is None),
-            None,
-        )
-        if barber is None:
+        # "El primero libre": entre los barberos SIN cruces, dentro de su
+        # horario y SIN bloqueo, el que tenga MENOS citas ese día, para repartir
+        # las reservas web (decisión del dueño, nov-2026; antes se llevaba todo
+        # el primero de la lista). Empate → orden de siempre (display_order, id).
+        # "Cualquiera" nunca fuerza sobre un bloqueo.
+        free = [b for b in candidates
+                if _slot_problem(b, service, req_d, req_t, is_walk_in=is_walk_in) is None]
+        if not free:
             return Response({'error': 'No hay barberos disponibles en la franja horaria seleccionada.'}, status=400)
+        load = dict(
+            Booking.objects.filter(barber__in=free, date=req_d)
+            .exclude(status='cancelled')
+            .values_list('barber').annotate(n=Count('id'))
+        )
+        barber = min(free, key=lambda b: (load.get(b.id, 0), b.display_order, b.id))
     else:
         try:
             barber = Barber.objects.get(pk=barber_id, is_available=True)
@@ -871,10 +880,13 @@ def admin_reschedule_booking_view(request, booking_id):
                     f'El nuevo horario no cabe en esa franja.'
                 )
             }, status=409)
-    elif booking.barber:
-        # Sin BlockedDate manda el horario del barbero, que ya resuelve
-        # festivo → ventana dominical.
-        violation = booking.barber.window_violation(req_date, req_time, req_end.time())
+    if booking.barber:
+        # Horario del barbero (festivo → dominical, horario de trabajo), recortado
+        # por el horario especial del local: ese día tampoco se puede mover la
+        # cita a un barbero que no atiende.
+        violation = booking.barber.window_violation(
+            req_date, req_time, req_end.time(), window=booking.barber.booking_window(req_date),
+        )
         if violation:
             return Response({'ok': False, 'error': violation}, status=409)
 

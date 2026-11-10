@@ -319,14 +319,27 @@
   function renderBarbers() {
     var list = barbersFor(S.svc), entry = currentEntry();
     var freeAt = (S.time && entry && entry.times[S.time]) || null;
+    // Quién tiene al menos una hora libre este día (descanso, bloqueo u
+    // "horario a elección" sin franja → no aparece en ninguna hora).
+    var dayFree = null;
+    if (entry && entry.status === 'ok' && !S.seeking) {
+      dayFree = {};
+      Object.keys(entry.times).forEach(function (t) {
+        if (isPast(S.day, t)) return;
+        entry.times[t].forEach(function (id) { dayFree[id] = true; });
+      });
+    }
     var html = '<button type="button" class="rsv-chip rsv-barber" data-barber="any" aria-pressed="' +
-      (S.barber === 'any') + '"><span class="rsv-ava" aria-hidden="true">★</span>El primero libre</button>';
+      (S.barber === 'any') + '"><span class="rsv-ava" aria-hidden="true">★</span><span>El primero libre' +
+      '<small>Quien tenga menos citas</small></span></button>';
     list.forEach(function (b) {
       var busy = !!(freeAt && freeAt.indexOf(b.id) === -1);
+      var off = !busy && !!(dayFree && !dayFree[b.id]);
+      var note = busy ? 'No disponible a esa hora' : (off ? 'Sin horas este día' : '');
       var ava = b.avatar ? '<img src="' + esc(b.avatar) + '" alt="" loading="lazy">' : esc(String(b.nombre || '?').charAt(0));
-      html += '<button type="button" class="rsv-chip rsv-barber" data-barber="' + b.id + '" aria-pressed="' +
-        (S.barber === b.id) + '"' + (busy ? ' disabled' : '') + '><span class="rsv-ava" aria-hidden="true">' + ava +
-        '</span><span>' + esc(b.nombre) + (busy ? '<small>Ocupado a esa hora</small>' : '') + '</span></button>';
+      html += '<button type="button" class="rsv-chip rsv-barber' + (off ? ' is-off' : '') + '" data-barber="' + b.id +
+        '" aria-pressed="' + (S.barber === b.id) + '"' + (busy ? ' disabled' : '') + '><span class="rsv-ava" aria-hidden="true">' + ava +
+        '</span><span>' + esc(b.nombre) + (note ? '<small>' + note + '</small>' : '') + '</span></button>';
     });
     el.barbers.innerHTML = html;
   }
