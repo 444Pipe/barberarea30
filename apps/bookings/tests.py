@@ -9,7 +9,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.barbers.models import Barber, BarberUnavailability
@@ -272,8 +272,8 @@ class WorkHoursTests(TestCase):
 
 @mock.patch('threading.Thread')
 class AgendaCortaTests(TestCase):
-    """Panel de reserva de nov-2026: solo nombre y WhatsApp, correo opcional,
-    promociones en casilla aparte y enlaces directos que abren el panel."""
+    """Página /reservar/ de nov-2026: solo nombre y WhatsApp, correo opcional,
+    promociones en casilla aparte y enlaces viejos que llegan a la página."""
 
     def setUp(self):
         shop = Barbershop.objects.create(name='Área 30 Test')
@@ -311,12 +311,23 @@ class AgendaCortaTests(TestCase):
     def test_sin_aceptar_datos_no_reserva(self, _thread):
         self.assertEqual(self._reservar(privacy_accepted=False).status_code, 400)
 
-    def test_enlace_directo_abre_el_panel_con_el_servicio(self, _thread):
+    # En tests DEBUG=False y el almacenamiento con manifiesto exige collectstatic;
+    # para renderizar la página basta el almacenamiento simple.
+    @override_settings(STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    })
+    def test_pagina_de_reserva(self, _thread):
         r = self.client.get('/reservar/?servicio=7')
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(r['Location'], '/?servicio=7&reservar=1')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'id="rsv-book"')
+        self.assertContains(r, 'js/reserva.js')
 
-    def test_enlaces_viejos_de_booking_llegan_al_panel(self, _thread):
+    def test_enlace_viejo_con_servicio_llega_a_la_pagina(self, _thread):
+        r = self.client.get('/booking/?servicio=7')
+        self.assertEqual((r.status_code, r['Location']), (302, '/reservar/?servicio=7'))
+
+    def test_enlaces_viejos_de_booking_llegan_a_la_pagina(self, _thread):
         for url in ('/booking/', '/booking', '/booking.html', '/reservar'):
             r = self.client.get(url)
-            self.assertEqual((r.status_code, r['Location']), (302, '/?reservar=1'), url)
+            self.assertEqual((r.status_code, r['Location']), (302, '/reservar/'), url)

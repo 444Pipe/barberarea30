@@ -40,15 +40,14 @@ class HomeView(TemplateView):
         return context
 
 def reservar_redirect_view(request):
-    """/reservar/ y la vieja /booking/ → inicio con el panel de reserva abierto.
+    """La vieja /booking/ (y /reservar sin barra) → página /reservar/.
 
     Conserva los parámetros (servicio, barbero) para que un enlace de Google o
     de una historia llegue con el servicio ya elegido. El #ancla de los enlaces
     viejos (/booking/#gold-exclusive) la conserva el navegador en la redirección.
     """
-    params = request.GET.copy()
-    params['reservar'] = params.get('reservar') or '1'
-    return redirect(f'/?{params.urlencode()}')
+    qs = request.GET.urlencode()
+    return redirect('/reservar/' + (f'?{qs}' if qs else ''))
 
 
 @api_view(['GET'])

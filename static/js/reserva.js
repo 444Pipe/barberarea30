@@ -1,12 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Panel de reserva de Área 30 (nov-2026)
+   Página de reserva de Área 30 — /reservar/ (nov-2026)
 
    Reemplaza el asistente de 4 pasos de /booking/. Todo en una pantalla:
    servicio → día (ya viene el primero con cupo) → hora → barbero
    (opcional, "El primero libre") → nombre y WhatsApp → Reservar.
 
-   - Lo abre cualquier enlace a /reservar/ o /booking/ de la página (con
-     ?servicio= y ?barbero= opcionales) y la URL ?reservar=1 al cargar.
+   - ?servicio=<id|slug> y ?barbero=<id|nombre> llegan ya elegidos (enlace
+     directo de Google / Instagram). El #ancla de los enlaces viejos
+     (/booking/#gold-exclusive) también elige el servicio.
    - Recuerda al cliente SOLO en su propio navegador (localStorage) para
      ofrecerle "¿Lo de siempre?".
    - Reserva por el mismo POST /api/bookings/ de siempre: el servidor
@@ -26,13 +27,14 @@
 
   function $(id) { return document.getElementById(id); }
   var el = {
-    sheet: $('rsv-sheet'), head: $('rsv-head'), body: $('rsv-body'),
+    layout: $('rsv-layout'),
     again: $('rsv-again'), againName: $('rsv-again-name'), againWhat: $('rsv-again-what'),
     svcBox: $('rsv-svc-box'), days: $('rsv-days'), slots: $('rsv-slots'), timeNote: $('rsv-time-note'),
     barbers: $('rsv-barbers'), data: $('rsv-blk-data'),
     name: $('rsv-name'), phone: $('rsv-phone'), more: $('rsv-more'), extra: $('rsv-extra'),
     email: $('rsv-email'), notes: $('rsv-notes'), optin: $('rsv-optin'), forget: $('rsv-forget'),
     err: $('rsv-err'), sumWhat: $('rsv-sum-what'), sumPrice: $('rsv-sum-price'), book: $('rsv-book'),
+    sSvc: $('rsv-s-svc'), sDay: $('rsv-s-day'), sTime: $('rsv-s-time'), sBarber: $('rsv-s-barber'), sPrice: $('rsv-s-price'),
     done: $('rsv-done')
   };
 
@@ -42,7 +44,7 @@
     day: null, dayByUser: false, seeking: false,
     time: null, barber: 'any',
     avail: {},            // "svcId|fecha" → { status, times: {hora: [ids libres]}, listed: [horas] }
-    sending: false, pushed: false, opener: null, againDismissed: false
+    sending: false, againDismissed: false
   };
 
   // ─── Utilidades ───────────────────────────────────────────────
@@ -67,6 +69,7 @@
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
   function phoneDigits() { return el.phone.value.replace(/\D/g, ''); }
+  function smooth() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
 
   function dayList() {
     var t = bogotaNow(); t.setHours(0, 0, 0, 0);
@@ -105,7 +108,6 @@
   function forget() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /* nada */ } }
 
   // ─── Datos ────────────────────────────────────────────────────
-  var dataPromise = null;
   function getJSON(url) {
     return fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) {
       if (!r.ok) throw new Error(url + ' ' + r.status);
@@ -113,8 +115,7 @@
     });
   }
   function loadData() {
-    if (dataPromise) return dataPromise;
-    dataPromise = Promise.all([
+    return Promise.all([
       getJSON('/api/servicios-nativos/'),
       getJSON('/api/barberos-nativos/').catch(function () { return { barberos: [] }; }),
       getJSON('/api/blocked-dates/').catch(function () { return []; })
@@ -125,8 +126,7 @@
       (Array.isArray(res[2]) ? res[2] : []).forEach(function (b) {
         if (!b.start_time) S.closedDays[b.date] = true;   // con horario = día recortado, no cerrado
       });
-    }).catch(function (err) { dataPromise = null; throw err; });
-    return dataPromise;
+    });
   }
 
   function barbersFor(svc) {
@@ -218,7 +218,9 @@
   }
   function scrollDayIntoView() {
     var chip = el.days.querySelector('[aria-pressed="true"]');
-    if (chip) el.days.scrollLeft = Math.max(0, chip.offsetLeft - el.days.offsetLeft - 12);
+    if (chip && el.days.scrollWidth > el.days.clientWidth) {
+      el.days.scrollLeft = Math.max(0, chip.offsetLeft - el.days.offsetLeft - 12);
+    }
   }
 
   // ─── Pintar ───────────────────────────────────────────────────
@@ -288,9 +290,8 @@
     if (!free.length) {
       var b = S.barber !== 'any' ? barberById(S.barber) : null;
       var who = b ? ' con ' + esc(b.nombre) : '';
-      var closed = S.closedDays[S.day];
       el.slots.innerHTML = '<p class="rsv-empty">' +
-        (closed ? 'Este día el club está cerrado.' : 'No quedan horas libres' + who + ' este día.') +
+        (S.closedDays[S.day] ? 'Este día el club está cerrado.' : 'No quedan horas libres' + who + ' este día.') +
         ' <button type="button" class="rsv-link" data-act="next-day">Ver el siguiente día con cupo</button></p>';
       return;
     }
@@ -341,18 +342,27 @@
     return null;
   }
   function renderSummary() {
+    var dayTxt = S.svc && S.day && !S.seeking ? dayShort(S.day) : '';
+    var b = S.barber !== 'any' ? barberById(S.barber) : null;
+    // Barra del celular: una línea
     var parts = [];
     if (S.svc) parts.push(S.svc.name);
-    if (S.svc && S.day && !S.seeking) parts.push(dayShort(S.day));
+    if (dayTxt) parts.push(dayTxt);
     if (S.time) parts.push(hourLabel(S.time));
     el.sumWhat.textContent = parts.length ? parts.join(' · ') : 'Elige servicio y hora';
     el.sumPrice.textContent = S.svc ? money(S.svc.price) : '';
+    // Tarjeta del computador: el detalle
+    el.sSvc.textContent = S.svc ? S.svc.name : '—';
+    el.sDay.textContent = dayTxt || '—';
+    el.sTime.textContent = S.time ? hourLabel(S.time) : '—';
+    el.sBarber.textContent = b ? b.nombre : 'El primero libre';
+    el.sPrice.textContent = S.svc ? money(S.svc.price) : '—';
     var m = missing();
     el.book.textContent = S.sending ? 'Reservando…' : (m ? m[1] : 'Reservar');
     el.book.classList.toggle('is-pending', !!m && !S.sending);
   }
 
-  function showErr(msg) { el.err.textContent = msg; el.err.hidden = false; el.err.scrollIntoView({ block: 'nearest' }); }
+  function showErr(msg) { el.err.textContent = msg; el.err.hidden = false; el.err.scrollIntoView({ behavior: smooth(), block: 'center' }); }
   function hideErr() { el.err.hidden = true; el.err.textContent = ''; }
 
   // ─── Acciones ─────────────────────────────────────────────────
@@ -404,11 +414,9 @@
     hideErr();
     render();
     if (!el.name.value.trim() || phoneDigits().length < 7) {
-      el.data.scrollIntoView({ behavior: smooth(), block: 'nearest' });
+      el.data.scrollIntoView({ behavior: smooth(), block: 'center' });
     }
   }
-
-  function smooth() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
 
   function focusMissing(key) {
     var map = { svc: el.svcBox, day: el.days, time: el.slots, name: el.name, phone: el.phone, email: el.email };
@@ -487,7 +495,7 @@
       ' a las ' + hourLabel(time) + ' a nombre de ' + p.client_name + '.';
     el.done.innerHTML =
       '<div class="rsv-check" aria-hidden="true">✓</div>' +
-      '<h3>¡Listo, ' + esc(firstName(p.client_name)) + '!</h3>' +
+      '<h2>¡Listo, ' + esc(firstName(p.client_name)) + '!</h2>' +
       '<p>Tu cita quedó agendada.</p>' +
       '<dl>' +
         '<div><dt>Servicio</dt><dd>' + esc(svc.name) + '</dd></div>' +
@@ -500,22 +508,26 @@
         ? 'Te enviamos la confirmación a <b>' + esc(p.client_email) + '</b>.'
         : 'Si necesitas cambiarla o cancelarla, escríbenos por WhatsApp.') + '</p>' +
       '<div class="rsv-done-btns">' +
-        '<button type="button" class="rsv-solid" data-act="done">Listo</button>' +
+        '<a class="rsv-solid" href="/">Volver al inicio</a>' +
         '<a class="rsv-ghost" href="https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(waText) +
         '" target="_blank" rel="noopener">Escribir por WhatsApp</a>' +
+        '<button type="button" class="rsv-link" data-act="again">Hacer otra reserva</button>' +
       '</div>';
+    el.layout.hidden = true;
     el.done.hidden = false;
-    el.done.scrollTop = 0;
-    var btn = el.done.querySelector('[data-act="done"]');
-    if (btn) btn.focus({ preventScroll: true });
+    document.body.classList.add('rsv-is-done');
+    window.scrollTo({ top: 0, behavior: smooth() });
   }
 
-  function resetAfterBooking() {
+  function newBooking() {
     el.done.hidden = true; el.done.innerHTML = '';
+    el.layout.hidden = false;
+    document.body.classList.remove('rsv-is-done');
     S.svc = null; S.svcOpen = true; S.day = null; S.dayByUser = false; S.time = null;
     S.barber = 'any'; S.againDismissed = false; S.avail = {};
     el.notes.value = ''; el.optin.checked = false;
-    hideErr();
+    hideErr(); prefill(); render();
+    window.scrollTo({ top: 0, behavior: smooth() });
   }
 
   function prefill() {
@@ -529,7 +541,7 @@
     if (r) el.forget.textContent = 'No soy ' + firstName(r.name);
   }
 
-  // ─── Abrir / cerrar ───────────────────────────────────────────
+  // ─── Enlace directo: ?servicio=..&barbero=.. (o #slug viejo) ──
   function findService(v) {
     if (v == null || v === '') return null;
     v = String(v).toLowerCase();
@@ -539,57 +551,24 @@
     }
     return null;
   }
-  function applyOpts(o) {
-    if (o.barbero) {
-      var v = String(o.barbero).toLowerCase();
+  function applyUrl() {
+    var params = new URLSearchParams(location.search);
+    var hash = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : '';
+    var barbero = params.get('barbero');
+    if (barbero) {
+      var v = barbero.toLowerCase();
       var b = S.barbers.filter(function (x) { return String(x.id) === v || niceSlug(x.nombre) === v; })[0];
       if (b) S.barber = b.id;
     }
-    var svc = findService(o.servicio);
-    if (svc) selectService(svc);
+    var svc = findService(params.get('servicio') || hash);
+    // Los servicios a consulta no se abren solos en WhatsApp: el cliente los elige.
+    if (svc && !svc.requires_consultation) selectService(svc);
   }
 
-  function isOpen() { return root.classList.contains('is-open'); }
-
-  function open(opts) {
-    opts = opts || {};
-    if (!isOpen()) {
-      S.opener = document.activeElement;
-      root.classList.add('is-open');
-      root.setAttribute('aria-hidden', 'false');
-      document.documentElement.classList.add('rsv-lock');
-      // El botón "atrás" del celular cierra el panel en vez de salir de la página.
-      try { history.pushState({ rsv: 1 }, ''); S.pushed = true; } catch (e) { S.pushed = false; }
-      setTimeout(function () { el.sheet.focus({ preventScroll: true }); }, 60);
-    }
-    var mm = document.getElementById('mobile-menu');
-    if (mm) mm.classList.add('hidden');
-    prefill();
-    render();
-    loadData().then(function () { applyOpts(opts); render(); }).catch(function () {
-      el.svcBox.innerHTML = '<p class="rsv-empty">No pudimos cargar los servicios. ' +
-        '<button type="button" class="rsv-link" data-act="retry">Intentar de nuevo</button></p>';
-    });
-  }
-
-  function close(fromHistory) {
-    if (!isOpen()) return;
-    root.classList.remove('is-open');
-    root.setAttribute('aria-hidden', 'true');
-    document.documentElement.classList.remove('rsv-lock');
-    el.sheet.style.removeProperty('--rsv-drag');
-    if (!el.done.hidden) resetAfterBooking();
-    if (S.pushed && !fromHistory) { S.pushed = false; history.back(); }
-    S.pushed = false;
-    if (S.opener && S.opener.focus) S.opener.focus({ preventScroll: true });
-  }
-  window.addEventListener('popstate', function () { if (isOpen()) { S.pushed = false; close(true); } });
-
-  // ─── Eventos dentro del panel ─────────────────────────────────
+  // ─── Eventos ──────────────────────────────────────────────────
   root.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-svc],[data-day],[data-time],[data-barber],[data-act],[data-rsv-close]');
+    var t = e.target.closest('[data-svc],[data-day],[data-time],[data-barber],[data-act]');
     if (!t || t.disabled) return;
-    if (t.hasAttribute('data-rsv-close')) { close(); return; }
     if (t.dataset.svc) {
       var id = Number(t.dataset.svc);
       var svc = S.services.filter(function (s) { return s.id === id; })[0];
@@ -602,8 +581,8 @@
     switch (t.dataset.act) {
       case 'svc-change': S.svcOpen = true; render(); break;
       case 'next-day': seekFirstFreeDay(Math.max(0, dayIndex(S.day)) + 1); break;
-      case 'retry': open({}); break;
-      case 'done': close(); break;
+      case 'retry': start(); break;
+      case 'again': newBooking(); break;
     }
   });
 
@@ -613,7 +592,7 @@
     var b = r.barberId !== 'any' ? barberById(r.barberId) : null;
     S.barber = b && barbersFor(svc).indexOf(b) !== -1 ? b.id : 'any';
     selectService(svc);
-    el.slots.scrollIntoView({ behavior: smooth(), block: 'nearest' });
+    $('rsv-blk-time').scrollIntoView({ behavior: smooth(), block: 'start' });
   });
   $('rsv-again-no').addEventListener('click', function () { S.againDismissed = true; render(); });
 
@@ -643,81 +622,14 @@
     submit();
   });
 
-  // Teclado: Esc cierra y el foco no se escapa del panel.
-  root.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { close(); return; }
-    if (e.key !== 'Tab') return;
-    var f = Array.prototype.filter.call(
-      el.sheet.querySelectorAll('button:not([disabled]), a[href], input, textarea'),
-      function (x) { return x.offsetParent !== null; });
-    if (!f.length) return;
-    var first = f[0], last = f[f.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  });
-
-  // Celular: se cierra deslizando hacia abajo desde la manija o el encabezado.
-  var drag = null;
-  function onDown(e) {
-    if (window.matchMedia('(min-width: 768px)').matches || e.target.closest('button')) return;
-    drag = { y: e.clientY, dy: 0, id: e.pointerId };
-    el.sheet.classList.add('is-dragging');
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* nada */ }
+  // ─── Arranque ─────────────────────────────────────────────────
+  function start() {
+    prefill();
+    render();
+    loadData().then(function () { applyUrl(); render(); }).catch(function () {
+      el.svcBox.innerHTML = '<p class="rsv-empty">No pudimos cargar los servicios. ' +
+        '<button type="button" class="rsv-link" data-act="retry">Intentar de nuevo</button></p>';
+    });
   }
-  function onMove(e) {
-    if (!drag) return;
-    drag.dy = Math.max(0, e.clientY - drag.y);
-    el.sheet.style.setProperty('--rsv-drag', drag.dy + 'px');
-  }
-  function onUp() {
-    if (!drag) return;
-    var dy = drag.dy; drag = null;
-    el.sheet.classList.remove('is-dragging');
-    if (dy > 110) close(); else el.sheet.style.setProperty('--rsv-drag', '0px');
-  }
-  [el.head, el.sheet.querySelector('.rsv-grip')].forEach(function (h) {
-    if (!h) return;
-    h.addEventListener('pointerdown', onDown);
-    h.addEventListener('pointermove', onMove);
-    h.addEventListener('pointerup', onUp);
-    h.addEventListener('pointercancel', onUp);
-  });
-
-  // ─── Enlaces de la página que abren el panel ──────────────────
-  var RESERVA_PATH = /^\/(reservar|booking)(\/|\.html)?$/;
-  document.addEventListener('click', function (e) {
-    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    var a = e.target.closest('a[href], [data-reservar]');
-    if (!a || root.contains(a)) return;
-    var opts;
-    if (a.hasAttribute('data-reservar')) {
-      opts = { servicio: a.getAttribute('data-servicio'), barbero: a.getAttribute('data-barbero') };
-    } else {
-      var url;
-      try { url = new URL(a.getAttribute('href'), location.href); } catch (_) { return; }
-      if (url.origin !== location.origin || !RESERVA_PATH.test(url.pathname)) return;
-      opts = {
-        servicio: url.searchParams.get('servicio') || (url.hash.length > 1 ? decodeURIComponent(url.hash.slice(1)) : null),
-        barbero: url.searchParams.get('barbero')
-      };
-    }
-    e.preventDefault();
-    open(opts);
-  });
-
-  // ─── Enlace directo: /?reservar=1[&servicio=..][&barbero=..] ──
-  var params = new URLSearchParams(location.search);
-  if (params.has('reservar')) {
-    var initial = {
-      servicio: params.get('servicio') || (location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : null),
-      barbero: params.get('barbero')
-    };
-    ['reservar', 'servicio', 'barbero'].forEach(function (k) { params.delete(k); });
-    var qs = params.toString();
-    try { history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '')); } catch (_) { /* nada */ }
-    open(initial);
-  }
-
-  // Para abrirlo desde otros scripts: window.A30Reserva.open({ servicio: 3 })
-  window.A30Reserva = { open: open, close: close };
+  start();
 })();

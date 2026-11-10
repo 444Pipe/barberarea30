@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+  <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/favicon30.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'images/favicon30.png' %}">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reserva tu cita - Área 30 Barber Club en Restrepo</title>
+  <meta name="description" content="Agenda tu cita en Área 30 Barber Club (Restrepo, Meta): elige servicio, día y hora en una sola pantalla.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#C9A24A', dark: '#A8802F', light: '#ECD48E' },
+            jet: { DEFAULT: '#0C0A07', card: '#14110C', lighter: '#1D1912' },
+            smoke: '#EFE7D6'
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/animations.css' %}">
+  <link rel="stylesheet" href="{% static 'css/letrero.css' %}">
+  <link rel="stylesheet" href="{% static 'css/reserva.css' %}">
+</head>
+<body class="rsv-page-body bg-jet text-smoke font-sans antialiased selection:bg-gold selection:text-jet">
+
+  <nav class="sticky top-0 z-50 bg-jet/90 backdrop-blur-md border-b border-gold/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+      <a href="/" class="flex items-center">
+        <img src="{% static 'images/AREA 30.png' %}" alt="Área 30 Barber Club" class="h-14 w-auto object-contain">
+      </a>
+      <a href="/" class="text-xs sm:text-sm tracking-widest uppercase text-smoke/70 hover:text-gold transition-colors">← Volver al club</a>
+    </div>
+  </nav>
+
+  <header class="rsv-hero">
+    <div class="rsv-stars" aria-hidden="true">★★★★★</div>
+    <h1 class="font-serif text-4xl md:text-5xl font-bold text-white">Reserva tu <span class="text-gold italic font-light">cita</span></h1>
+    <p>Elige servicio, día y hora. Todo en esta pantalla.</p>
+  </header>
+
+  <main class="rsv" id="rsv">
+    <div class="rsv-layout" id="rsv-layout">
+
+      <div class="rsv-form">
+        <div class="rsv-again" id="rsv-again" hidden>
+          <p>Hola, <span id="rsv-again-name"></span>. ¿Lo de siempre?<strong id="rsv-again-what"></strong></p>
+          <div class="rsv-again-btns">
+            <button type="button" class="rsv-solid" id="rsv-again-yes">Sí, solo elijo la hora</button>
+            <button type="button" class="rsv-link" id="rsv-again-no">Quiero otra cosa</button>
+          </div>
+        </div>
+
+        <section class="rsv-blk" id="rsv-blk-svc" aria-labelledby="rsv-t-svc">
+          <h2 class="rsv-t" id="rsv-t-svc">Servicio</h2>
+          <div id="rsv-svc-box"><p class="rsv-empty">Cargando servicios…</p></div>
+        </section>
+
+        <section class="rsv-blk" id="rsv-blk-day" aria-labelledby="rsv-t-day">
+          <h2 class="rsv-t" id="rsv-t-day">Día</h2>
+          <div class="rsv-scroll" id="rsv-days"></div>
+        </section>
+
+        <section class="rsv-blk" id="rsv-blk-time" aria-labelledby="rsv-t-time">
+          <h2 class="rsv-t" id="rsv-t-time">Hora <small id="rsv-time-note"></small></h2>
+          <div class="rsv-slots" id="rsv-slots"><p class="rsv-empty">Elige un servicio para ver las horas libres.</p></div>
+        </section>
+
+        <section class="rsv-blk" id="rsv-blk-barber" aria-labelledby="rsv-t-barber">
+          <h2 class="rsv-t" id="rsv-t-barber">Barbero <small>opcional</small></h2>
+          <div class="rsv-scroll" id="rsv-barbers"></div>
+        </section>
+
+        <section class="rsv-blk" id="rsv-blk-data" aria-labelledby="rsv-t-data">
+          <h2 class="rsv-t" id="rsv-t-data">Tus datos <button type="button" class="rsv-link is-quiet" id="rsv-forget" hidden></button></h2>
+          <div class="rsv-fields">
+            <label class="rsv-sr" for="rsv-name">Nombre</label>
+            <input class="rsv-field" id="rsv-name" type="text" autocomplete="name" placeholder="Nombre" maxlength="150">
+            <label class="rsv-sr" for="rsv-phone">WhatsApp</label>
+            <input class="rsv-field" id="rsv-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="WhatsApp" maxlength="20">
+          </div>
+          <button type="button" class="rsv-link" id="rsv-more" aria-expanded="false" aria-controls="rsv-extra">+ Agregar correo o una nota (opcional)</button>
+          <div class="rsv-blk" id="rsv-extra" hidden>
+            <label class="rsv-sr" for="rsv-email">Correo</label>
+            <input class="rsv-field" id="rsv-email" type="email" autocomplete="email" placeholder="Correo, para recibir la confirmación">
+            <label class="rsv-sr" for="rsv-notes">Nota para el barbero</label>
+            <textarea class="rsv-field" id="rsv-notes" rows="2" maxlength="500" placeholder="Nota para el barbero"></textarea>
+          </div>
+          <label class="rsv-optin"><input type="checkbox" id="rsv-optin">Quiero recibir promociones por WhatsApp</label>
+        </section>
+
+        <p class="rsv-err" id="rsv-err" role="alert" hidden></p>
+      </div>
+
+      <!-- Resumen: tarjeta fija a la derecha en computador, barra abajo en celular -->
+      <aside class="rsv-aside" aria-label="Tu reserva">
+        <div class="rsv-card">
+          <h2 class="rsv-card-t">Tu reserva</h2>
+          <dl class="rsv-sumlist">
+            <div><dt>Servicio</dt><dd id="rsv-s-svc">—</dd></div>
+            <div><dt>Día</dt><dd id="rsv-s-day">—</dd></div>
+            <div><dt>Hora</dt><dd id="rsv-s-time">—</dd></div>
+            <div><dt>Barbero</dt><dd id="rsv-s-barber">El primero libre</dd></div>
+            <div class="rsv-total"><dt>Total</dt><dd id="rsv-s-price">—</dd></div>
+          </dl>
+          <div class="rsv-sum"><span id="rsv-sum-what">Elige servicio y hora</span><span id="rsv-sum-price"></span></div>
+          <button type="button" class="rsv-book is-pending" id="rsv-book">Elige un servicio</button>
+          <p class="rsv-legal">Al tocar Reservar aceptas la <a href="/politica-datos/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> (Ley 1581 de 2012).</p>
+        </div>
+      </aside>
+    </div>
+
+    <section class="rsv-done" id="rsv-done" hidden aria-live="polite"></section>
+  </main>
+
+  <footer class="bg-black pt-12 pb-8 px-4 border-t border-white/5">
+    <div class="max-w-7xl mx-auto text-center flex flex-col md:flex-row justify-between items-center gap-4">
+      <p class="text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase">&copy; 2026 Área 30 Barber Club. Restrepo, Meta - Colombia.</p>
+      <a href="/admin-panel/login/" class="text-[0.6rem] tracking-[0.2em] font-bold text-smoke/20 uppercase hover:text-gold transition-colors">Acceso Staff</a>
+    </div>
+  </footer>
+
+{% include "public/_credito_af.html" %}
+  <script src="{% static 'js/reserva.js' %}" defer></script>
+</body>
+</html>

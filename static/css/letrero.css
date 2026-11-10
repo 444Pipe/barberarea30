@@ -39,10 +39,15 @@ h1 .text-gold, h2 .text-gold, h3 .text-gold {
   -webkit-background-clip: text; background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
 }
-/* "Identidad." del hero: misma letra caligráfica, ahora en hoja de oro */
+/* "Identidad." del hero: misma letra caligráfica, ahora en hoja de oro.
+   Con line-height 0.82 los trazos altos de la "I" y la "d" salían del área
+   pintada y se veían cortados (pasaba desde antes). El padding-top amplía el
+   área hacia arriba y el margin negativo deja el texto en el mismo lugar. */
 .hero-title .script {
   background: var(--a30-foil);
   -webkit-background-clip: text; background-clip: text;
+  padding-top: 0.22em;
+  margin-top: calc(0.06em - 0.22em);
 }
 
 /* ── Botón dorado: hoja de oro con el doble filete interior del aviso ── */

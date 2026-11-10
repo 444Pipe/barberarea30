@@ -7,10 +7,10 @@ urlpatterns = [
     path('', HomeView.as_view(), name='home'),
     path('services/', TemplateView.as_view(template_name='public/services.html'), name='services'),
     path('gallery/', TemplateView.as_view(template_name='public/gallery.html'), name='gallery'),
-    # Enlace directo de reserva (Google, Instagram, WhatsApp): abre el inicio
-    # con el panel ya abierto. /booking/ era el asistente de 4 pasos; sus
-    # enlaces viejos llegan al mismo panel.
-    path('reservar/', reservar_redirect_view, name='reservar'),
+    # Página de reserva en una sola pantalla. También es el enlace directo
+    # para Google / Instagram / WhatsApp (?servicio=..&barbero=..). /booking/
+    # era el asistente de 4 pasos: sus enlaces viejos llegan aquí.
+    path('reservar/', TemplateView.as_view(template_name='public/reservar.html'), name='reservar'),
     path('booking/', reservar_redirect_view, name='booking'),
     path('reserva/<str:signed_id>/', client_booking_detail_view, name='client_booking_detail'),
     path('politica-datos/', TemplateView.as_view(template_name='public/politica_datos.html'), name='politica_datos'),

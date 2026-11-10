@@ -159,9 +159,9 @@ El teléfono del cliente lo ve **todo** el personal del panel (barberos incluido
 
 Statuses recently changed: manual-service bookings are now created as **`confirmed`** (not `completed`) so they remain manageable. See commit `6770249`.
 
-### Reserva pública: panel en la misma página (nov-2026)
+### Reserva pública: página `/reservar/` en una sola pantalla (nov-2026)
 
-El asistente de 4 pasos de `/booking/` ya no existe. La reserva es un panel que se abre encima de la página: [_reserva_panel.html](templates/public/_reserva_panel.html) + [reserva.js](static/js/reserva.js) + [reserva.css](static/css/reserva.css), incluido en inicio, servicios, galería, reels y profesionales. Cualquier enlace a `/reservar/` o `/booking/` lo abre sin cambiar de página; `/reservar/?servicio=<id|slug>&barbero=<id>` es el enlace directo para Google / Instagram / WhatsApp (redirige a `/?reservar=1&...`).
+El asistente de 4 pasos de `/booking/` ya no existe. La reserva es una **página propia** (no un modal, decisión del dueño nov-2026): [reservar.html](templates/public/reservar.html) + [reserva.js](static/js/reserva.js) + [reserva.css](static/css/reserva.css). En computador, formulario a la izquierda y tarjeta "Tu reserva" fija a la derecha; en celular, una columna con barra fija abajo. `/reservar/?servicio=<id|slug>&barbero=<id>` es el enlace directo para Google / Instagram / WhatsApp; `/booking/` (y `/booking`, `/booking.html`) redirige a `/reservar/` conservando los parámetros, y el `#slug` de los enlaces viejos también elige el servicio.
 
 - Usa las mismas APIs públicas y el mismo `POST /api/bookings/`; `barber_id: "any"` = "El primero libre" (el servidor asigna).
 - Solo nombre y WhatsApp; correo y nota opcionales. Tocar Reservar = aceptar datos (texto bajo el botón → `privacy_accepted=true`); las promociones son una casilla aparte → `Booking.marketing_opt_in`.
