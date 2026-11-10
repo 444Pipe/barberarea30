@@ -1,0 +1,451 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Tarjeta de sellos{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Tarjeta de sellos: el mismo marco del aviso (doble filete dorado) */
+  .lc-foil { background: linear-gradient(105deg, #8d6b27 0%, #e9cf86 26%, #c9a24a 48%, #f5e4ac 66%, #a8802f 100%); }
+  .lc-card {
+    padding: 22px; display: grid; gap: 16px;
+    background: radial-gradient(140% 120% at 100% 0%, rgba(201, 162, 74, 0.16), transparent 55%), #15130e;
+    border: 1px solid #8d6b27; box-shadow: inset 0 0 0 5px #15130e, inset 0 0 0 6px rgba(201, 162, 74, 0.35);
+  }
+  .lc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .lc-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .lc-cell {
+    aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed rgba(201, 162, 74, 0.35);
+    display: grid; place-items: center; font-size: 11px; color: rgba(245, 245, 245, 0.3); font-weight: 600;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  /* Playfair trae números "de texto" (el 3, 4, 5, 7 y 9 bajan): aquí van parejos */
+  .lc-num { font-variant-numeric: lining-nums tabular-nums; }
+  .lc-cell.on {
+    border: 0; color: #0c0a07; font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600;
+    background: linear-gradient(105deg, #8d6b27 0%, #e9cf86 26%, #c9a24a 48%, #f5e4ac 66%, #a8802f 100%);
+    box-shadow: 0 6px 16px -8px rgba(201, 162, 74, 0.8);
+  }
+  .lc-cell.prize { border-style: solid; border-color: #c9a24a; color: #ecd48e; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; line-height: 1.15; }
+  .lc-cell.prize.on { color: #0c0a07; font-family: 'Playfair Display', serif; font-size: 17px; letter-spacing: 0; }
+  .lc-dots { display: inline-grid; grid-auto-flow: column; gap: 3px; vertical-align: middle; }
+  .lc-dots i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(201, 162, 74, 0.45); }
+  .lc-dots i.on { border: 0; background: #c9a24a; }
+  .lc-row[aria-current="true"] { background: rgba(212, 175, 55, 0.07); box-shadow: inset 2px 0 0 #D4AF37; }
+  .lc-btn {
+    border: 1px solid #c9a24a; outline: 1px solid rgba(12, 10, 7, 0.4); outline-offset: -5px;
+    color: #0c0a07; font-weight: 700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; padding: 12px 18px;
+  }
+  .lc-btn:disabled { opacity: 0.5; cursor: wait; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl font-serif font-bold text-white tracking-wider">Tarjeta de sellos</h1>
+        <span class="inline-flex items-center gap-1.5 text-[0.6rem] font-bold tracking-[0.2em] uppercase text-amber-300 bg-amber-400/10 border border-amber-400/40 rounded-full px-3 py-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" aria-hidden="true"></span>En desarrollo
+        </span>
+      </div>
+      <p class="text-xs text-smoke/40 mt-1 tracking-wider">Los clientes todavía no la ven. Las reglas y el canje pueden cambiar mientras la probamos.</p>
+    </div>
+    {% if can_configure %}
+    <button type="button" id="lc-config-toggle" class="text-[0.7rem] tracking-widest uppercase text-gold border border-gold/40 rounded-md px-4 py-2 hover:bg-gold/10" aria-expanded="false" aria-controls="lc-config">Cambiar reglas</button>
+    {% endif %}
+  </div>
+
+  <!-- Reglas vigentes -->
+  <div class="bg-jet-card border border-white/5 rounded-xl p-5">
+    <p class="text-[0.6rem] tracking-[0.25em] uppercase text-smoke/40 mb-3">Cómo funciona</p>
+    <ul id="lc-rules" class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-xs text-smoke/70"></ul>
+  </div>
+
+  {% if can_configure %}
+  <!-- Reglas: solo socios (superadmin) -->
+  <form id="lc-config" class="bg-jet-card border border-gold/20 rounded-xl p-5 space-y-4" hidden>
+    <p class="text-[0.6rem] tracking-[0.25em] uppercase text-gold/80">Reglas de la tarjeta</p>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Sellos para el premio
+        <input type="number" min="1" max="50" name="stamps_required" class="admin-input w-full mt-1" required>
+      </label>
+      <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Suman servicios desde ($)
+        <input type="number" min="0" step="1000" name="min_service_price" class="admin-input w-full mt-1" required>
+      </label>
+      <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Cada sello vence a los (meses)
+        <input type="number" min="0" max="60" name="expiry_months" class="admin-input w-full mt-1" required>
+        <span class="block normal-case tracking-normal text-smoke/30 mt-1">0 = no vencen</span>
+      </label>
+      <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Premio
+        <select name="reward_service_id" class="admin-input w-full mt-1"></select>
+      </label>
+    </div>
+    <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Aclaración del premio (opcional)
+      <input type="text" maxlength="200" name="reward_note" class="admin-input w-full mt-1" placeholder="Ej: si escoge un servicio más caro, paga la diferencia">
+    </label>
+    <p id="lc-config-err" class="text-xs text-red-400" hidden></p>
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" class="lc-btn lc-foil">Guardar reglas</button>
+      <button type="button" id="lc-config-cancel" class="text-[0.7rem] tracking-widest uppercase text-smoke/50 hover:text-white px-3 py-2">Cancelar</button>
+      <span id="lc-config-meta" class="text-[0.65rem] text-smoke/30"></span>
+    </div>
+  </form>
+  {% endif %}
+
+  <!-- Resumen -->
+  <div id="lc-summary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] items-start">
+    <!-- Clientes -->
+    <div class="bg-jet-card border border-white/5 rounded-xl overflow-hidden min-w-0">
+      <div class="p-4 border-b border-white/5">
+        <input type="search" id="lc-search" class="admin-input w-full" placeholder="Buscar por nombre o celular..." autocomplete="off">
+      </div>
+      <ul id="lc-list" class="divide-y divide-white/5"></ul>
+    </div>
+
+    <!-- Tarjeta del cliente elegido -->
+    <section id="lc-detail" class="space-y-4 lg:sticky lg:top-6" aria-live="polite">
+      <div class="bg-jet-card border border-white/5 rounded-xl p-6 text-center text-xs text-smoke/40">
+        Elige un cliente para ver su tarjeta.
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  // window.esc / phoneLinks / showToast los define base_admin.html al final del
+  // <body>, después de este script: se buscan al usarlos, no al cargar.
+  const esc = (s) => window.esc(s);
+  const CAN_REDEEM = {{ can_redeem|yesno:"true,false" }};
+  const CAN_CONFIG = {{ can_configure|yesno:"true,false" }};
+  const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const $ = (id) => document.getElementById(id);
+  const S = { settings: null, services: [], cards: [], current: null, redeeming: false };
+
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-CO');
+  function fecha(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    return `${d} ${MESES[m - 1]} ${y}`;
+  }
+  function getCSRF() {
+    const c = document.cookie.split(';').find(x => x.trim().startsWith('csrftoken='));
+    if (c) return decodeURIComponent(c.split('=')[1]);
+    const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return input ? input.value : '';
+  }
+  async function api(url, opts) {
+    opts = opts || {};
+    const headers = { 'X-CSRFToken': getCSRF() };
+    if (opts.body) headers['Content-Type'] = 'application/json';
+    const r = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined, credentials: 'same-origin' });
+    const data = r.status === 204 ? {} : await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(data.error || 'No se pudo completar.'), { data });
+    return data;
+  }
+  function premio(s) {
+    return s.reward_service || 'sin definir';
+  }
+
+  // ── Reglas ─────────────────────────────────────────────
+  function renderRules() {
+    const s = S.settings;
+    const items = [
+      `<b class="text-white font-semibold">${s.stamps_required} sellos</b> = premio: <b class="text-gold font-semibold">${esc(premio(s))}</b>${s.reward_note ? ` <span class="text-smoke/40">(${esc(s.reward_note)})</span>` : ''}`,
+      `Suman los servicios <b class="text-white font-semibold">desde ${money(s.min_service_price)}</b>. Un servicio gratis no suma.`,
+      `El sello cuenta solo cuando la venta queda <b class="text-white font-semibold">aprobada en caja</b>. Reservar no suma.`,
+      s.expiry_months ? `Cada sello <b class="text-white font-semibold">vence a los ${s.expiry_months} meses</b> del servicio.` : `Los sellos <b class="text-white font-semibold">no vencen</b>.`,
+    ];
+    $('lc-rules').innerHTML = items.map(t => `<li class="flex gap-2"><span class="text-gold mt-[1px]">◆</span><span>${t}</span></li>`).join('');
+  }
+
+  function renderSummary(sum) {
+    const tiles = [
+      ['Clientes con sellos', sum.clients, 'text-white'],
+      ['Premios listos', sum.ready, 'text-gold'],
+      ['Vencen en 30 días', sum.expiring, sum.expiring ? 'text-amber-400' : 'text-white'],
+      ['Canjes hechos', sum.redeemed, 'text-emerald-400'],
+    ];
+    $('lc-summary').innerHTML = tiles.map(([label, n, cls]) => `
+      <div class="bg-jet-card border border-white/5 rounded-xl p-4">
+        <p class="text-[0.6rem] tracking-[0.2em] uppercase text-smoke/40">${label}</p>
+        <p class="text-2xl font-serif font-bold ${cls} mt-1 lc-num">${n}</p>
+      </div>`).join('');
+  }
+
+  // ── Lista de clientes ──────────────────────────────────
+  function dots(active, required) {
+    const n = Math.min(required, 12);
+    let html = '';
+    for (let i = 0; i < n; i++) html += `<i class="${i < active ? 'on' : ''}"></i>`;
+    return `<span class="lc-dots" aria-hidden="true">${html}</span>`;
+  }
+
+  function renderList() {
+    const ul = $('lc-list');
+    if (!S.cards.length) {
+      const q = $('lc-search').value.trim();
+      ul.innerHTML = `<li class="px-4 py-8 text-center text-xs text-smoke/40">${q ? 'Nadie con ese nombre o celular tiene sellos.' : 'Todavía ningún cliente tiene sellos. Aparecen cuando caja aprueba un servicio que suma.'}</li>`;
+      return;
+    }
+    ul.innerHTML = S.cards.map(c => {
+      let tag = '';
+      if (c.complete) tag = '<span class="text-[0.6rem] tracking-widest uppercase text-jet lc-foil px-2 py-0.5 font-bold">Premio listo</span>';
+      else if (c.expires_soon) tag = `<span class="text-[0.65rem] text-amber-400">Vence ${fecha(c.next_expiry)}</span>`;
+      else if (!c.active) tag = '<span class="text-[0.65rem] text-smoke/30">Sin sellos vigentes</span>';
+      return `
+      <li>
+        <button type="button" class="lc-row w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-white/[0.02]" data-phone="${esc(c.phone)}" aria-current="${S.current === c.phone}">
+          <span class="min-w-0 flex-1">
+            <span class="block text-sm text-white font-medium truncate">${esc(c.name)}</span>
+            <span class="block text-[0.7rem] text-smoke/40 tabular-nums">${esc(c.phone)}${c.last_visit ? ' · último servicio ' + fecha(c.last_visit) : ''}</span>
+          </span>
+          <span class="hidden sm:block">${dots(c.active, c.required)}</span>
+          <span class="text-right shrink-0">
+            <span class="block text-sm font-serif font-bold ${c.complete ? 'text-gold' : 'text-white'} lc-num">${c.active} / ${c.required}</span>
+            ${tag}
+          </span>
+        </button>
+      </li>`;
+    }).join('');
+  }
+
+  async function loadList() {
+    const q = $('lc-search').value.trim();
+    try {
+      const data = await api('/api/admin/loyalty/' + (q ? '?search=' + encodeURIComponent(q) : ''));
+      S.settings = data.settings;
+      S.cards = data.cards;
+      renderRules();
+      renderSummary(data.summary);
+      renderList();
+    } catch (e) {
+      console.error('Tarjeta de sellos:', e);
+      $('lc-list').innerHTML = '<li class="px-4 py-8 text-center text-xs text-red-400">No se pudieron cargar las tarjetas.</li>';
+    }
+  }
+
+  // ── Tarjeta de un cliente ──────────────────────────────
+  const STATE = {
+    activo: ['Vigente', 'text-emerald-400'],
+    usado: ['Canjeado', 'text-gold/70'],
+    vencido: ['Vencido', 'text-smoke/30 line-through'],
+  };
+
+  function renderCard(card) {
+    const s = card.settings;
+    const req = card.required;
+    const shown = Math.min(card.active, req);
+    let cells = '';
+    for (let i = 1; i <= req; i++) {
+      const on = i <= shown;
+      const prize = i === req;
+      cells += `<span class="lc-cell${on ? ' on' : ''}${prize ? ' prize' : ''}">${prize && !on ? 'Premio' : i}</span>`;
+    }
+    let note;
+    if (card.complete) {
+      note = `<b class="text-white">Completó la tarjeta.</b> Se gana: <b class="text-gold">${esc(premio(s))}</b>${card.active > req ? ` · le sobran ${card.active - req} sellos` : ''}.`;
+    } else if (card.active) {
+      note = `Le ${card.missing === 1 ? 'falta <b class="text-white">1 sello</b>' : `faltan <b class="text-white">${card.missing} sellos</b>`} para el premio.${card.next_expiry ? ` El más antiguo vence el <b class="text-white">${fecha(card.next_expiry)}</b>.` : ''}`;
+    } else if (card.redemptions.length) {
+      note = 'Ya canjeó su premio. Con su próximo servicio empieza una tarjeta nueva.';
+    } else {
+      note = 'No tiene sellos vigentes.';
+    }
+
+    const redeemBox = card.complete && CAN_REDEEM ? `
+      <div id="lc-redeem" class="space-y-3">
+        <button type="button" id="lc-redeem-open" class="lc-btn lc-foil w-full">Canjear premio</button>
+        <div id="lc-redeem-form" class="space-y-3" hidden>
+          <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Servicio que se regala
+            <select id="lc-redeem-svc" class="admin-input w-full mt-1">
+              ${S.services.map(x => `<option value="${x.id}"${x.id === s.reward_service_id ? ' selected' : ''}>${esc(x.name)} · ${money(x.price)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="block text-[0.65rem] tracking-wider uppercase text-smoke/50">Nota (opcional)
+            <input id="lc-redeem-notes" type="text" maxlength="200" class="admin-input w-full mt-1" placeholder="Ej: cita del sábado con Frank">
+          </label>
+          <p class="text-[0.7rem] text-smoke/50 leading-relaxed">Se gastan ${req} sellos. En caja cobra ese servicio con <b class="text-smoke/80">descuento del 100% asumido por la empresa</b>: así queda en $0 y no suma sello nuevo.</p>
+          <div class="flex gap-2">
+            <button type="button" id="lc-redeem-ok" class="lc-btn lc-foil flex-1">Confirmar canje</button>
+            <button type="button" id="lc-redeem-cancel" class="text-[0.7rem] tracking-widest uppercase text-smoke/50 hover:text-white px-3">Cancelar</button>
+          </div>
+        </div>
+      </div>` : '';
+
+    const stamps = card.stamps.map(st => {
+      const [label, cls] = STATE[st.state];
+      return `
+        <li class="flex items-start justify-between gap-3 py-2.5 text-xs">
+          <span class="min-w-0">
+            <span class="block text-white">${esc(st.service)} <span class="text-smoke/40">· ${money(st.price)}</span></span>
+            <span class="block text-smoke/40">${fecha(st.date)}${st.barber ? ' · ' + esc(st.barber) : ''}${st.expires && st.state === 'activo' ? ' · vence ' + fecha(st.expires) : ''}</span>
+          </span>
+          <span class="shrink-0 text-[0.65rem] tracking-wider uppercase ${cls}">${label}</span>
+        </li>`;
+    }).join('');
+
+    const reds = card.redemptions.map(r => `
+      <li class="flex items-start justify-between gap-3 py-2.5 text-xs">
+        <span class="min-w-0">
+          <span class="block text-white">${esc(r.service || 'Premio')} <span class="text-smoke/40">· ${r.stamps_used} sellos</span></span>
+          <span class="block text-smoke/40">${esc(r.date)}${r.by ? ' · ' + esc(r.by) : ''}${r.notes ? ' · ' + esc(r.notes) : ''}</span>
+        </span>
+        ${CAN_CONFIG ? `<button type="button" class="shrink-0 text-[0.65rem] tracking-wider uppercase text-red-400/70 hover:text-red-400" data-undo="${r.id}">Deshacer</button>` : ''}
+      </li>`).join('');
+
+    $('lc-detail').innerHTML = `
+      <div class="lc-card">
+        <div class="lc-head">
+          <span>
+            <span class="block text-[0.6rem] tracking-[0.3em] uppercase text-gold/70">Área 30 · Tarjeta de sellos</span>
+            <span class="block font-serif text-xl text-white mt-1">${esc(card.name)}</span>
+          </span>
+          <span class="font-serif text-lg text-gold lc-num">${card.active} / ${req}</span>
+        </div>
+        <div class="lc-grid">${cells}</div>
+        <p class="text-xs text-smoke/60 leading-relaxed">${note}</p>
+        <div class="text-[0.7rem]">${window.phoneLinks(card.phone)}</div>
+        ${redeemBox}
+      </div>
+      <div class="bg-jet-card border border-white/5 rounded-xl p-5">
+        <p class="text-[0.6rem] tracking-[0.25em] uppercase text-smoke/40 mb-1">Servicios que sumaron</p>
+        <ul class="divide-y divide-white/5">${stamps || '<li class="py-3 text-xs text-smoke/40">Ninguno todavía.</li>'}</ul>
+      </div>
+      ${reds ? `
+      <div class="bg-jet-card border border-white/5 rounded-xl p-5">
+        <p class="text-[0.6rem] tracking-[0.25em] uppercase text-smoke/40 mb-1">Premios canjeados</p>
+        <ul class="divide-y divide-white/5">${reds}</ul>
+      </div>` : ''}`;
+  }
+
+  async function openCard(phone, scroll) {
+    S.current = phone;
+    document.querySelectorAll('.lc-row').forEach(b => b.setAttribute('aria-current', String(b.dataset.phone === phone)));
+    try {
+      const card = await api('/api/admin/loyalty/' + encodeURIComponent(phone) + '/');
+      renderCard(card);
+      if (scroll && window.matchMedia('(max-width: 1023px)').matches) {
+        $('lc-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } catch (e) {
+      $('lc-detail').innerHTML = `<div class="bg-jet-card border border-white/5 rounded-xl p-6 text-center text-xs text-red-400">${esc(e.message)}</div>`;
+    }
+  }
+
+  async function redeem() {
+    if (S.redeeming) return;
+    S.redeeming = true;
+    const btn = $('lc-redeem-ok');
+    btn.disabled = true;
+    btn.textContent = 'Canjeando…';
+    try {
+      const res = await api('/api/admin/loyalty/' + encodeURIComponent(S.current) + '/redeem/', {
+        method: 'POST',
+        body: { reward_service_id: $('lc-redeem-svc').value || null, notes: $('lc-redeem-notes').value.trim() },
+      });
+      window.showToast && window.showToast('Premio canjeado. Recuerda cobrarlo en caja con descuento del 100%.', 'success');
+      renderCard(res.card);
+      loadList();
+    } catch (e) {
+      window.showToast && window.showToast(e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Confirmar canje';
+    } finally {
+      S.redeeming = false;
+    }
+  }
+
+  async function undo(id) {
+    if (!confirm('¿Deshacer este canje? Los sellos vuelven a la tarjeta del cliente.')) return;
+    try {
+      await api('/api/admin/loyalty/redemptions/' + id + '/', { method: 'DELETE' });
+      window.showToast && window.showToast('Canje deshecho.', 'success');
+      openCard(S.current);
+      loadList();
+    } catch (e) {
+      window.showToast && window.showToast(e.message, 'error');
+    }
+  }
+
+  // ── Configuración (socios) ─────────────────────────────
+  function fillConfig() {
+    const f = $('lc-config'), s = S.settings;
+    f.stamps_required.value = s.stamps_required;
+    f.min_service_price.value = s.min_service_price;
+    f.expiry_months.value = s.expiry_months;
+    f.reward_note.value = s.reward_note || '';
+    f.reward_service_id.innerHTML = '<option value="">Sin definir</option>' +
+      S.services.map(x => `<option value="${x.id}"${x.id === s.reward_service_id ? ' selected' : ''}>${esc(x.name)} · ${money(x.price)}</option>`).join('');
+    $('lc-config-meta').textContent = s.updated_by ? `Último cambio: ${s.updated_by}, ${s.updated_at}` : '';
+    $('lc-config-err').hidden = true;
+  }
+
+  function toggleConfig(open) {
+    const f = $('lc-config');
+    f.hidden = !open;
+    $('lc-config-toggle').setAttribute('aria-expanded', String(open));
+    if (open) { fillConfig(); f.stamps_required.focus(); }
+  }
+
+  async function saveConfig(ev) {
+    ev.preventDefault();
+    const f = ev.target;
+    const btn = f.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const res = await api('/api/admin/loyalty/settings/', {
+        method: 'PUT',
+        body: {
+          stamps_required: f.stamps_required.value,
+          min_service_price: f.min_service_price.value,
+          expiry_months: f.expiry_months.value,
+          reward_service_id: f.reward_service_id.value || null,
+          reward_note: f.reward_note.value.trim(),
+        },
+      });
+      S.settings = res.settings;
+      toggleConfig(false);
+      window.showToast && window.showToast('Reglas guardadas. Las tarjetas ya se recalcularon.', 'success');
+      await loadList();
+      if (S.current) openCard(S.current);
+    } catch (e) {
+      const errs = (e.data && e.data.errors) ? Object.values(e.data.errors).join(' ') : e.message;
+      $('lc-config-err').textContent = errs;
+      $('lc-config-err').hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Eventos ────────────────────────────────────────────
+  let searchTimer = null;
+  $('lc-search').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadList, 300);
+  });
+  $('lc-list').addEventListener('click', (ev) => {
+    const row = ev.target.closest('.lc-row');
+    if (row) openCard(row.dataset.phone, true);
+  });
+  $('lc-detail').addEventListener('click', (ev) => {
+    const t = ev.target;
+    if (t.id === 'lc-redeem-open') { $('lc-redeem-form').hidden = false; t.hidden = true; $('lc-redeem-svc').focus(); }
+    else if (t.id === 'lc-redeem-cancel') { $('lc-redeem-form').hidden = true; $('lc-redeem-open').hidden = false; }
+    else if (t.id === 'lc-redeem-ok') redeem();
+    else if (t.dataset.undo) undo(t.dataset.undo);
+  });
+  if (CAN_CONFIG) {
+    $('lc-config-toggle').addEventListener('click', () => toggleConfig($('lc-config').hidden));
+    $('lc-config-cancel').addEventListener('click', () => toggleConfig(false));
+    $('lc-config').addEventListener('submit', saveConfig);
+  }
+
+  api('/api/admin/loyalty/settings/').then(d => { S.services = d.services; }).catch(() => {});
+  loadList();
+})();
+</script>
+{% endblock %}

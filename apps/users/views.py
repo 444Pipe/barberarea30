@@ -242,6 +242,20 @@ def admin_clients_view(request):
 
 
 @admin_required
+def admin_loyalty_view(request):
+    """Tarjeta de sellos (prueba): solo en el panel, el cliente aún no la ve."""
+    profile = request.user.profile
+    context = {
+        'user_role': profile.role,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'active_section': 'loyalty',
+        'can_redeem': profile.can_confirm_sales,
+        'can_configure': profile.can_manage_promotions,
+    }
+    return render(request, 'admin/loyalty.html', context)
+
+
+@admin_required
 def admin_charts_view(request):
     context = {
         'user_role': request.user.profile.role,

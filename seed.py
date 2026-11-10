@@ -386,6 +386,19 @@ except Exception:
     except Exception as e:
         print("⚠ No se pudo crear la columna manualmente:", e)
 
+# --- Autocuración para la tarjeta de sellos (clients_loyaltysettings / clients_loyaltyredemption) ---
+try:
+    from apps.clients.models import LoyaltySettings as _LoyaltySettings, LoyaltyRedemption as _LoyaltyRedemption
+    for _model in (_LoyaltySettings, _LoyaltyRedemption):
+        try:
+            _model.objects.exists()
+        except Exception:
+            with connection.schema_editor() as schema_editor:
+                schema_editor.create_model(_model)
+            print(f"✓ Tabla {_model._meta.db_table} creada vía Schema Editor")
+except Exception as e:
+    print("⚠ No se pudo verificar/crear las tablas de la tarjeta de sellos:", e)
+
 # --- Comisión canónica de Frank: 50% (idempotente) ---
 try:
     from apps.barbers.models import Barber as _FrankBarber

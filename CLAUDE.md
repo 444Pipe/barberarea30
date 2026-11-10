@@ -138,6 +138,15 @@ pero no descuenta del saldo. Los tipos `materials` y `barber_payment` los asigna
 el sistema; el ROI excluye del gasto operativo **solo** el "Pago Diario: Franko"
 automático, no la categoría entera.
 
+### Tarjeta de sellos (prueba, nov-2026 — solo panel)
+
+Página `/admin-panel/sellos/` ([loyalty.html](templates/admin/loyalty.html)), API `/api/admin/loyalty/…` ([views_loyalty.py](apps/clients/views_loyalty.py)), cálculo en [apps/clients/loyalty.py](apps/clients/loyalty.py). **El cliente todavía no ve nada** (decisión del dueño): no la conectes al sitio público ni a `/reservar/` sin que lo pida.
+
+- Regla del dueño: un sello cuenta **solo cuando la venta queda aprobada en caja** (`Sale.approval_status='approved'`). Reservar, cancelar, no venir, venta pendiente o rechazada: no suma.
+- Los sellos **no se guardan**: se recalculan desde las ventas aprobadas (con cita, `base_price >= min_service_price`, `final_price > 0` → el servicio de premio cobrado en $0 no suma). Solo se guardan las reglas (`LoyaltySettings`, una fila) y los canjes (`LoyaltyRedemption`, que gastan los sellos vigentes más antiguos).
+- La tarjeta es por celular normalizado (`phone_key`: solo dígitos, sin el 57).
+- Reglas por defecto: 10 sellos, desde $30.000, vencen a los 6 meses, premio sin definir. Las cambian los socios (`can_manage_promotions`) desde la misma página; canjea quien confirma ventas (`can_confirm_sales`); deshacer un canje es solo de socios. Pruebas: `TarjetaDeSellosTests`.
+
 ### Booking integrity
 
 [Booking](apps/bookings/models.py) enforces no-double-booking in two layers — both matter:
