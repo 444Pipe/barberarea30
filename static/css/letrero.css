@@ -1,11 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Capa visual "letrero dorado" del sitio público (nov-2026)
+   Capa de efectos "letrero dorado" del sitio público (nov-2026)
 
-   Toma la identidad del aviso del local: capitales romanas (Marcellus,
-   como "ÁREA 30"), geométrica limpia (Jost, como "BARBER CLUB"), latón
-   cepillado en vez de amarillo plano, doble filete dorado y las cinco
-   estrellas. Se carga AL FINAL del <head> de cada página pública, así que
-   gana sobre styles.css, animations.css y el <style> propio de la página.
+   Solo efectos, NO tipografía: la letra del sitio sigue siendo Playfair
+   Display + Montserrat (+ Italianno en el hero), decisión del dueño.
+   Aporta: dorado de latón en hoja (degradado con brillo), doble filete
+   en los botones dorados, las cinco estrellas del aviso en los
+   separadores y un grano de película muy suave sobre el negro.
+
+   Se carga AL FINAL del <head> de cada página pública, así que gana sobre
+   styles.css, animations.css y el <style> propio de la página.
    El panel de administración NO la carga.
    ═══════════════════════════════════════════════════════════════════ */
 :root {
@@ -18,14 +21,10 @@
   --a30-cream: #efe7d6;
   --a30-line: rgba(201, 162, 74, 0.32);
   --a30-foil: linear-gradient(105deg, #8d6b27 0%, #e9cf86 26%, #c9a24a 48%, #f5e4ac 66%, #a8802f 100%);
-  --a30-display: 'Marcellus', 'Trajan Pro', Georgia, 'Times New Roman', serif;
-  --a30-body: 'Jost', 'Futura', 'Century Gothic', 'Avenir Next', system-ui, sans-serif;
+  /* Las mismas familias del sitio; las usa el panel de reserva */
+  --a30-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --a30-body: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
-
-/* Marcellus tiene un solo peso y no tiene cursiva: sin negritas ni
-   cursivas falsas, que la deforman. */
-html { font-synthesis: none; }
-body { font-family: var(--a30-body); }
 
 /* Grano de película muy suave sobre el negro */
 body::after {
@@ -33,38 +32,17 @@ body::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .95 0 0 0 0 .85 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ── Títulos ── */
-.font-serif { letter-spacing: 0.01em; }
-/* Los acentos dorados de los títulos pasan a hoja de oro, derechos (sin cursiva) */
+/* ── Acentos dorados de los títulos: hoja de oro (conservan su cursiva) ── */
 .font-serif .text-gold,
 h1 .text-gold, h2 .text-gold, h3 .text-gold {
-  font-style: normal;
   background: var(--a30-foil);
   -webkit-background-clip: text; background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
 }
-
-/* Hero del inicio: "ELEVAMOS TU IDENTIDAD." en capitales, como el aviso */
-.hero-title {
-  font-family: var(--a30-display);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  font-size: clamp(2.2rem, 5vw, 4.6rem);
-  line-height: 1.04;
-}
-.hero-title .script,
-.hero-stack .hero-title .script {
-  font-family: var(--a30-display);
-  font-size: 1em;
-  line-height: 1.04;
-  letter-spacing: 0.02em;
-  margin-top: 0.04em;
-  padding-bottom: 0.04em;
+/* "Identidad." del hero: misma letra caligráfica, ahora en hoja de oro */
+.hero-title .script {
   background: var(--a30-foil);
   -webkit-background-clip: text; background-clip: text;
-}
-@media (max-width: 1023px) {
-  .hero-stack .hero-title { font-size: clamp(2rem, 9.4vw, 2.6rem); }
 }
 
 /* ── Botón dorado: hoja de oro con el doble filete interior del aviso ── */
@@ -102,14 +80,10 @@ h1 .text-gold, h2 .text-gold, h3 .text-gold {
 @media (min-width: 641px) {
   .menu-row { grid-template-columns: auto auto 1fr auto auto; }
 }
-.menu-name { font-family: var(--a30-display); font-weight: 400; letter-spacing: 0.01em; }
-/* Las cifras van en Jost: en Marcellus el cero se confunde con la O ("$3Ok") */
-.menu-price { font-family: var(--a30-body); font-style: normal; font-weight: 400; letter-spacing: 0.02em; }
 .menu-price:not(.text-slate-300):not(.text-purple-400) {
   background: var(--a30-foil);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.stat-num { font-family: var(--a30-body); font-weight: 300; letter-spacing: 0; }
 
 /* ── Botón flotante de redes ── */
-.fab-main { font-family: var(--a30-display); font-weight: 400; background: var(--a30-foil); }
+.fab-main { background: var(--a30-foil); }

@@ -167,7 +167,7 @@ El asistente de 4 pasos de `/booking/` ya no existe. La reserva es un panel que 
 - Solo nombre y WhatsApp; correo y nota opcionales. Tocar Reservar = aceptar datos (texto bajo el botón → `privacy_accepted=true`); las promociones son una casilla aparte → `Booking.marketing_opt_in`.
 - "¿Lo de siempre?": el cliente se recuerda **solo en su navegador** (`localStorage` `a30.cliente`), nunca en el servidor.
 
-Estilo "letrero dorado" del sitio público: [letrero.css](static/css/letrero.css) se carga al **final** del `<head>` de las páginas públicas (el admin no la carga). Marcellus (títulos) + Jost (texto y **cifras**: en Marcellus el 0 parece una O), latón `#C9A24A`.
+Efectos "letrero dorado" del sitio público: [letrero.css](static/css/letrero.css) se carga al **final** del `<head>` de las páginas públicas (el admin no la carga). Solo efectos (latón `#C9A24A` en hoja de oro, doble filete en botones dorados, cinco estrellas en separadores, grano): **la tipografía se queda en Playfair Display + Montserrat (+ Italianno en el hero)**, decisión del dueño nov-2026. No cambiar fuentes desde esa capa.
 
 ### Sale / Commission auto-calculation
 
