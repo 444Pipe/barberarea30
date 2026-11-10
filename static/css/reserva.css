@@ -128,10 +128,19 @@ textarea.rsv-field { resize: none; min-height: 72px; }
 }
 @media (max-width: 1023px) {
   .rsv-sumlist, .rsv-card-t { display: none; }
-  .rsv-aside { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
-  .rsv-card { padding: 12px 16px max(12px, env(safe-area-inset-bottom, 0px)); background: rgba(20, 17, 12, 0.97); border-top: 1px solid var(--a30-line); box-shadow: 0 -18px 40px -18px rgba(0, 0, 0, 0.9); gap: 9px; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  /* iPhone (Safari 26): la página se dibuja también por detrás de la barra de
+     direcciones flotante. Safari solo tapa esa zona con el color de una barra
+     fija pegada abajo si ESA barra tiene fondo sólido; antes el fondo era
+     casi transparente y estaba en el hijo, y se veían las horas por debajo.
+     El ::after prolonga el mismo color por si Safari no lo extiende solo. */
+  .rsv-aside { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--a30-panel); border-top: 1px solid var(--a30-line); }
+  .rsv-aside::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 160px; background: var(--a30-panel); pointer-events: none; }
+  .rsv-card { padding: 12px 16px max(12px, env(safe-area-inset-bottom, 0px)); background: transparent; gap: 9px; }
   /* Que la barra fija no tape el final de la página */
-  .rsv-page-body { padding-bottom: 150px; }
+  .rsv-page-body { padding-bottom: calc(var(--rsv-bar-h, 150px) + 12px); }
+  /* El crédito del pie deja 84px abajo para los botones flotantes de las
+     otras páginas; aquí no hay, y ese espacio blanco quedaba bajo la barra. */
+  .rsv-page-body .afws-d { padding-bottom: 16px; }
 }
 
 /* ── Confirmación ── */

@@ -645,4 +645,14 @@
     });
   }
   start();
+
+  // En celular la barra fija de abajo cambia de alto según el ancho (el texto
+  // legal puede ocupar 2 o 3 líneas): el espacio al final de la página la
+  // sigue para que nunca tape el pie.
+  var aside = document.querySelector('.rsv-aside');
+  if (aside && 'ResizeObserver' in window) {
+    new ResizeObserver(function () {
+      document.body.style.setProperty('--rsv-bar-h', aside.offsetHeight + 'px');
+    }).observe(aside);
+  }
 })();
